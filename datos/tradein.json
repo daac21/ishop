@@ -20,7 +20,6 @@
         "B Y P": "No Aplica"
       }
     },
-    
     "iPhone 12": {
       "64 GB": {
         "ÓPTIMO": "$3,000",
@@ -649,7 +648,6 @@
         "B Y P": "No Aplica"
       }
     }
-    
   },
   "iPad": {
     "iPad 8ª gen": {
@@ -730,7 +728,7 @@
         "B Y P": "No Aplica"
       }
     },
-"iPad 11ª gen A16": {
+    "iPad 11ª gen A16": {
       "128 GB": {
         "ÓPTIMO": "$5,000",
         "BATERÍA": "No Aplica",
@@ -820,7 +818,7 @@
         "B Y P": "No Aplica"
       }
     },
- "iPad Mini A17 Pro": {
+    "iPad Mini A17 Pro": {
       "128 GB": {
         "ÓPTIMO": "$7,000",
         "BATERÍA": "No Aplica",
@@ -856,8 +854,8 @@
         "BATERÍA": "No Aplica",
         "PANTALLA": "No Aplica",
         "B Y P": "No Aplica"
-}      
-},
+      }
+    },
     "iPad Air 3ª gen 10.5\"": {
       "64 GB": {
         "ÓPTIMO": "$3,000",
@@ -1258,6 +1256,18 @@
         "BATERÍA": "No Aplica",
         "PANTALLA": "No Aplica",
         "B Y P": "No Aplica"
+      },
+      "128 GB": {
+        "ÓPTIMO": "$7,000",
+        "BATERÍA": "No Aplica",
+        "PANTALLA": "No Aplica",
+        "B Y P": "No Aplica"
+      },
+      "128 GB +Cell": {
+        "ÓPTIMO": "$8,000",
+        "BATERÍA": "No Aplica",
+        "PANTALLA": "No Aplica",
+        "B Y P": "No Aplica"
       }
     },
     "iPad Pro 12.9\" 5ª gen": {
@@ -1316,7 +1326,7 @@
         "B Y P": "No Aplica"
       },
       "2 TB +Cell": {
-        "ÓPTIMO": "$13,000",
+        "ÓPTIMO": "$14,000",
         "BATERÍA": "No Aplica",
         "PANTALLA": "No Aplica",
         "B Y P": "No Aplica"
@@ -1423,6 +1433,12 @@
       },
       "1 TB +Cell": {
         "ÓPTIMO": "$14,000",
+        "BATERÍA": "No Aplica",
+        "PANTALLA": "No Aplica",
+        "B Y P": "No Aplica"
+      },
+      "256 GB +Cell": {
+        "ÓPTIMO": "$10,000",
         "BATERÍA": "No Aplica",
         "PANTALLA": "No Aplica",
         "B Y P": "No Aplica"
@@ -1628,7 +1644,7 @@
         "B Y P": "No Aplica"
       }
     },
-        "iPad Pro 11\" M5": {
+    "iPad Pro 11\" M5": {
       "256 GB": {
         "ÓPTIMO": "$17,000",
         "BATERÍA": "No Aplica",
@@ -1728,7 +1744,7 @@
         "B Y P": "No Aplica"
       }
     },
-        "iPad Pro 13\" M5": {
+    "iPad Pro 13\" M5": {
       "256 GB": {
         "ÓPTIMO": "$22,000",
         "BATERÍA": "No Aplica",
@@ -2040,115 +2056,111 @@
     }
   },
   "Mac": {
-  "MacBook Air 13 M1": {
-    "256 GB": {
-      "8 GB RAM": {
-        "ÓPTIMO": "$5,750",
-        "BATERÍA": "No Aplica",
-        "PANTALLA": "No Aplica",
-        "B Y P": "No Aplica"
-      }
-    }
-  },
-
-  "MacBook Air 13 M2": {
-    "256 GB": {
-      "8 GB RAM": {
-        "ÓPTIMO": "$6,500",
-        "BATERÍA": "No Aplica",
-        "PANTALLA": "No Aplica",
-        "B Y P": "No Aplica"
-      },
-       "16 GB RAM": {
-        "ÓPTIMO": "$9,280",
-        "BATERÍA": "No Aplica",
-        "PANTALLA": "No Aplica",
-        "B Y P": "No Aplica"
+    "MacBook Air 13 M1": {
+      "256 GB": {
+        "8 GB RAM": {
+          "ÓPTIMO": "$5,750",
+          "BATERÍA": "No Aplica",
+          "PANTALLA": "No Aplica",
+          "B Y P": "No Aplica"
+        }
       }
     },
-    "512 GB": {
-      "8 GB RAM": {
-        "ÓPTIMO": "$9,000",
-        "BATERÍA": "No Aplica",
-        "PANTALLA": "No Aplica",
-        "B Y P": "No Aplica"
-      }
-    }
-  },
-
-  "MacBook Air 15 M2": {
-    "256 GB": {
-      "8 GB RAM": {
-        "ÓPTIMO": "$10,000",
-        "BATERÍA": "No Aplica",
-        "PANTALLA": "No Aplica",
-        "B Y P": "No Aplica"
+    "MacBook Air 13 M2": {
+      "256 GB": {
+        "8 GB RAM": {
+          "ÓPTIMO": "$6,500",
+          "BATERÍA": "No Aplica",
+          "PANTALLA": "No Aplica",
+          "B Y P": "No Aplica"
+        },
+        "16 GB RAM": {
+          "ÓPTIMO": "$9,280",
+          "BATERÍA": "No Aplica",
+          "PANTALLA": "No Aplica",
+          "B Y P": "No Aplica"
+        }
+      },
+      "512 GB": {
+        "8 GB RAM": {
+          "ÓPTIMO": "$9,000",
+          "BATERÍA": "No Aplica",
+          "PANTALLA": "No Aplica",
+          "B Y P": "No Aplica"
+        }
       }
     },
-    "512 GB": {
-      "8 GB RAM": {
-        "ÓPTIMO": "$11,000",
-        "BATERÍA": "No Aplica",
-        "PANTALLA": "No Aplica",
-        "B Y P": "No Aplica"
-      }
-    }
-  },
-
-  "MacBook Air 13 M3": {
-    "256 GB": {
-      "8 GB RAM": {
-        "ÓPTIMO": "$7,500",
-        "BATERÍA": "No Aplica",
-        "PANTALLA": "No Aplica",
-        "B Y P": "No Aplica"
+    "MacBook Air 15 M2": {
+      "256 GB": {
+        "8 GB RAM": {
+          "ÓPTIMO": "$10,000",
+          "BATERÍA": "No Aplica",
+          "PANTALLA": "No Aplica",
+          "B Y P": "No Aplica"
+        }
+      },
+      "512 GB": {
+        "8 GB RAM": {
+          "ÓPTIMO": "$11,000",
+          "BATERÍA": "No Aplica",
+          "PANTALLA": "No Aplica",
+          "B Y P": "No Aplica"
+        }
       }
     },
-    "512 GB": {
-      "8 GB RAM": {
-        "ÓPTIMO": "$9,200",
-        "BATERÍA": "No Aplica",
-        "PANTALLA": "No Aplica",
-        "B Y P": "No Aplica"
+    "MacBook Air 13 M3": {
+      "256 GB": {
+        "8 GB RAM": {
+          "ÓPTIMO": "$7,500",
+          "BATERÍA": "No Aplica",
+          "PANTALLA": "No Aplica",
+          "B Y P": "No Aplica"
+        }
       },
-      "16 GB RAM": {
-        "ÓPTIMO": "$10,950",
-        "BATERÍA": "No Aplica",
-        "PANTALLA": "No Aplica",
-        "B Y P": "No Aplica"
-      }
-    }
-  },
-
-  "MacBook Air 15 M3": {
-    "256 GB": {
-      "8 GB RAM": {
-        "ÓPTIMO": "$11,000",
-        "BATERÍA": "No Aplica",
-        "PANTALLA": "No Aplica",
-        "B Y P": "No Aplica"
-      },
-      "16 GB RAM": {
-        "ÓPTIMO": "$11,000",
-        "BATERÍA": "No Aplica",
-        "PANTALLA": "No Aplica",
-        "B Y P": "No Aplica"
+      "512 GB": {
+        "8 GB RAM": {
+          "ÓPTIMO": "$9,200",
+          "BATERÍA": "No Aplica",
+          "PANTALLA": "No Aplica",
+          "B Y P": "No Aplica"
+        },
+        "16 GB RAM": {
+          "ÓPTIMO": "$10,950",
+          "BATERÍA": "No Aplica",
+          "PANTALLA": "No Aplica",
+          "B Y P": "No Aplica"
+        }
       }
     },
-    "512 GB": {
-      "8 GB RAM": {
-        "ÓPTIMO": "$13,000",
-        "BATERÍA": "No Aplica",
-        "PANTALLA": "No Aplica",
-        "B Y P": "No Aplica"
+    "MacBook Air 15 M3": {
+      "256 GB": {
+        "8 GB RAM": {
+          "ÓPTIMO": "$11,000",
+          "BATERÍA": "No Aplica",
+          "PANTALLA": "No Aplica",
+          "B Y P": "No Aplica"
+        },
+        "16 GB RAM": {
+          "ÓPTIMO": "$11,000",
+          "BATERÍA": "No Aplica",
+          "PANTALLA": "No Aplica",
+          "B Y P": "No Aplica"
+        }
       },
-      "16 GB RAM": {
-        "ÓPTIMO": "$13,000",
-        "BATERÍA": "No Aplica",
-        "PANTALLA": "No Aplica",
-        "B Y P": "No Aplica"
+      "512 GB": {
+        "8 GB RAM": {
+          "ÓPTIMO": "$13,000",
+          "BATERÍA": "No Aplica",
+          "PANTALLA": "No Aplica",
+          "B Y P": "No Aplica"
+        },
+        "16 GB RAM": {
+          "ÓPTIMO": "$13,000",
+          "BATERÍA": "No Aplica",
+          "PANTALLA": "No Aplica",
+          "B Y P": "No Aplica"
+        }
       }
     }
   }
-}
 }
