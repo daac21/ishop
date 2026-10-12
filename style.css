@@ -823,3 +823,119 @@ html,body{
   font-size:12px;
   font-weight:700;
 }
+
+/* =====================================================================
+   Reparaciones (sección oculta) — estilo oscuro cinematográfico.
+   Todo está acotado a .rep-* / html.rep-mode para no afectar otras secciones.
+   ===================================================================== */
+html.rep-mode, html.rep-mode body{ background:#000; }
+html.rep-mode #topbar{
+  background: rgba(10,10,12,0.72);
+  border-bottom-color: rgba(255,255,255,0.08);
+  color:#f5f5f7;
+}
+html.rep-mode .nav-btn{ color:#2997ff; }
+
+.rep-trigger{ -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; transition:transform .15s ease; }
+.rep-pressing{ transform:scale(0.97); }
+
+.screen.rep-screen{
+  padding:0 0 calc(28px + var(--safe-bottom));
+  color:#f5f5f7;
+  background: radial-gradient(120% 55% at 50% 0%, #1b1d24 0%, #0a0a0c 60%, #000 100%);
+}
+.rep-hero{ position:relative; height:clamp(340px, 52dvh, 640px); overflow:hidden; }
+.rep-stage{ position:absolute; inset:0; }
+.rep-glow{
+  position:absolute; left:22%; top:46%; width:200px; height:200px; z-index:0;
+  background:radial-gradient(circle, rgba(10,132,255,.32), transparent 65%); filter:blur(10px);
+}
+.rep-img{
+  position:absolute; left:50%; top:64%; width:min(145%, 1000px); max-width:none; height:auto;
+  transform:translate(-48%,-50%); opacity:0; transition:opacity .45s ease;
+  pointer-events:none; -webkit-user-select:none; user-select:none;
+  -webkit-mask-image:radial-gradient(ellipse 52% 50% at 50% 50%, #000 55%, transparent 100%);
+  mask-image:radial-gradient(ellipse 52% 50% at 50% 50%, #000 55%, transparent 100%);
+}
+.rep-img.on{ opacity:1; }
+.rep-fallback{ display:none; position:absolute; inset:0; align-items:center; justify-content:center; font-size:96px; opacity:.5; padding-top:60px; }
+.rep-hero.rep-noimg .rep-fallback{ display:flex; }
+.rep-hero.rep-noimg .rep-concept{ display:none; }
+.rep-hero::after{
+  content:""; position:absolute; left:0; right:0; bottom:0; height:120px; z-index:1; pointer-events:none;
+  background:linear-gradient(transparent, #000);
+}
+.rep-cap{ position:absolute; top:18px; left:0; right:0; z-index:3; text-align:center; padding:0 16px; }
+.rep-eyebrow{ font-size:12px; letter-spacing:.18em; text-transform:uppercase; font-weight:700; color:#2997ff; }
+.rep-title{
+  font-size:clamp(30px, 8vw, 60px); line-height:1.05; font-weight:700; letter-spacing:-.02em; margin:8px 0 0;
+  background:linear-gradient(180deg,#fff,#a1a1a6); -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+.rep-sub{ font-size:clamp(13px, 3.6vw, 19px); color:#a1a1a6; margin:6px 0 0; }
+.rep-tabs{
+  position:absolute; left:0; right:0; bottom:14px; z-index:3; display:flex; gap:8px;
+  overflow-x:auto; padding:0 16px; scrollbar-width:none; -webkit-overflow-scrolling:touch;
+}
+.rep-tabs::-webkit-scrollbar{ display:none; }
+.rep-tab:first-child{ margin-left:auto; }
+.rep-tab:last-child{ margin-right:auto; }
+.rep-tab{
+  flex:0 0 auto; padding:9px 16px; border-radius:999px; font:inherit; font-size:14px; font-weight:600;
+  border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.08); color:#d1d1d6;
+  -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px);
+}
+.rep-tab.on{ background:#fff; color:#000; border-color:#fff; }
+.rep-concept{ position:absolute; right:14px; top:6px; z-index:3; font-size:9px; letter-spacing:.04em; color:#6e6e73; display:none; }
+.rep-hero:not(.rep-noimg) .rep-concept{ display:block; top:auto; bottom:2px; }
+
+.rep-cards{ position:relative; z-index:2; display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:0 14px; margin-top:8px; }
+.rep-card{ position:relative; display:flex; flex-direction:column; min-height:140px; padding:16px 14px; border-radius:24px; overflow:hidden; }
+.rep-card-ac{
+  color:#fff; background:linear-gradient(160deg,#0a3a8f,#0a84ff 70%,#3da0ff);
+  box-shadow:0 10px 40px rgba(10,132,255,.45), inset 0 1px 0 rgba(255,255,255,.35);
+}
+.rep-card-no{
+  color:#c7c7cc; background:linear-gradient(160deg,#2a2a2e,#1a1a1d);
+  border:1px solid rgba(255,255,255,.12); box-shadow:inset 0 1px 0 rgba(255,255,255,.15);
+}
+.rep-lbl{ font-size:11px; letter-spacing:.14em; font-weight:700; text-transform:uppercase; opacity:.9; }
+.rep-price{ font-size:clamp(32px, 9.5vw, 64px); font-weight:700; letter-spacing:-.035em; line-height:1; margin-top:10px; }
+.rep-price.txt{ font-size:clamp(24px, 7vw, 44px); }
+.rep-card-no .rep-price{
+  background:linear-gradient(180deg,#fff,#b8b8bd); -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+.rep-cur{ font-size:12px; letter-spacing:.08em; font-weight:600; opacity:.8; margin-top:4px; }
+.rep-note{ font-size:11.5px; margin-top:auto; padding-top:8px; opacity:.85; line-height:1.3; }
+
+.rep-more{
+  display:flex; align-items:center; justify-content:space-between; width:calc(100% - 28px); height:54px;
+  margin:14px 14px 0; padding:0 18px; border-radius:16px; font:inherit; font-size:15px; font-weight:600;
+  background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.12); color:#f5f5f7; text-align:left;
+}
+.rep-more svg{ color:#8e8e93; transition:transform .2s ease; }
+.rep-more.open svg{ transform:rotate(90deg); }
+.rep-more:active{ opacity:.7; }
+.rep-details{ margin:12px 14px 0; display:flex; flex-direction:column; gap:12px; }
+.rep-details[hidden]{ display:none; }
+.rep-details .plan-result{ background:#1c1c1e; border-color:rgba(255,255,255,.1); border-left-color:#0a84ff; box-shadow:none; }
+.rep-details .plan-result h4{ margin:0 0 2px; font-size:12px; font-weight:700; color:#8e8e93; text-transform:uppercase; letter-spacing:.05em; }
+.rep-details .plan-phase span{ color:#a1a1a6; }
+.rep-details .plan-phase strong{ color:#2997ff; }
+
+@media (min-width:700px){
+  .rep-glow{ left:26%; width:340px; height:340px; }
+  .rep-eyebrow{ font-size:15px; }
+  .rep-cap{ top:28px; }
+  .rep-tab{ font-size:16px; padding:11px 22px; }
+  .rep-cards{ gap:20px; padding:0 44px; }
+  .rep-card{ padding:30px 28px; border-radius:32px; min-height:220px; }
+  .rep-lbl{ font-size:15px; }
+  .rep-price{ font-size:clamp(64px, 9vw, 78px); margin-top:18px; }
+  .rep-price.txt{ font-size:clamp(44px, 6vw, 56px); }
+  .rep-cur{ font-size:22px; margin-top:8px; }
+  .rep-note{ font-size:17px; }
+  .rep-more{ width:calc(100% - 88px); margin:20px 44px 0; height:72px; font-size:20px; border-radius:22px; }
+  .rep-details{ margin:16px 44px 0; }
+  .rep-concept{ font-size:12px; }
+}
+@media (prefers-reduced-motion: reduce){ .rep-img{ transition:none; } }
