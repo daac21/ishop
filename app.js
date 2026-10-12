@@ -284,6 +284,7 @@ function render(isForward) {
   titleEl.textContent = entry.title;
   backBtn.hidden = stack.length === 1;
   homeBtn.hidden = stack.length === 1;
+  setRepairTheme(entry.screen === "repair");
 
   const node = buildScreen(entry);
   node.classList.add("screen");
@@ -325,6 +326,9 @@ function buildScreen(entry) {
     el.appendChild(buildAcVariants(entry.category, entry.model));
   } else if (entry.screen === "acDetail") {
     el.appendChild(buildAcDetail(entry.category, entry.model, entry.variant));
+  } else if (entry.screen === "repair") {
+    el.classList.add("rep-screen");
+    el.appendChild(buildRepair(entry.category, entry.model, entry.variant));
   } else if (entry.screen === "scanner") {
     el.appendChild(buildScanner());
   } else if (entry.screen === "cajasCategories") {
@@ -1572,6 +1576,15 @@ function buildAcDetail(category, model, variant) {
   `;
   wrap.appendChild(hero);
 
+  // Gesto secreto: mantener presionado el precio de AppleCare+ (el normal) abre Reparaciones.
+  const repTrigger = hero.querySelector(".ac-price-box:not(.robo)") || hero.querySelector(".ac-price");
+  if (repTrigger && repairPartsFor(category, info).length) {
+    repTrigger.classList.add("rep-trigger");
+    setupRepairTrigger(repTrigger, () => {
+      navigate({ screen: "repair", category, model, variant, title: "Reparaciones" });
+    });
+  }
+
   if (Array.isArray(info.cubre) && info.cubre.length) {
     const benefits = document.createElement("div");
     benefits.className = "ac-benefits";
@@ -1620,6 +1633,223 @@ function buildAcDetail(category, model, variant) {
     wrap.appendChild(covBtn);
   }
 
+  return wrap;
+}
+
+/* =====================================================================
+   Reparaciones (sección oculta)
+   Se abre manteniendo presionado el precio de AppleCare+ en el detalle de un iPhone.
+   Los importes salen de datos/applecare_info.json (sinAppleCare y deducibles)
+   y de datos/cobertura.json (cuota de cristal trasero y condición de batería).
+   Imágenes: reparaciones/<id>.jpg  (opcional por modelo: reparaciones/<modelo-en-minusculas-con-guiones>/<id>.jpg)
+   ===================================================================== */
+const REPAIR_PARTS = [
+  { id: "camara",   label: "Cámara",         icon: "📷", title: "Sistema de cámaras.", sub: "Ingeniería de precisión, pieza por pieza.",
+    sin: "Daño de la cámara trasera", con: { deducible: "Otros daños" } },
+  { id: "pantalla", label: "Pantalla",       icon: "📱", title: "Pantalla.", sub: "Una reparación que exige precisión.",
+    sin: "Daño de la pantalla", con: { deducible: "Pantalla" } },
+  { id: "bateria",  label: "Batería",        icon: "🔋", title: "Batería.", sub: "La energía de tu iPhone, bien cuidada.",
+    sin: "Servicio de batería", con: { bateria: true } },
+  { id: "vidrio",   label: "Vidrio trasero", icon: "✨", title: "Vidrio trasero.", sub: "El acabado que se ve y se siente.",
+    sin: "Daño de la parte posterior de vidrio", con: { cuota: "Cristal trasero" } },
+  { id: "cuerpo",   label: "Cuerpo",         icon: "🛠️", title: "Cuerpo.", sub: "El chasis que mantiene todo unido.",
+    sin: "Otro daño", con: { deducible: "Otros daños" } },
+];
+
+function setRepairTheme(on) {
+  document.documentElement.classList.toggle("rep-mode", !!on);
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute("content", on ? "#0a0a0c" : "#f5f5f7");
+}
+
+function setupRepairTrigger(el, onOpen) {
+  const HOLD_MS = 800;
+  let timer = null, sx = 0, sy = 0;
+  const cancel = () => {
+    clearTimeout(timer);
+    timer = null;
+    el.classList.remove("rep-pressing");
+  };
+  el.addEventListener("pointerdown", (e) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    sx = e.clientX; sy = e.clientY;
+    el.classList.add("rep-pressing");
+    timer = setTimeout(() => {
+      timer = null;
+      el.classList.remove("rep-pressing");
+      if (navigator.vibrate) navigator.vibrate(15);
+      onOpen();
+    }, HOLD_MS);
+  });
+  el.addEventListener("pointermove", (e) => {
+    if (timer && Math.hypot(e.clientX - sx, e.clientY - sy) > 10) cancel();
+  });
+  ["pointerup", "pointerleave", "pointercancel"].forEach(t => el.addEventListener(t, cancel));
+  el.addEventListener("contextmenu", (e) => e.preventDefault());
+}
+
+// Importe "con AppleCare+" de una pieza, sacado de los datos existentes. null = no hay dato.
+function repairWithAc(part, info, category) {
+  const c = part.con;
+  const cob = COBERTURA_DATA?.[category]?.["AppleCare+"];
+  if (c.deducible) {
+    const v = info?.deducibles?.[c.deducible];
+    return typeof v === "number" ? { amount: v, note: "Deducible · " + c.deducible } : null;
+  }
+  if (c.cuota) {
+    const q = (cob?.cuotas || []).find(x => x.label === c.cuota);
+    const v = parsePesoValue(q?.precio);
+    return v === null ? null : { amount: v, note: "Cuota · " + c.cuota };
+  }
+  if (c.bateria) {
+    return cob?.bateria ? { text: "Sin costo", note: cob.bateria.condicion } : null;
+  }
+  return null;
+}
+
+// Piezas que sí tienen precio sin AppleCare+ y con AppleCare+ para este equipo.
+function repairPartsFor(category, info) {
+  if (category !== "iPhone" || !info?.sinAppleCare) return [];
+  return REPAIR_PARTS.filter(p =>
+    typeof info.sinAppleCare[p.sin] === "number" && repairWithAc(p, info, category)
+  );
+}
+
+function buildRepairImage(urls, onFail) {
+  const img = document.createElement("img");
+  img.className = "rep-img";
+  img.alt = "";
+  img.decoding = "async";
+  img.draggable = false;
+  let i = 0;
+  img.addEventListener("error", () => {
+    i += 1;
+    if (i < urls.length) img.src = urls[i];
+    else onFail();
+  });
+  img.src = urls[0];
+  return img;
+}
+
+function buildRepair(category, model, variant) {
+  const info = APPLECARE_INFO?.[category]?.[model]?.[variant];
+  const parts = repairPartsFor(category, info);
+  const wrap = document.createElement("div");
+
+  if (!parts.length) {
+    wrap.style.padding = "20px 16px";
+    wrap.appendChild(buildPlaceholder("Sin datos", "🛠️", "Aún no hay costos de reparación cargados para este equipo."));
+    return wrap;
+  }
+
+  const slug = model.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  wrap.innerHTML = `
+    <section class="rep-hero">
+      <div class="rep-glow"></div>
+      <div class="rep-stage"></div>
+      <div class="rep-fallback"></div>
+      <div class="rep-cap">
+        <span class="rep-eyebrow"></span>
+        <h2 class="rep-title"></h2>
+        <p class="rep-sub"></p>
+      </div>
+      <div class="rep-tabs" role="tablist"></div>
+      <span class="rep-concept">Imagen conceptual ilustrativa</span>
+    </section>
+    <div class="rep-cards">
+      <div class="rep-card rep-card-ac">
+        <span class="rep-lbl">Con AppleCare+</span>
+        <strong class="rep-price"></strong>
+        <span class="rep-cur">MXN</span>
+        <span class="rep-note"></span>
+      </div>
+      <div class="rep-card rep-card-no">
+        <span class="rep-lbl">Sin AppleCare+</span>
+        <strong class="rep-price"></strong>
+        <span class="rep-cur">MXN</span>
+        <span class="rep-note"></span>
+      </div>
+    </div>
+    <button class="rep-more" type="button" aria-expanded="false">
+      <span>Ver más costos y detalles</span>
+      <svg width="10" height="16" viewBox="0 0 10 16" aria-hidden="true"><path d="M2 2l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <div class="rep-details" hidden></div>
+  `;
+
+  const $ = (sel) => wrap.querySelector(sel);
+  $(".rep-eyebrow").textContent = model;
+  const stage = $(".rep-stage");
+  const hero = $(".rep-hero");
+  const tabsEl = $(".rep-tabs");
+  const cardAc = $(".rep-card-ac");
+  const cardNo = $(".rep-card-no");
+
+  const state = parts.map(p => ({ part: p, img: null, failed: false }));
+  let active = 0;
+
+  function paintCard(card, value, note) {
+    const priceEl = card.querySelector(".rep-price");
+    const curEl = card.querySelector(".rep-cur");
+    const isText = value.text !== undefined;
+    priceEl.textContent = isText ? value.text : money(value.amount);
+    priceEl.classList.toggle("txt", isText);
+    curEl.hidden = isText;
+    card.querySelector(".rep-note").textContent = note || "";
+  }
+
+  function select(i) {
+    active = i;
+    const s = state[i];
+    const p = s.part;
+    state.forEach((x, k) => { if (x.img) x.img.classList.toggle("on", k === i); });
+    tabsEl.querySelectorAll(".rep-tab").forEach((b, k) => {
+      b.classList.toggle("on", k === i);
+      b.setAttribute("aria-selected", k === i ? "true" : "false");
+    });
+    $(".rep-title").textContent = p.title;
+    $(".rep-sub").textContent = p.sub;
+    hero.classList.toggle("rep-noimg", s.failed);
+    $(".rep-fallback").textContent = p.icon;
+    paintCard(cardAc, repairWithAc(p, info, category), repairWithAc(p, info, category).note);
+    paintCard(cardNo, { amount: info.sinAppleCare[p.sin] }, p.sin);
+  }
+
+  state.forEach((s, i) => {
+    const p = s.part;
+    s.img = buildRepairImage(
+      [`reparaciones/${slug}/${p.id}.jpg`, `reparaciones/${p.id}.jpg`],
+      () => { s.failed = true; s.img.remove(); if (active === i) select(i); }
+    );
+    stage.appendChild(s.img);
+
+    const tab = document.createElement("button");
+    tab.type = "button";
+    tab.className = "rep-tab";
+    tab.setAttribute("role", "tab");
+    tab.textContent = p.label;
+    tab.addEventListener("click", () => select(i));
+    tabsEl.appendChild(tab);
+  });
+
+  // Detalle: mismos datos que ya muestra la pantalla de AppleCare+, sin duplicarlos en otro lugar.
+  const details = $(".rep-details");
+  const block = (title, obj) => `<div class="plan-result"><h4>${title}</h4>`
+    + Object.entries(obj).map(([k, v]) => `<div class="plan-phase"><span>${k}</span><strong>${money(v)}</strong></div>`).join("")
+    + `</div>`;
+  details.innerHTML =
+    (info.deducibles && Object.keys(info.deducibles).length ? block("Deducibles con AppleCare+", info.deducibles) : "")
+    + block("Reparación sin AppleCare+", info.sinAppleCare);
+  const more = $(".rep-more");
+  more.addEventListener("click", () => {
+    const open = details.hidden;
+    details.hidden = !open;
+    more.classList.toggle("open", open);
+    more.setAttribute("aria-expanded", open ? "true" : "false");
+    if (open) details.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+
+  select(0);
   return wrap;
 }
 
