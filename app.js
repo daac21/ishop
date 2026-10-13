@@ -1754,6 +1754,9 @@ function buildRepair(category, model, variant) {
         <p class="rep-sub"></p>
       </div>
       <div class="rep-tabs" role="tablist"></div>
+      <button class="rep-expand" type="button" aria-label="Ver imagen completa">
+        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M10 2h4v4M6 14H2v-4M14 2l-4.5 4.5M2 14l4.5-4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
       <span class="rep-concept">Imagen conceptual ilustrativa</span>
     </section>
     <div class="rep-cards">
@@ -1849,8 +1852,86 @@ function buildRepair(category, model, variant) {
     if (open) details.scrollIntoView({ behavior: "smooth", block: "start" });
   });
 
+  const openViewer = () => {
+    const s = state[active];
+    if (!s.failed && s.img) openRepairViewer(s.img.currentSrc || s.img.src);
+  };
+  stage.addEventListener("click", openViewer);
+  $(".rep-expand").addEventListener("click", openViewer);
+
   select(0);
   return wrap;
+}
+
+// Visor a pantalla completa: pellizcar o doble toque para acercar, arrastrar para mover, ✕ para cerrar.
+function openRepairViewer(src) {
+  const ov = document.createElement("div");
+  ov.className = "rep-viewer";
+  const img = document.createElement("img");
+  img.src = src; img.alt = ""; img.draggable = false;
+  const close = document.createElement("button");
+  close.type = "button"; close.className = "rep-viewer-close";
+  close.setAttribute("aria-label", "Cerrar"); close.textContent = "✕";
+  const hint = document.createElement("span");
+  hint.className = "rep-viewer-hint";
+  hint.textContent = "Pellizca o toca dos veces para acercar";
+  ov.append(img, close, hint);
+  document.body.appendChild(ov);
+
+  let s = 1, tx = 0, ty = 0, startDist = 0, startS = 1, lastTap = 0, moved = false, sx = 0, sy = 0;
+  const pts = new Map();
+  const apply = () => { img.style.transform = `translate(${tx}px,${ty}px) scale(${s})`; };
+  const clamp = () => {
+    const mx = (s - 1) * ov.clientWidth / 2, my = (s - 1) * ov.clientHeight / 2;
+    tx = Math.max(-mx, Math.min(mx, tx));
+    ty = Math.max(-my, Math.min(my, ty));
+    if (s <= 1) { tx = 0; ty = 0; }
+  };
+  const onKey = (e) => { if (e.key === "Escape") shut(); };
+  function shut() { ov.remove(); document.removeEventListener("keydown", onKey); }
+  document.addEventListener("keydown", onKey);
+  close.addEventListener("click", shut);
+
+  ov.addEventListener("pointerdown", (e) => {
+    if (e.target === close) return;
+    ov.setPointerCapture(e.pointerId);
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    moved = false; sx = e.clientX; sy = e.clientY;
+    if (pts.size === 2) {
+      const [a, b] = [...pts.values()];
+      startDist = Math.hypot(a.x - b.x, a.y - b.y) || 1;
+      startS = s;
+    }
+  });
+  ov.addEventListener("pointermove", (e) => {
+    const p = pts.get(e.pointerId);
+    if (!p) return;
+    const dx = e.clientX - p.x, dy = e.clientY - p.y;
+    p.x = e.clientX; p.y = e.clientY;
+    if (Math.hypot(e.clientX - sx, e.clientY - sy) > 8) moved = true;
+    if (pts.size === 2) {
+      const [a, b] = [...pts.values()];
+      s = Math.max(1, Math.min(5, startS * Math.hypot(a.x - b.x, a.y - b.y) / startDist));
+    } else if (s > 1) {
+      tx += dx; ty += dy;
+    }
+    clamp(); apply();
+  });
+  ov.addEventListener("pointerup", (e) => {
+    if (!pts.has(e.pointerId)) return;
+    pts.delete(e.pointerId);
+    if (pts.size === 0 && !moved && e.target !== close) {
+      const now = Date.now();
+      if (now - lastTap < 300) { s = s > 1 ? 1 : 2.5; clamp(); apply(); lastTap = 0; }
+      else lastTap = now;
+    }
+  });
+  ov.addEventListener("pointercancel", (e) => pts.delete(e.pointerId));
+  ov.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    s = Math.max(1, Math.min(5, s * (e.deltaY < 0 ? 1.15 : 1 / 1.15)));
+    clamp(); apply();
+  }, { passive: false });
 }
 
 function buildPlanTabs(options, base, extraOpts = {}) {
