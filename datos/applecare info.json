@@ -54,19 +54,30 @@
     },
     "iPhone Duo": {
       "AppleCare+": {
-        "precio": 4799,
-        "Robo y Extravío": 6399,
+        "precio": 6999,
         "deducibles": {
-          "Pantalla": 559,
-          "Otros daños": 1899,
-          "Robo o extravío": 3299
+          "Servicio de batería": 0,
+          "Daño en la capa de la cubierta": 399,
+          "Daño de la parte posterior de vidrio": 559,
+          "Daño en la pantalla exterior": 559,
+          "Daño en la pantalla interior": 1899,
+          "Otro daño accidental": 1899
+        },
+        "sinAppleCare": {
+          "Daño en la capa de la cubierta": 989,
+          "Daño de la parte posterior de vidrio": 4379,
+          "Servicio de batería": 4969,
+          "Daño de la cámara trasera": 5149,
+          "Daño en la pantalla exterior": 8499,
+          "Daño en la pantalla exterior y el vidrio trasero": 11389,
+          "Daño en la pantalla interior": 23989,
+          "Otro daño": 35989
         },
         "cubre": [
           "Daños accidentales ilimitados.",
           "Reparaciones con piezas originales Apple.",
           "Cobertura de batería cuando conserve menos del 80 % de su capacidad original.",
-          "Soporte técnico prioritario.",
-          "Protección contra robo y extravío al contratar AppleCare+ Robo y Extravío."
+          "Soporte técnico prioritario."
         ]
       }
     },
