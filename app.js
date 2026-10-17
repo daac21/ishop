@@ -1959,7 +1959,7 @@ function openRepairViewer(src) {
 const DOCS_TITULO = "iPhone/iPad/Mac/Watch® For Life a 24 Meses";
 const DOCS_BANNERS = ["imágenes/docs/banner.jpg", "imágenes/docs/banner.png"];
 const DOCS_TTL_MS = 48 * 60 * 60 * 1000;
-const DOCS_HOLD_MS = 850;
+const DOCS_HOLD_MS = 3000;
 
 function docsOpenDb() {
   return new Promise((resolve, reject) => {

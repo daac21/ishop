@@ -41,7 +41,7 @@ self.addEventListener("fetch", (event) => {
   // (precios, modelos, etc.) y actualiza la copia guardada en el celular.
   // Si no hay internet, usa esa copia guardada como respaldo.
   event.respondWith(
-    fetch(event.request)
+    fetch(event.request, { cache: "no-store" })
       .then(response => {
         const copy = response.clone();
         caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
