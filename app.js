@@ -14,7 +14,6 @@ const MENU = [
   { id: "getac",     icon: "💳", label: "GET + AC",       color: "#af52de" },
   { id: "cubre",     icon: "🛠️", label: "¿Qué cubre?",    color: "#ff3b30" },
   { id: "scanner",   icon: "📷", label: "Escáner",        color: "#1d1d1f" },
-  { id: "docs",      icon: "🗂️", label: "Documentos",     color: "#32ade6" },
   { id: "cajas",     icon: "𝄃𝄃𝄂𝄂𝄀𝄁𝄃𝄂𝄂𝄃", label: "Código cajas",   color: "#8e8e93" },
 ];
 
@@ -332,6 +331,8 @@ function buildScreen(entry) {
     el.appendChild(buildRepair(entry.category, entry.model, entry.variant));
   } else if (entry.screen === "docs") {
     el.appendChild(buildDocs());
+  } else if (entry.screen === "docsOk") {
+    el.appendChild(buildDocsOk(entry));
   } else if (entry.screen === "scanner") {
     el.appendChild(buildScanner());
   } else if (entry.screen === "cajasCategories") {
@@ -398,6 +399,7 @@ function buildHome() {
         tile.className = "coverage-tile";
         tile.style.setProperty("--tile-color", item.color);
         tile.innerHTML = `<span class="coverage-tile-icon">${item.icon}</span><span>${item.label}</span>`;
+        if (item.id === "cajas") setupDocsTrigger(tile);
         tile.addEventListener("click", () => handleMenuClick(item));
         grid.appendChild(tile);
       });
@@ -413,6 +415,7 @@ function buildHome() {
           <span class="tool-label">${item.label}</span>
           <span class="chev"></span>
         `;
+        if (item.id === "cajas") setupDocsTrigger(btn);
         btn.addEventListener("click", () => handleMenuClick(item));
         list.appendChild(btn);
       });
@@ -440,8 +443,6 @@ function buildHome() {
     } else if (item.id === "scanner") {
       if (!ESCANER_DATA) await dataReady;
       navigate({ screen: "scanner", title: item.label });
-    } else if (item.id === "docs") {
-      navigate({ screen: "docs", title: "Documentos" });
     } else if (item.id === "cajas") {
       if (!CODIGOS_CAJAS) await dataReady;
       navigate({ screen: "cajasCategories", title: item.label });
@@ -1949,11 +1950,16 @@ function openRepairViewer(src) {
 }
 
 /* =====================================================================
-   Respaldo de documentos
-   Guarda en ESTE teléfono (IndexedDB) la foto del registro del cliente ("Usuario") y la del
-   ticket de compra, para subirlas después a la plataforma oficial. No envía nada a ningún servidor.
+   Registro de documentos (oculto)
+   Se abre manteniendo presionado "Código cajas" ~10 segundos.
+   Guarda las fotos en ESTE teléfono (IndexedDB) y las borra solas a las 48 h.
+   No envía nada a ningún servidor.
+   Banner: imágenes/docs/banner.jpg (o .png) — se ajusta solo al recuadro.
    ===================================================================== */
-const DOCS_PROGRAMAS = ["For Life", "Get", "Switch Up", "Trade In"];
+const DOCS_TITULO = "iPhone/iPad/Mac/Watch® For Life a 24 Meses";
+const DOCS_BANNERS = ["imágenes/docs/banner.jpg", "imágenes/docs/banner.png"];
+const DOCS_TTL_MS = 48 * 60 * 60 * 1000;
+const DOCS_HOLD_MS = 10000;
 
 function docsOpenDb() {
   return new Promise((resolve, reject) => {
@@ -1974,11 +1980,30 @@ async function docsRun(mode, fn) {
     tx.onabort = () => { db.close(); reject(tx.error); };
   });
 }
-const docsAll = async () => ((await docsRun("readonly", s => s.getAll())) || []).sort((a, b) => b.fecha.localeCompare(a.fecha));
+const docsAllRaw = async () => (await docsRun("readonly", s => s.getAll())) || [];
 const docsPut = (rec) => docsRun("readwrite", s => s.put(rec));
 const docsDelete = (id) => docsRun("readwrite", s => s.delete(id));
 
-// Reduce la foto (máx. 2400 px) para ahorrar espacio sin perder legibilidad. Si algo falla, guarda la original.
+// Borra los registros con más de 48 h y devuelve el resto (más nuevo primero).
+async function docsAll() {
+  const now = Date.now();
+  const all = await docsAllRaw();
+  const vivos = [];
+  for (const r of all) {
+    if (now - new Date(r.fecha).getTime() > DOCS_TTL_MS) { try { await docsDelete(r.id); } catch (e) {} }
+    else vivos.push(r);
+  }
+  return vivos.sort((a, b) => b.fecha.localeCompare(a.fecha));
+}
+docsAll().catch(() => {});   // limpieza al abrir la app
+
+function docsTimeLeft(rec) {
+  const ms = DOCS_TTL_MS - (Date.now() - new Date(rec.fecha).getTime());
+  const h = Math.ceil(ms / 3600000);
+  return h <= 1 ? "Se borra en menos de 1 h" : `Se borra en ${h} h`;
+}
+
+// Reduce la foto (máx. 2400 px). Si algo falla, guarda la original.
 async function docsShrink(file, maxSide = 2400, quality = 0.88) {
   let url = null;
   try {
@@ -1999,8 +2024,7 @@ async function docsShrink(file, maxSide = 2400, quality = 0.88) {
   }
 }
 
-// Abre el menú de compartir del teléfono (ahí está "Guardar imagen" para mandarla a Fotos).
-// Si el navegador no lo permite, descarga los archivos.
+// Abre el menú de compartir del teléfono ("Guardar imagen" → Fotos). Si no se puede, descarga.
 async function docsShareFiles(files, title) {
   if (!files.length) return;
   if (navigator.canShare && navigator.canShare({ files })) {
@@ -2026,153 +2050,214 @@ const docsBase = (nombre) => ((nombre || "registro").replace(/[^\w-]+/g, "_").sl
 async function docsShare(rec) {
   const base = docsBase(rec.nombre);
   const files = [];
-  const frente = rec.usuarioFrente || rec.usuario;   // "usuario" = registros guardados con la versión anterior
-  if (frente) files.push(docsFile(frente, base, "usuario_frente"));
-  if (rec.usuarioReverso) files.push(docsFile(rec.usuarioReverso, base, "usuario_reverso"));
+  const frente = rec.usuarioFrente || rec.usuario;   // "usuario" = registros de versiones anteriores
+  if (frente) files.push(docsFile(frente, base, "documento_frente"));
+  if (rec.usuarioReverso) files.push(docsFile(rec.usuarioReverso, base, "documento_atras"));
   if (rec.ticket) files.push(docsFile(rec.ticket, base, "ticket"));
   await docsShareFiles(files, base);
 }
 
+/* ---- Gesto secreto: mantener presionado "Código cajas" 10 s abre el registro ---- */
+let docsClickGuard = false;
+document.addEventListener("pointerdown", () => { docsClickGuard = false; }, true);
+document.addEventListener("pointerup", () => { setTimeout(() => { docsClickGuard = false; }, 500); }, true);
+document.addEventListener("click", (e) => {
+  if (docsClickGuard) { e.stopPropagation(); e.preventDefault(); }
+}, true);
+
+function setupDocsTrigger(el) {
+  let timer = null;
+  let fired = false;
+  el.classList.add("hold-guard");
+
+  el.addEventListener("pointerdown", (e) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    fired = false;
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      fired = true;
+      docsClickGuard = true;   // evita que al soltar el dedo se active algo de la nueva pantalla
+      if (navigator.vibrate) navigator.vibrate(30);
+      navigate({ screen: "docs", title: "Documentos" });
+    }, DOCS_HOLD_MS);
+  });
+  const cancel = () => clearTimeout(timer);
+  el.addEventListener("pointerup", cancel);
+  el.addEventListener("pointerleave", cancel);
+  el.addEventListener("pointercancel", cancel);
+  el.addEventListener("contextmenu", (e) => e.preventDefault());
+  // Si se mantuvo presionado, ese toque NO abre Código cajas (este listener va antes que el de click normal).
+  el.addEventListener("click", (e) => {
+    if (fired) { fired = false; e.stopImmediatePropagation(); e.preventDefault(); }
+  });
+}
+
+/* ---- Pantalla 1: formulario ---- */
 function buildDocs() {
   const wrap = document.createElement("div");
+  wrap.className = "docs-page";
   wrap.innerHTML = `
-    <div class="section-heading">
-      <h2>🗂️ Respaldo de documentos</h2>
-      <p>Para cuando la plataforma no deja subir archivos.</p>
-    </div>
-    <div class="docs-note">
-      <strong>Se guarda solo en este teléfono.</strong> Estos archivos todavía
-      <strong>no están en la plataforma oficial</strong>: súbelos después y borra el registro.
-      El navegador puede borrar los datos guardados si pasan muchos días.
-    </div>
+    <div class="docs-banner-box"><img class="docs-banner" alt=""></div>
+    <h2 class="docs-title"></h2>
     <div class="docs-card">
       <h3>Carga de documentos</h3>
       <div class="docs-field">
-        <label for="docsNombre">Folio o nombre del cliente</label>
-        <input id="docsNombre" class="docs-input" type="text" autocomplete="off" placeholder="Folio o nombre">
+        <label for="docsNombre">Nombre</label>
+        <input id="docsNombre" class="docs-input" type="text" autocomplete="off" placeholder="Nombre del cliente">
       </div>
       <div class="docs-field">
-        <label for="docsProg">Programa (opcional)</label>
-        <select id="docsProg" class="docs-select">
-          <option value="">—</option>
-          ${DOCS_PROGRAMAS.map(p => `<option value="${p}">${p}</option>`).join("")}
-        </select>
-      </div>
-      <div class="docs-group">
-        <div class="docs-slot-title">Usuario</div>
-        <div class="docs-group-sub">Foto del registro o contrato del cliente</div>
-        <div class="docs-pair">
-          <div class="docs-slot" data-slot="frente"></div>
-          <div class="docs-slot" data-slot="reverso"></div>
+        <label>Documento</label>
+        <div class="docs-seg" id="docsSeg" data-side="frente">
+          <span class="docs-seg-knob"></span>
+          <button type="button" data-side="frente">Frente</button>
+          <button type="button" data-side="reverso">Atrás</button>
         </div>
+        <div class="docs-slot" id="docsSlotDoc"></div>
       </div>
-      <div class="docs-slot" data-slot="ticket"></div>
-      <button type="button" class="docs-btn docs-save" id="docsSave" disabled>Guardar en este teléfono</button>
-      <p class="docs-msg" id="docsMsg" role="status"></p>
+      <div class="docs-field">
+        <label>Ticket de compra :</label>
+        <div class="docs-slot" id="docsSlotTicket"></div>
+      </div>
     </div>
-    <div class="docs-list" id="docsList"></div>
+    <button type="button" class="docs-accept" id="docsAccept" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Aceptar</span></button>
+    <p class="docs-msg" id="docsMsg" role="status"></p>
+    <button type="button" class="docs-link" id="docsVer">Ver registros</button>
   `;
+  const $ = (s) => wrap.querySelector(s);
+  $(".docs-title").textContent = DOCS_TITULO;
 
-  const $ = (sel) => wrap.querySelector(sel);
+  // Banner: se ajusta al recuadro (object-fit: cover). Si no hay imagen, se oculta.
+  const ban = $(".docs-banner");
+  let bi = 0;
+  ban.onerror = () => { bi++; if (bi < DOCS_BANNERS.length) ban.src = DOCS_BANNERS[bi]; else $(".docs-banner-box").hidden = true; };
+  ban.src = DOCS_BANNERS[0];
+
   const nombreEl = $("#docsNombre");
-  const progEl = $("#docsProg");
-  const saveBtn = $("#docsSave");
+  const seg = $("#docsSeg");
+  const acceptBtn = $("#docsAccept");
   const msg = $("#docsMsg");
-  const listEl = $("#docsList");
-
   const draft = { frente: null, reverso: null, ticket: null };
-  const slotDefs = {
-    frente:  { title: "Frente",  hint: "Parte de enfrente", tag: "usuario_frente" },
-    reverso: { title: "Reverso", hint: "Parte de atrás",    tag: "usuario_reverso" },
-    ticket:  { title: "Ticket de compra", hint: "Foto del ticket", tag: "ticket" },
+  const names = { frente: "", reverso: "", ticket: "" };
+  const urls = {};
+  let side = "frente";
+
+  const refresh = () => {
+    acceptBtn.disabled = !(draft.frente || draft.reverso || draft.ticket);
+    seg.querySelectorAll("button").forEach(b => b.classList.toggle("has", !!draft[b.dataset.side]));
   };
-  const slotUrls = {};
-  let listUrls = [];
 
-  const refreshSave = () => { saveBtn.disabled = !(draft.frente || draft.reverso || draft.ticket); };
-
-  function makeInput(capture, onFile) {
+  function renderSlot(container, key) {
+    if (urls[key]) { URL.revokeObjectURL(urls[key]); urls[key] = null; }
+    container.innerHTML = "";
+    const row = document.createElement("div");
+    row.className = "docs-file";
     const inp = document.createElement("input");
-    inp.type = "file";
-    inp.accept = "image/*";
-    if (capture) inp.setAttribute("capture", "environment");
-    inp.hidden = true;
-    inp.addEventListener("change", () => {
+    inp.type = "file"; inp.accept = "image/*"; inp.hidden = true;
+    const pick = document.createElement("button");
+    pick.type = "button"; pick.className = "docs-pick"; pick.textContent = "Seleccionar archivos";
+    pick.addEventListener("click", () => inp.click());
+    const nm = document.createElement("span");
+    nm.className = "docs-file-name";
+    nm.textContent = draft[key] ? (names[key] || "foto") : "Ningún archivo seleccionado";
+    row.append(pick, nm, inp);
+    container.appendChild(row);
+
+    inp.addEventListener("change", async () => {
       const f = inp.files && inp.files[0];
       inp.value = "";
-      if (f) onFile(f);
+      if (!f) return;
+      nm.textContent = "Procesando…";
+      draft[key] = await docsShrink(f);
+      names[key] = f.name || "foto.jpg";
+      renderSlot(container, key);
+      refresh();
     });
-    return inp;
-  }
-
-  function renderSlot(key) {
-    const slot = $(`[data-slot="${key}"]`);
-    const def = slotDefs[key];
-    if (slotUrls[key]) { URL.revokeObjectURL(slotUrls[key]); slotUrls[key] = null; }
-    slot.innerHTML = `<div class="docs-slot-title">${def.title}</div><div class="docs-slot-box${draft[key] ? " filled" : ""}"></div>`;
-    const box = slot.querySelector(".docs-slot-box");
-
-    const onFile = async (file) => {
-      box.innerHTML = `<span class="docs-hint">Procesando foto…</span>`;
-      draft[key] = await docsShrink(file);
-      renderSlot(key);
-      refreshSave();
-    };
-    const cam = makeInput(true, onFile);
-    const gal = makeInput(false, onFile);
-    slot.append(cam, gal);
-
-    const btn = (text, cls, fn) => {
-      const b = document.createElement("button");
-      b.type = "button";
-      b.className = "docs-btn " + cls;
-      b.textContent = text;
-      b.addEventListener("click", fn);
-      return b;
-    };
 
     if (draft[key]) {
-      slotUrls[key] = URL.createObjectURL(draft[key]);
+      urls[key] = URL.createObjectURL(draft[key]);
+      const prev = document.createElement("div");
+      prev.className = "docs-preview";
       const img = document.createElement("img");
-      img.className = "docs-thumb";
-      img.alt = def.title;
-      img.src = slotUrls[key];
-      const actions = document.createElement("div");
-      actions.className = "docs-actions";
-      actions.append(
-        btn("Guardar en Fotos", "", () => docsShareFiles([docsFile(draft[key], docsBase(nombreEl.value.trim()), def.tag)], docsBase(nombreEl.value.trim()))),
-        btn("Retomar", "sec", () => cam.click()),
-        btn("Quitar", "sec", () => { draft[key] = null; renderSlot(key); refreshSave(); })
-      );
-      box.append(img, actions);
-    } else {
-      const hint = document.createElement("span");
-      hint.className = "docs-hint";
-      hint.textContent = def.hint;
-      const actions = document.createElement("div");
-      actions.className = "docs-actions";
-      actions.append(btn("📷 Tomar foto", "", () => cam.click()), btn("Galería", "sec", () => gal.click()));
-      box.append(hint, actions);
+      img.alt = "Vista previa"; img.src = urls[key];
+      const rm = document.createElement("button");
+      rm.type = "button"; rm.className = "docs-remove"; rm.textContent = "Quitar foto";
+      rm.addEventListener("click", () => { draft[key] = null; names[key] = ""; renderSlot(container, key); refresh(); });
+      prev.append(img, rm);
+      container.appendChild(prev);
     }
   }
 
+  const docSlot = $("#docsSlotDoc");
+  const renderDoc = () => renderSlot(docSlot, side);
+  seg.addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-side]");
+    if (!b || b.dataset.side === side) return;
+    side = b.dataset.side;
+    seg.dataset.side = side;
+    renderDoc();
+  });
+
+  acceptBtn.addEventListener("click", async () => {
+    const faltan = [];
+    if (!draft.frente) faltan.push("Documento (frente)");
+    if (!draft.reverso) faltan.push("Documento (atrás)");
+    if (!draft.ticket) faltan.push("Ticket de compra");
+    if (faltan.length && !confirm(`Falta: ${faltan.join(", ")}.\n¿Guardar de todos modos?`)) return;
+    acceptBtn.disabled = true;
+    try {
+      await docsPut({
+        id: Date.now() + "-" + Math.random().toString(36).slice(2, 7),
+        nombre: nombreEl.value.trim() || "Sin nombre",
+        fecha: new Date().toISOString(),
+        usuarioFrente: draft.frente,
+        usuarioReverso: draft.reverso,
+        ticket: draft.ticket,
+      });
+      if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+      navigate({ screen: "docsOk", title: "Registro", hero: true });
+    } catch (e) {
+      msg.textContent = "No se pudo guardar. Revisa el espacio del teléfono o abre la app en Safari normal (no privado).";
+      refresh();
+    }
+  });
+  $("#docsVer").addEventListener("click", () => navigate({ screen: "docsOk", title: "Registros", hero: false }));
+
+  renderDoc();
+  renderSlot($("#docsSlotTicket"), "ticket");
+  return wrap;
+}
+
+/* ---- Pantalla 2: palomita verde + registros (deslizando hacia abajo) ---- */
+let docsListUrls = [];
+function buildDocsOk(entry) {
+  const wrap = document.createElement("div");
+  wrap.className = "docs-page";
+  wrap.innerHTML = `
+    ${entry.hero ? `
+    <section class="docs-ok-hero">
+      <div class="docs-ok-circle"><svg viewBox="0 0 52 52" aria-hidden="true"><path d="M14 27l8 8 16-17" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <h2>Registro guardado</h2>
+      <p class="docs-ok-sub">Desliza hacia abajo para ver registros</p>
+      <div class="docs-ok-arrow" aria-hidden="true">⌄</div>
+    </section>` : ""}
+    <section class="docs-regs">
+      <h3 class="docs-list-title">Registros</h3>
+      <div id="docsList"></div>
+    </section>
+  `;
+  const listEl = wrap.querySelector("#docsList");
+
   async function renderList() {
-    listUrls.forEach(u => URL.revokeObjectURL(u));
-    listUrls = [];
+    docsListUrls.forEach(u => URL.revokeObjectURL(u));
+    docsListUrls = [];
     listEl.innerHTML = "";
     let recs;
-    try {
-      recs = await docsAll();
-    } catch (e) {
-      listEl.innerHTML = `<p class="docs-msg">Este navegador no permite guardar archivos en el teléfono (¿modo privado?). Ábrela en Safari normal o instálala en la pantalla de inicio.</p>`;
-      saveBtn.disabled = true;
-      saveBtn.dataset.blocked = "1";
+    try { recs = await docsAll(); }
+    catch (e) {
+      listEl.innerHTML = `<p class="docs-msg">Este navegador no permite guardar archivos (¿modo privado?).</p>`;
       return;
     }
-    const h = document.createElement("h4");
-    h.className = "docs-list-title";
-    h.textContent = recs.length ? `Pendientes de subir (${recs.length})` : "No hay documentos pendientes";
-    listEl.appendChild(h);
+    if (!recs.length) { listEl.innerHTML = `<p class="docs-msg">No hay registros guardados.</p>`; return; }
 
     recs.forEach(rec => {
       const card = document.createElement("div");
@@ -2181,24 +2266,23 @@ function buildDocs() {
       const top = document.createElement("div");
       top.className = "docs-rec-top";
       const name = document.createElement("strong");
-      name.textContent = rec.nombre || "Sin folio ni nombre";
+      name.textContent = rec.nombre || "Sin nombre";
       const chip = document.createElement("span");
       chip.className = "docs-chip";
-      chip.textContent = "Pendiente de subir";
+      chip.textContent = docsTimeLeft(rec);
       top.append(name, chip);
 
       const meta = document.createElement("div");
       meta.className = "docs-rec-meta";
-      const fecha = new Date(rec.fecha).toLocaleString("es-MX", { dateStyle: "medium", timeStyle: "short" });
-      meta.textContent = [rec.programa, fecha].filter(Boolean).join(" · ");
+      meta.textContent = new Date(rec.fecha).toLocaleString("es-MX", { dateStyle: "medium", timeStyle: "short" });
 
       const thumbs = document.createElement("div");
       thumbs.className = "docs-rec-thumbs";
-      [["Frente", rec.usuarioFrente || rec.usuario], ["Reverso", rec.usuarioReverso], ["Ticket", rec.ticket]].forEach(([label, blob]) => {
+      [["Frente", rec.usuarioFrente || rec.usuario], ["Atrás", rec.usuarioReverso], ["Ticket", rec.ticket]].forEach(([label, blob]) => {
         if (!blob) return;
         const fig = document.createElement("figure");
         const u = URL.createObjectURL(blob);
-        listUrls.push(u);
+        docsListUrls.push(u);
         const im = document.createElement("img");
         im.src = u; im.alt = label;
         const cap = document.createElement("figcaption");
@@ -2209,59 +2293,22 @@ function buildDocs() {
 
       const actions = document.createElement("div");
       actions.className = "docs-actions";
-      const share = document.createElement("button");
-      share.type = "button";
-      share.className = "docs-btn";
-      share.textContent = "Guardar / compartir fotos";
-      share.addEventListener("click", () => docsShare(rec));
+      const save = document.createElement("button");
+      save.type = "button"; save.className = "docs-btn"; save.textContent = "Guardar fotos";
+      save.addEventListener("click", () => docsShare(rec));
       const del = document.createElement("button");
-      del.type = "button";
-      del.className = "docs-btn danger";
-      del.textContent = "Ya lo subí · Borrar";
+      del.type = "button"; del.className = "docs-btn danger"; del.textContent = "Borrar";
       del.addEventListener("click", async () => {
-        if (!confirm("¿Ya subiste estos documentos a la plataforma oficial?\n\nSe borrarán de este teléfono y no se pueden recuperar.")) return;
-        try { await docsDelete(rec.id); } catch (e) { /* se mostrará igual al recargar la lista */ }
+        if (!confirm("¿Borrar este registro del teléfono? No se puede recuperar.")) return;
+        try { await docsDelete(rec.id); } catch (e) {}
         renderList();
       });
-      actions.append(share, del);
+      actions.append(save, del);
 
       card.append(top, meta, thumbs, actions);
       listEl.appendChild(card);
     });
   }
-
-  saveBtn.addEventListener("click", async () => {
-    const faltan = [];
-    if (!draft.frente) faltan.push("Usuario (frente)");
-    if (!draft.ticket) faltan.push("Ticket de compra");
-    if (faltan.length && !confirm(`Falta: ${faltan.join(" y ")}. ¿Guardar de todos modos?`)) return;
-    saveBtn.disabled = true;
-    try {
-      const rec = {
-        id: Date.now() + "-" + Math.random().toString(36).slice(2, 7),
-        nombre: nombreEl.value.trim(),
-        programa: progEl.value,
-        fecha: new Date().toISOString(),
-        usuarioFrente: draft.frente,
-        usuarioReverso: draft.reverso,
-        ticket: draft.ticket,
-      };
-      await docsPut(rec);
-      if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
-      draft.frente = null; draft.reverso = null; draft.ticket = null;
-      nombreEl.value = ""; progEl.value = "";
-      renderSlot("frente"); renderSlot("reverso"); renderSlot("ticket");
-      msg.textContent = "✓ Guardado en este teléfono. Pendiente de subir a la plataforma oficial.";
-      await renderList();
-    } catch (e) {
-      msg.textContent = "No se pudo guardar. Revisa el espacio del teléfono o los permisos del navegador.";
-    }
-    if (!saveBtn.dataset.blocked) refreshSave();
-  });
-
-  renderSlot("frente");
-  renderSlot("reverso");
-  renderSlot("ticket");
   renderList();
   return wrap;
 }
