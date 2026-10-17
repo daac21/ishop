@@ -1049,7 +1049,9 @@ html.rep-mode .nav-btn{ color:#2997ff; }
 .docs-ok-circle path{ stroke-dasharray:50; stroke-dashoffset:50; animation:docsDraw .4s .25s ease forwards; }
 .docs-ok-hero h2{ margin:18px 0 0; font-size:26px; }
 .docs-ok-sub{ margin:0; font-size:15px; color:var(--text-secondary); }
-.docs-ok-arrow{ margin-top:16px; font-size:30px; line-height:1; color:#8e8e93; animation:docsBob 1.4s ease-in-out infinite; }
+.docs-ok-arrow{ margin-top:16px; font:inherit; font-size:34px; line-height:1; color:#8e8e93; background:none; border:none; padding:10px 24px; animation:docsBob 1.4s ease-in-out infinite; }
+.docs-ok-arrow.open{ animation:none; transform:rotate(180deg); }
+.docs-regs[hidden]{ display:none; }
 @keyframes docsPop{ from{ transform:scale(.3); opacity:0; } to{ transform:scale(1); opacity:1; } }
 @keyframes docsDraw{ to{ stroke-dashoffset:0; } }
 @keyframes docsBob{ 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(7px); } }
