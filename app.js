@@ -14,6 +14,7 @@ const MENU = [
   { id: "getac",     icon: "💳", label: "GET + AC",       color: "#af52de" },
   { id: "cubre",     icon: "🛠️", label: "¿Qué cubre?",    color: "#ff3b30" },
   { id: "scanner",   icon: "📷", label: "Escáner",        color: "#1d1d1f" },
+  { id: "docs",      icon: "🗂️", label: "Documentos",     color: "#32ade6" },
   { id: "cajas",     icon: "𝄃𝄃𝄂𝄂𝄀𝄁𝄃𝄂𝄂𝄃", label: "Código cajas",   color: "#8e8e93" },
 ];
 
@@ -329,6 +330,8 @@ function buildScreen(entry) {
   } else if (entry.screen === "repair") {
     el.classList.add("rep-screen");
     el.appendChild(buildRepair(entry.category, entry.model, entry.variant));
+  } else if (entry.screen === "docs") {
+    el.appendChild(buildDocs());
   } else if (entry.screen === "scanner") {
     el.appendChild(buildScanner());
   } else if (entry.screen === "cajasCategories") {
@@ -437,6 +440,8 @@ function buildHome() {
     } else if (item.id === "scanner") {
       if (!ESCANER_DATA) await dataReady;
       navigate({ screen: "scanner", title: item.label });
+    } else if (item.id === "docs") {
+      navigate({ screen: "docs", title: "Documentos" });
     } else if (item.id === "cajas") {
       if (!CODIGOS_CAJAS) await dataReady;
       navigate({ screen: "cajasCategories", title: item.label });
@@ -1645,15 +1650,19 @@ function buildAcDetail(category, model, variant) {
    ===================================================================== */
 const REPAIR_PARTS = [
   { id: "camara",   label: "Cámara",         icon: "📷", title: "Sistema de cámaras.", sub: "Ingeniería de precisión, pieza por pieza.",
-    sin: "Daño de la cámara trasera", con: { deducible: "Otros daños" } },
+    sin: "Daño de la cámara trasera", con: { deducible: ["Otros daños", "Otro daño accidental"] } },
   { id: "pantalla", label: "Pantalla",       icon: "📱", title: "Pantalla.", sub: "Una reparación que exige precisión.",
-    sin: "Daño de la pantalla", con: { deducible: "Pantalla" } },
+    sin: ["Daño de la pantalla", "Daño en la pantalla exterior"], con: { deducible: ["Pantalla", "Daño en la pantalla exterior"] } },
+  { id: "pantalla-interior", label: "Pantalla interior", icon: "📖", title: "Pantalla interior.", sub: "Precisión en cada pliegue.",
+    sin: "Daño en la pantalla interior", con: { deducible: "Daño en la pantalla interior" } },
   { id: "bateria",  label: "Batería",        icon: "🔋", title: "Batería.", sub: "La energía de tu iPhone, bien cuidada.",
     sin: "Servicio de batería", con: { bateria: true } },
   { id: "vidrio",   label: "Vidrio trasero", icon: "✨", title: "Vidrio trasero.", sub: "El acabado que se ve y se siente.",
     sin: "Daño de la parte posterior de vidrio", con: { cuota: "Cristal trasero" } },
+  { id: "cubierta", label: "Capa de cubierta", icon: "🛡️", title: "Capa de cubierta.", sub: "La primera capa de protección.",
+    sin: "Daño en la capa de la cubierta", con: { deducible: "Daño en la capa de la cubierta" } },
   { id: "cuerpo",   label: "Cuerpo",         icon: "🛠️", title: "Cuerpo.", sub: "El chasis que mantiene todo unido.",
-    sin: "Otro daño", con: { deducible: "Otros daños" } },
+    sin: "Otro daño", con: { deducible: ["Otros daños", "Otro daño accidental"] } },
 ];
 
 function setRepairTheme(on) {
@@ -1688,13 +1697,17 @@ function setupRepairTrigger(el, onOpen) {
   el.addEventListener("contextmenu", (e) => e.preventDefault());
 }
 
+// Algunos modelos usan otros nombres en los datos (p. ej. iPhone Duo): se acepta una lista de nombres posibles.
+const repairList = (x) => Array.isArray(x) ? x : [x];
+const repairSinKey = (part, info) => repairList(part.sin).find(k => typeof info?.sinAppleCare?.[k] === "number");
+
 // Importe "con AppleCare+" de una pieza, sacado de los datos existentes. null = no hay dato.
 function repairWithAc(part, info, category) {
   const c = part.con;
   const cob = COBERTURA_DATA?.[category]?.["AppleCare+"];
   if (c.deducible) {
-    const v = info?.deducibles?.[c.deducible];
-    return typeof v === "number" ? { amount: v, note: "Deducible · " + c.deducible } : null;
+    const dk = repairList(c.deducible).find(k => typeof info?.deducibles?.[k] === "number");
+    return dk ? { amount: info.deducibles[dk], note: "Deducible · " + dk } : null;
   }
   if (c.cuota) {
     const q = (cob?.cuotas || []).find(x => x.label === c.cuota);
@@ -1711,7 +1724,7 @@ function repairWithAc(part, info, category) {
 function repairPartsFor(category, info) {
   if (category !== "iPhone" || !info?.sinAppleCare) return [];
   return REPAIR_PARTS.filter(p =>
-    typeof info.sinAppleCare[p.sin] === "number" && repairWithAc(p, info, category)
+    repairSinKey(p, info) && repairWithAc(p, info, category)
   );
 }
 
@@ -1815,7 +1828,8 @@ function buildRepair(category, model, variant) {
     hero.classList.toggle("rep-noimg", s.failed);
     $(".rep-fallback").textContent = p.icon;
     paintCard(cardAc, repairWithAc(p, info, category), repairWithAc(p, info, category).note);
-    paintCard(cardNo, { amount: info.sinAppleCare[p.sin] }, p.sin);
+    const sinKey = repairSinKey(p, info);
+    paintCard(cardNo, { amount: info.sinAppleCare[sinKey] }, sinKey);
   }
 
   state.forEach((s, i) => {
@@ -1932,6 +1946,324 @@ function openRepairViewer(src) {
     s = Math.max(1, Math.min(5, s * (e.deltaY < 0 ? 1.15 : 1 / 1.15)));
     clamp(); apply();
   }, { passive: false });
+}
+
+/* =====================================================================
+   Respaldo de documentos
+   Guarda en ESTE teléfono (IndexedDB) la foto del registro del cliente ("Usuario") y la del
+   ticket de compra, para subirlas después a la plataforma oficial. No envía nada a ningún servidor.
+   ===================================================================== */
+const DOCS_PROGRAMAS = ["For Life", "Get", "Switch Up", "Trade In"];
+
+function docsOpenDb() {
+  return new Promise((resolve, reject) => {
+    if (!window.indexedDB) { reject(new Error("sin IndexedDB")); return; }
+    const req = indexedDB.open("ishop_docs", 1);
+    req.onupgradeneeded = () => req.result.createObjectStore("registros", { keyPath: "id" });
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function docsRun(mode, fn) {
+  const db = await docsOpenDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction("registros", mode);
+    const req = fn(tx.objectStore("registros"));
+    tx.oncomplete = () => { db.close(); resolve(req ? req.result : undefined); };
+    tx.onerror = () => { db.close(); reject(tx.error); };
+    tx.onabort = () => { db.close(); reject(tx.error); };
+  });
+}
+const docsAll = async () => ((await docsRun("readonly", s => s.getAll())) || []).sort((a, b) => b.fecha.localeCompare(a.fecha));
+const docsPut = (rec) => docsRun("readwrite", s => s.put(rec));
+const docsDelete = (id) => docsRun("readwrite", s => s.delete(id));
+
+// Reduce la foto (máx. 2400 px) para ahorrar espacio sin perder legibilidad. Si algo falla, guarda la original.
+async function docsShrink(file, maxSide = 2400, quality = 0.88) {
+  let url = null;
+  try {
+    url = URL.createObjectURL(file);
+    const img = new Image();
+    await new Promise((ok, bad) => { img.onload = ok; img.onerror = bad; img.src = url; });
+    const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement("canvas");
+    c.width = Math.round(img.naturalWidth * scale);
+    c.height = Math.round(img.naturalHeight * scale);
+    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+    const blob = await new Promise(r => c.toBlob(r, "image/jpeg", quality));
+    return blob || file;
+  } catch (e) {
+    return file;
+  } finally {
+    if (url) URL.revokeObjectURL(url);
+  }
+}
+
+// Abre el menú de compartir del teléfono (ahí está "Guardar imagen" para mandarla a Fotos).
+// Si el navegador no lo permite, descarga los archivos.
+async function docsShareFiles(files, title) {
+  if (!files.length) return;
+  if (navigator.canShare && navigator.canShare({ files })) {
+    try { await navigator.share({ files, title }); return; }
+    catch (e) { if (e && e.name === "AbortError") return; }
+  }
+  files.forEach(f => {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(f);
+    a.download = f.name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  });
+}
+function docsFile(blob, base, tag) {
+  const ext = blob.type === "image/png" ? "png" : "jpg";
+  return new File([blob], `${base}_${tag}.${ext}`, { type: blob.type || "image/jpeg" });
+}
+const docsBase = (nombre) => ((nombre || "registro").replace(/[^\w-]+/g, "_").slice(0, 40)) || "registro";
+
+async function docsShare(rec) {
+  const base = docsBase(rec.nombre);
+  const files = [];
+  const frente = rec.usuarioFrente || rec.usuario;   // "usuario" = registros guardados con la versión anterior
+  if (frente) files.push(docsFile(frente, base, "usuario_frente"));
+  if (rec.usuarioReverso) files.push(docsFile(rec.usuarioReverso, base, "usuario_reverso"));
+  if (rec.ticket) files.push(docsFile(rec.ticket, base, "ticket"));
+  await docsShareFiles(files, base);
+}
+
+function buildDocs() {
+  const wrap = document.createElement("div");
+  wrap.innerHTML = `
+    <div class="section-heading">
+      <h2>🗂️ Respaldo de documentos</h2>
+      <p>Para cuando la plataforma no deja subir archivos.</p>
+    </div>
+    <div class="docs-note">
+      <strong>Se guarda solo en este teléfono.</strong> Estos archivos todavía
+      <strong>no están en la plataforma oficial</strong>: súbelos después y borra el registro.
+      El navegador puede borrar los datos guardados si pasan muchos días.
+    </div>
+    <div class="docs-card">
+      <h3>Carga de documentos</h3>
+      <div class="docs-field">
+        <label for="docsNombre">Folio o nombre del cliente</label>
+        <input id="docsNombre" class="docs-input" type="text" autocomplete="off" placeholder="Folio o nombre">
+      </div>
+      <div class="docs-field">
+        <label for="docsProg">Programa (opcional)</label>
+        <select id="docsProg" class="docs-select">
+          <option value="">—</option>
+          ${DOCS_PROGRAMAS.map(p => `<option value="${p}">${p}</option>`).join("")}
+        </select>
+      </div>
+      <div class="docs-group">
+        <div class="docs-slot-title">Usuario</div>
+        <div class="docs-group-sub">Foto del registro o contrato del cliente</div>
+        <div class="docs-pair">
+          <div class="docs-slot" data-slot="frente"></div>
+          <div class="docs-slot" data-slot="reverso"></div>
+        </div>
+      </div>
+      <div class="docs-slot" data-slot="ticket"></div>
+      <button type="button" class="docs-btn docs-save" id="docsSave" disabled>Guardar en este teléfono</button>
+      <p class="docs-msg" id="docsMsg" role="status"></p>
+    </div>
+    <div class="docs-list" id="docsList"></div>
+  `;
+
+  const $ = (sel) => wrap.querySelector(sel);
+  const nombreEl = $("#docsNombre");
+  const progEl = $("#docsProg");
+  const saveBtn = $("#docsSave");
+  const msg = $("#docsMsg");
+  const listEl = $("#docsList");
+
+  const draft = { frente: null, reverso: null, ticket: null };
+  const slotDefs = {
+    frente:  { title: "Frente",  hint: "Parte de enfrente", tag: "usuario_frente" },
+    reverso: { title: "Reverso", hint: "Parte de atrás",    tag: "usuario_reverso" },
+    ticket:  { title: "Ticket de compra", hint: "Foto del ticket", tag: "ticket" },
+  };
+  const slotUrls = {};
+  let listUrls = [];
+
+  const refreshSave = () => { saveBtn.disabled = !(draft.frente || draft.reverso || draft.ticket); };
+
+  function makeInput(capture, onFile) {
+    const inp = document.createElement("input");
+    inp.type = "file";
+    inp.accept = "image/*";
+    if (capture) inp.setAttribute("capture", "environment");
+    inp.hidden = true;
+    inp.addEventListener("change", () => {
+      const f = inp.files && inp.files[0];
+      inp.value = "";
+      if (f) onFile(f);
+    });
+    return inp;
+  }
+
+  function renderSlot(key) {
+    const slot = $(`[data-slot="${key}"]`);
+    const def = slotDefs[key];
+    if (slotUrls[key]) { URL.revokeObjectURL(slotUrls[key]); slotUrls[key] = null; }
+    slot.innerHTML = `<div class="docs-slot-title">${def.title}</div><div class="docs-slot-box${draft[key] ? " filled" : ""}"></div>`;
+    const box = slot.querySelector(".docs-slot-box");
+
+    const onFile = async (file) => {
+      box.innerHTML = `<span class="docs-hint">Procesando foto…</span>`;
+      draft[key] = await docsShrink(file);
+      renderSlot(key);
+      refreshSave();
+    };
+    const cam = makeInput(true, onFile);
+    const gal = makeInput(false, onFile);
+    slot.append(cam, gal);
+
+    const btn = (text, cls, fn) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "docs-btn " + cls;
+      b.textContent = text;
+      b.addEventListener("click", fn);
+      return b;
+    };
+
+    if (draft[key]) {
+      slotUrls[key] = URL.createObjectURL(draft[key]);
+      const img = document.createElement("img");
+      img.className = "docs-thumb";
+      img.alt = def.title;
+      img.src = slotUrls[key];
+      const actions = document.createElement("div");
+      actions.className = "docs-actions";
+      actions.append(
+        btn("Guardar en Fotos", "", () => docsShareFiles([docsFile(draft[key], docsBase(nombreEl.value.trim()), def.tag)], docsBase(nombreEl.value.trim()))),
+        btn("Retomar", "sec", () => cam.click()),
+        btn("Quitar", "sec", () => { draft[key] = null; renderSlot(key); refreshSave(); })
+      );
+      box.append(img, actions);
+    } else {
+      const hint = document.createElement("span");
+      hint.className = "docs-hint";
+      hint.textContent = def.hint;
+      const actions = document.createElement("div");
+      actions.className = "docs-actions";
+      actions.append(btn("📷 Tomar foto", "", () => cam.click()), btn("Galería", "sec", () => gal.click()));
+      box.append(hint, actions);
+    }
+  }
+
+  async function renderList() {
+    listUrls.forEach(u => URL.revokeObjectURL(u));
+    listUrls = [];
+    listEl.innerHTML = "";
+    let recs;
+    try {
+      recs = await docsAll();
+    } catch (e) {
+      listEl.innerHTML = `<p class="docs-msg">Este navegador no permite guardar archivos en el teléfono (¿modo privado?). Ábrela en Safari normal o instálala en la pantalla de inicio.</p>`;
+      saveBtn.disabled = true;
+      saveBtn.dataset.blocked = "1";
+      return;
+    }
+    const h = document.createElement("h4");
+    h.className = "docs-list-title";
+    h.textContent = recs.length ? `Pendientes de subir (${recs.length})` : "No hay documentos pendientes";
+    listEl.appendChild(h);
+
+    recs.forEach(rec => {
+      const card = document.createElement("div");
+      card.className = "docs-rec";
+
+      const top = document.createElement("div");
+      top.className = "docs-rec-top";
+      const name = document.createElement("strong");
+      name.textContent = rec.nombre || "Sin folio ni nombre";
+      const chip = document.createElement("span");
+      chip.className = "docs-chip";
+      chip.textContent = "Pendiente de subir";
+      top.append(name, chip);
+
+      const meta = document.createElement("div");
+      meta.className = "docs-rec-meta";
+      const fecha = new Date(rec.fecha).toLocaleString("es-MX", { dateStyle: "medium", timeStyle: "short" });
+      meta.textContent = [rec.programa, fecha].filter(Boolean).join(" · ");
+
+      const thumbs = document.createElement("div");
+      thumbs.className = "docs-rec-thumbs";
+      [["Frente", rec.usuarioFrente || rec.usuario], ["Reverso", rec.usuarioReverso], ["Ticket", rec.ticket]].forEach(([label, blob]) => {
+        if (!blob) return;
+        const fig = document.createElement("figure");
+        const u = URL.createObjectURL(blob);
+        listUrls.push(u);
+        const im = document.createElement("img");
+        im.src = u; im.alt = label;
+        const cap = document.createElement("figcaption");
+        cap.textContent = label;
+        fig.append(im, cap);
+        thumbs.appendChild(fig);
+      });
+
+      const actions = document.createElement("div");
+      actions.className = "docs-actions";
+      const share = document.createElement("button");
+      share.type = "button";
+      share.className = "docs-btn";
+      share.textContent = "Guardar / compartir fotos";
+      share.addEventListener("click", () => docsShare(rec));
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "docs-btn danger";
+      del.textContent = "Ya lo subí · Borrar";
+      del.addEventListener("click", async () => {
+        if (!confirm("¿Ya subiste estos documentos a la plataforma oficial?\n\nSe borrarán de este teléfono y no se pueden recuperar.")) return;
+        try { await docsDelete(rec.id); } catch (e) { /* se mostrará igual al recargar la lista */ }
+        renderList();
+      });
+      actions.append(share, del);
+
+      card.append(top, meta, thumbs, actions);
+      listEl.appendChild(card);
+    });
+  }
+
+  saveBtn.addEventListener("click", async () => {
+    const faltan = [];
+    if (!draft.frente) faltan.push("Usuario (frente)");
+    if (!draft.ticket) faltan.push("Ticket de compra");
+    if (faltan.length && !confirm(`Falta: ${faltan.join(" y ")}. ¿Guardar de todos modos?`)) return;
+    saveBtn.disabled = true;
+    try {
+      const rec = {
+        id: Date.now() + "-" + Math.random().toString(36).slice(2, 7),
+        nombre: nombreEl.value.trim(),
+        programa: progEl.value,
+        fecha: new Date().toISOString(),
+        usuarioFrente: draft.frente,
+        usuarioReverso: draft.reverso,
+        ticket: draft.ticket,
+      };
+      await docsPut(rec);
+      if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+      draft.frente = null; draft.reverso = null; draft.ticket = null;
+      nombreEl.value = ""; progEl.value = "";
+      renderSlot("frente"); renderSlot("reverso"); renderSlot("ticket");
+      msg.textContent = "✓ Guardado en este teléfono. Pendiente de subir a la plataforma oficial.";
+      await renderList();
+    } catch (e) {
+      msg.textContent = "No se pudo guardar. Revisa el espacio del teléfono o los permisos del navegador.";
+    }
+    if (!saveBtn.dataset.blocked) refreshSave();
+  });
+
+  renderSlot("frente");
+  renderSlot("reverso");
+  renderSlot("ticket");
+  renderList();
+  return wrap;
 }
 
 function buildPlanTabs(options, base, extraOpts = {}) {
