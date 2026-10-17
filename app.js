@@ -2237,15 +2237,25 @@ function buildDocsOk(entry) {
     <section class="docs-ok-hero">
       <div class="docs-ok-circle"><svg viewBox="0 0 52 52" aria-hidden="true"><path d="M14 27l8 8 16-17" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
       <h2>Registro guardado</h2>
-      <p class="docs-ok-sub">Desliza hacia abajo para ver registros</p>
-      <div class="docs-ok-arrow" aria-hidden="true">⌄</div>
+      <button type="button" class="docs-ok-arrow" id="docsArrow" aria-label="Ver registros" aria-expanded="false">⌄</button>
     </section>` : ""}
-    <section class="docs-regs">
+    <section class="docs-regs" id="docsRegs"${entry.hero ? " hidden" : ""}>
       <h3 class="docs-list-title">Registros</h3>
       <div id="docsList"></div>
     </section>
   `;
   const listEl = wrap.querySelector("#docsList");
+  const arrow = wrap.querySelector("#docsArrow");
+  if (arrow) {
+    const regs = wrap.querySelector("#docsRegs");
+    arrow.addEventListener("click", () => {
+      const open = regs.hidden;
+      regs.hidden = !open;
+      arrow.classList.toggle("open", open);
+      arrow.setAttribute("aria-expanded", String(open));
+      if (open) { renderList(); setTimeout(() => regs.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }
+    });
+  }
 
   async function renderList() {
     docsListUrls.forEach(u => URL.revokeObjectURL(u));
@@ -2309,7 +2319,7 @@ function buildDocsOk(entry) {
       listEl.appendChild(card);
     });
   }
-  renderList();
+  if (!entry.hero) renderList();
   return wrap;
 }
 
