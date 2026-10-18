@@ -331,6 +331,10 @@ function buildScreen(entry) {
     el.appendChild(buildRepair(entry.category, entry.model, entry.variant));
   } else if (entry.screen === "docs") {
     el.appendChild(buildDocs());
+  } else if (entry.screen === "docsFotos") {
+    el.appendChild(buildDocsFotos());
+  } else if (entry.screen === "docsConfirm") {
+    el.appendChild(buildDocsConfirm());
   } else if (entry.screen === "docsOk") {
     el.appendChild(buildDocsOk(entry));
   } else if (entry.screen === "scanner") {
@@ -1951,16 +1955,38 @@ function openRepairViewer(src) {
 
 /* =====================================================================
    Registro de documentos (oculto)
-   Se abre manteniendo presionado "Código cajas" ~10 segundos.
-   Guarda las fotos en ESTE teléfono (IndexedDB) y las borra solas a las 48 h.
-   No envía nada a ningún servidor.
-   Banner: imágenes/docs/banner.jpg (o .png) — se ajusta solo al recuadro.
+   Se abre manteniendo presionado "Código cajas" ~3 segundos.
+   Flujo: 1) Datos del cliente + firma  →  2) Fotos (frente, atrás, ticket; el frente
+   llena el nombre solo)  →  3) Confirmar  →  4) Palomita verde + registros.
+   Todo se guarda en ESTE teléfono (IndexedDB) y se borra solo a las 48 h.
+   Banner: imágenes/docs/banner.jpg (o .png). Lector de texto: libs/tesseract/.
    ===================================================================== */
 const DOCS_TITULO = "iPhone/iPad/Mac/Watch® For Life a 24 Meses";
+const DOCS_SUCURSAL = "Morelia";
 const DOCS_BANNERS = ["imágenes/docs/banner.jpg", "imágenes/docs/banner.png"];
 const DOCS_TTL_MS = 48 * 60 * 60 * 1000;
-const DOCS_HOLD_MS = 850;
+const DOCS_HOLD_MS = 3000;
 
+/* ---------- Borrador compartido entre pantallas ---------- */
+function docsNewDraft() {
+  return {
+    email: "", nombre: "", paterno: "", materno: "", telefono: "", serie: "",
+    firmaUrl: "",
+    frente: null, reverso: null, ticket: null,
+    names: { frente: "", reverso: "", ticket: "" },
+    auto: { nombre: false, paterno: false, materno: false },   // true = lo llenó la lectura de la foto
+    dudoso: { nombre: false, paterno: false, materno: false }, // true = la lectura no está segura
+    ocr: "",                                                   // "", "leyendo", "ok", "parcial", "fallo"
+  };
+}
+let docsDraft = docsNewDraft();
+let docsOcrToken = 0;
+let docsNameHook = null;
+const docsFullName = (d) => [d.nombre, d.paterno, d.materno].filter(Boolean).join(" ");
+const docsHayDatos = (d) => !!(d.email || d.nombre || d.paterno || d.materno || d.telefono || d.serie || d.firmaUrl);
+const docsFechaHoy = () => new Date().toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" });
+
+/* ---------- Base de datos del teléfono ---------- */
 function docsOpenDb() {
   return new Promise((resolve, reject) => {
     if (!window.indexedDB) { reject(new Error("sin IndexedDB")); return; }
@@ -2003,7 +2029,7 @@ function docsTimeLeft(rec) {
   return h <= 1 ? "Se borra en menos de 1 h" : `Se borra en ${h} h`;
 }
 
-// Reduce la foto (máx. 2400 px). Si algo falla, guarda la original.
+/* ---------- Fotos: reducir, compartir/descargar ---------- */
 async function docsShrink(file, maxSide = 2400, quality = 0.88) {
   let url = null;
   try {
@@ -2024,7 +2050,7 @@ async function docsShrink(file, maxSide = 2400, quality = 0.88) {
   }
 }
 
-// Abre el menú de compartir del teléfono ("Guardar imagen" → Fotos). Si no se puede, descarga.
+// Abre el menú de compartir del teléfono ("Guardar imagen" → Fotos, o "Guardar en Archivos"). Si no se puede, descarga.
 async function docsShareFiles(files, title) {
   if (!files.length) return;
   if (navigator.canShare && navigator.canShare({ files })) {
@@ -2054,10 +2080,192 @@ async function docsShare(rec) {
   if (frente) files.push(docsFile(frente, base, "documento_frente"));
   if (rec.usuarioReverso) files.push(docsFile(rec.usuarioReverso, base, "documento_atras"));
   if (rec.ticket) files.push(docsFile(rec.ticket, base, "ticket"));
+  if (rec.firma) files.push(docsFile(rec.firma, base, "firma"));
   await docsShareFiles(files, base);
 }
 
-/* ---- Gesto secreto: mantener presionado "Código cajas" 10 s abre el registro ---- */
+/* ---------- Datos: copiar y descargar ---------- */
+const DOCS_CAMPOS = [
+  ["nombre", "Nombre"], ["paterno", "Apellido paterno"], ["materno", "Apellido materno"],
+  ["telefono", "Teléfono"], ["email", "Correo"], ["serie", "# Serie"],
+];
+function docsDatosTexto(rec) {
+  const d = rec.datos || {};
+  const fecha = new Date(rec.fecha).toLocaleString("es-MX", { dateStyle: "long", timeStyle: "short" });
+  const lines = [`Registro iShop · ${fecha}`, `Sucursal: ${d.sucursal || DOCS_SUCURSAL}`, ""];
+  DOCS_CAMPOS.forEach(([k, label]) => { if (d[k]) lines.push(`${label}: ${d[k]}`); });
+  return lines.join("\n") + "\n";
+}
+async function docsShareDatos(rec) {
+  const f = new File([docsDatosTexto(rec)], `${docsBase(rec.nombre)}_datos.txt`, { type: "text/plain" });
+  await docsShareFiles([f], docsBase(rec.nombre));
+}
+async function docsCopy(text, btn) {
+  let ok = false;
+  try { await navigator.clipboard.writeText(text); ok = true; }
+  catch (e) {
+    const t = document.createElement("textarea");
+    t.value = text; t.style.position = "fixed"; t.style.opacity = "0";
+    document.body.appendChild(t); t.select();
+    try { ok = document.execCommand("copy"); } catch (e2) {}
+    t.remove();
+  }
+  const old = btn.textContent;
+  btn.textContent = ok ? "✓ Copiado" : "No se pudo";
+  btn.classList.toggle("done", ok);
+  setTimeout(() => { btn.textContent = old; btn.classList.remove("done"); }, 1400);
+}
+
+/* ---------- Lector del nombre (INE) con Tesseract, todo dentro del teléfono ---------- */
+let docsOcrP = null;
+function docsGetWorker() {
+  if (docsOcrP) return docsOcrP;
+  const abs = (p) => new URL(p, location.href).href;
+  docsOcrP = (async () => {
+    if (!window.Tesseract) {
+      await new Promise((ok, bad) => {
+        const s = document.createElement("script");
+        s.src = "libs/tesseract/tesseract.min.js";
+        s.onload = ok; s.onerror = () => bad(new Error("no carga"));
+        document.head.appendChild(s);
+      });
+    }
+    return window.Tesseract.createWorker("spa", 1, {
+      workerPath: abs("libs/tesseract/worker.min.js"),
+      corePath: abs("libs/tesseract"),
+      langPath: abs("libs/tesseract"),
+      gzip: true,
+      cacheMethod: "none",
+    });
+  })();
+  docsOcrP.catch(() => { docsOcrP = null; });
+  return docsOcrP;
+}
+
+// Prepara la foto para leerla: tamaño parejo, escala de grises, contraste (y opcional blanco/negro).
+async function docsPrepOcr(blob, binarize) {
+  const url = URL.createObjectURL(blob);
+  try {
+    const img = new Image();
+    await new Promise((ok, bad) => { img.onload = ok; img.onerror = bad; img.src = url; });
+    const long = Math.max(img.naturalWidth, img.naturalHeight);
+    const scale = Math.max(0.5, Math.min(2, 1800 / long));
+    const c = document.createElement("canvas");
+    c.width = Math.round(img.naturalWidth * scale);
+    c.height = Math.round(img.naturalHeight * scale);
+    const ctx = c.getContext("2d", { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0, c.width, c.height);
+    const im = ctx.getImageData(0, 0, c.width, c.height);
+    const px = im.data, n = px.length / 4;
+    const g = new Uint8ClampedArray(n), hist = new Uint32Array(256);
+    for (let i = 0; i < n; i++) {
+      const v = (px[i * 4] * 0.299 + px[i * 4 + 1] * 0.587 + px[i * 4 + 2] * 0.114) | 0;
+      g[i] = v; hist[v]++;
+    }
+    let acc = 0, lo = 0, hi = 255;
+    for (let v = 0; v < 256; v++) { acc += hist[v]; if (acc >= n * 0.02) { lo = v; break; } }
+    acc = 0;
+    for (let v = 255; v >= 0; v--) { acc += hist[v]; if (acc >= n * 0.02) { hi = v; break; } }
+    const span = Math.max(1, hi - lo);
+    for (let i = 0; i < n; i++) g[i] = Math.max(0, Math.min(255, ((g[i] - lo) * 255) / span));
+    let thr = 128;
+    if (binarize) {   // Otsu
+      const h2 = new Uint32Array(256);
+      for (let i = 0; i < n; i++) h2[g[i]]++;
+      let sum = 0; for (let t = 0; t < 256; t++) sum += t * h2[t];
+      let sB = 0, wB = 0, best = 0;
+      for (let t = 0; t < 256; t++) {
+        wB += h2[t]; if (!wB) continue;
+        const wF = n - wB; if (!wF) break;
+        sB += t * h2[t];
+        const mB = sB / wB, mF = (sum - sB) / wF;
+        const between = wB * wF * (mB - mF) * (mB - mF);
+        if (between > best) { best = between; thr = t; }
+      }
+    }
+    for (let i = 0; i < n; i++) {
+      const v = binarize ? (g[i] > thr ? 255 : 0) : g[i];
+      px[i * 4] = px[i * 4 + 1] = px[i * 4 + 2] = v; px[i * 4 + 3] = 255;
+    }
+    ctx.putImageData(im, 0, 0);
+    return c;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+// En la credencial el bloque va así:  NOMBRE / apellido paterno / apellido materno / nombre(s)
+function docsParseNombre(data) {
+  const UP = /^[A-ZÁÉÍÓÚÜÑ]{2,}$/;
+  const rows = (data.lines || []).map(l => {
+    const clean = (t) => (t || "").trim().replace(/^[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+|[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+$/g, "");
+    const ws = (l.words || []).map(w => ({ text: clean(w.text), confidence: w.confidence })).filter(w => UP.test(w.text));
+    const text = ws.map(w => w.text).join(" ");
+    const conf = ws.length ? ws.reduce((a, w) => a + w.confidence, 0) / ws.length : 0;
+    return { ws, text, conf, raw: (l.text || "").toUpperCase() };
+  });
+  const iLabel = rows.findIndex(r => r.ws.some(w => /^N[O0]MBRES?$/.test(w.text.trim())));
+  if (iLabel < 0) return null;
+  const STOP = /DOMICILIO|CALLE|COL\b|FECHA|SEXO|CLAVE|CURP|ESTADO|NACIMIENTO|\d/;
+  const got = [];
+  for (let i = iLabel + 1; i < rows.length && got.length < 5; i++) {
+    const r = rows[i];
+    if (STOP.test(r.raw)) break;
+    if (r.text && r.ws.some(w => w.text.trim().length >= 2)) got.push(r);
+  }
+  if (!got.length) return null;
+  const join = (arr) => arr.map(r => r.text).join(" ");
+  const avg = (arr) => arr.reduce((a, r) => a + r.conf, 0) / arr.length;
+  let paterno = "", materno = "", nombre = "", cP = 0, cM = 0, cN = 0;
+  if (got.length === 1) { nombre = got[0].text; cN = got[0].conf; }
+  else if (got.length === 2) { paterno = got[0].text; cP = got[0].conf; nombre = got[1].text; cN = got[1].conf; }
+  else {
+    paterno = got[0].text; cP = got[0].conf;
+    materno = got[1].text; cM = got[1].conf;
+    nombre = join(got.slice(2)); cN = avg(got.slice(2));
+  }
+  return { paterno, materno, nombre, cP, cM, cN, lines: got.length, score: avg(got) };
+}
+
+async function docsRunOcr() {
+  const token = ++docsOcrToken;
+  const d = docsDraft;
+  const blob = d.frente;
+  if (!blob) return;
+  d.ocr = "leyendo";
+  if (docsNameHook) docsNameHook();
+  let best = null;
+  try {
+    const worker = await docsGetWorker();
+    for (const bin of [false, true]) {
+      const canvas = await docsPrepOcr(blob, bin);
+      const { data } = await worker.recognize(canvas);
+      if (token !== docsOcrToken) return;
+      const r = docsParseNombre(data);
+      if (r && (!best || r.lines > best.lines || (r.lines === best.lines && r.score > best.score))) best = r;
+      if (best && best.lines >= 3 && best.score >= 85) break;
+    }
+  } catch (e) {
+    best = null;
+  }
+  if (token !== docsOcrToken) return;
+  if (!best) {
+    d.ocr = "fallo";
+  } else {
+    const put = (k, v, c) => {
+      if (!v) return;
+      if (d[k] && !d.auto[k]) return;   // lo que escribió la persona no se pisa
+      d[k] = v; d.auto[k] = true; d.dudoso[k] = c < 80;
+    };
+    put("paterno", best.paterno, best.cP);
+    put("materno", best.materno, best.cM);
+    put("nombre", best.nombre, best.cN);
+    d.ocr = best.lines >= 3 && !d.dudoso.paterno && !d.dudoso.materno && !d.dudoso.nombre ? "ok" : "parcial";
+  }
+  if (docsNameHook) docsNameHook();
+}
+
+/* ---------- Gesto secreto: mantener presionado "Código cajas" ---------- */
 let docsClickGuard = false;
 document.addEventListener("pointerdown", () => { docsClickGuard = false; }, true);
 document.addEventListener("pointerup", () => { setTimeout(() => { docsClickGuard = false; }, 500); }, true);
@@ -2076,8 +2284,10 @@ function setupDocsTrigger(el) {
     clearTimeout(timer);
     timer = setTimeout(() => {
       fired = true;
-      docsClickGuard = true;   // evita que al soltar el dedo se active algo de la nueva pantalla
+      docsClickGuard = true;
       if (navigator.vibrate) navigator.vibrate(30);
+      docsDraft = docsNewDraft();
+      docsOcrToken++;
       navigate({ screen: "docs", title: "Documentos" });
     }, DOCS_HOLD_MS);
   });
@@ -2086,25 +2296,135 @@ function setupDocsTrigger(el) {
   el.addEventListener("pointerleave", cancel);
   el.addEventListener("pointercancel", cancel);
   el.addEventListener("contextmenu", (e) => e.preventDefault());
-  // Si se mantuvo presionado, ese toque NO abre Código cajas (este listener va antes que el de click normal).
   el.addEventListener("click", (e) => {
     if (fired) { fired = false; e.stopImmediatePropagation(); e.preventDefault(); }
   });
 }
 
-/* ---- Pantalla 1: formulario ---- */
+/* ---------- Piezas comunes de pantalla ---------- */
+function docsHeaderHtml() {
+  return `<div class="docs-banner-box"><img class="docs-banner" alt=""></div><h2 class="docs-title"></h2>`;
+}
+function docsInitHeader(wrap) {
+  wrap.querySelector(".docs-title").textContent = DOCS_TITULO;
+  const ban = wrap.querySelector(".docs-banner");
+  let bi = 0;
+  ban.onerror = () => { bi++; if (bi < DOCS_BANNERS.length) ban.src = DOCS_BANNERS[bi]; else wrap.querySelector(".docs-banner-box").hidden = true; };
+  ban.src = DOCS_BANNERS[0];
+}
+function docsBindText(wrap, id, key, opts = {}) {
+  const el = wrap.querySelector("#" + id);
+  el.value = docsDraft[key] || "";
+  if (docsDraft.dudoso[key]) el.classList.add("dudoso");
+  el.addEventListener("input", () => {
+    docsDraft[key] = opts.upper ? el.value.toUpperCase() : el.value;
+    if (opts.upper && el.value !== docsDraft[key]) el.value = docsDraft[key];
+    if (docsDraft.auto[key] !== undefined) { docsDraft.auto[key] = false; docsDraft.dudoso[key] = false; el.classList.remove("dudoso"); }
+  });
+  return el;
+}
+
+/* ---------- Pantalla 1: datos del cliente + firma ---------- */
 function buildDocs() {
   const wrap = document.createElement("div");
   wrap.className = "docs-page";
   wrap.innerHTML = `
-    <div class="docs-banner-box"><img class="docs-banner" alt=""></div>
-    <h2 class="docs-title"></h2>
+    ${docsHeaderHtml()}
+    <div class="docs-card">
+      <h3>Datos del cliente</h3>
+      <div class="docs-field"><label for="dEmail">Email :</label>
+        <input id="dEmail" class="docs-input" type="email" inputmode="email" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false"></div>
+      <div class="docs-field"><label for="dNombre">Nombre :</label>
+        <input id="dNombre" class="docs-input" type="text" autocomplete="off" autocapitalize="characters"></div>
+      <div class="docs-row2">
+        <div class="docs-field"><label for="dPaterno">Apellido Paterno :</label>
+          <input id="dPaterno" class="docs-input" type="text" autocomplete="off" autocapitalize="characters"></div>
+        <div class="docs-field"><label for="dMaterno">Apellido Materno :</label>
+          <input id="dMaterno" class="docs-input" type="text" autocomplete="off" autocapitalize="characters"></div>
+      </div>
+      <div class="docs-field"><label for="dTel">Teléfono :</label>
+        <input id="dTel" class="docs-input" type="tel" inputmode="tel" autocomplete="off"></div>
+      <div class="docs-field docs-half"><label for="dSerie"># Serie :</label>
+        <input id="dSerie" class="docs-input" type="text" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false"></div>
+      <div class="docs-row2 docs-info">
+        <div><div class="docs-lbl">Fecha :</div><div class="docs-val" id="dFecha"></div></div>
+        <div><div class="docs-lbl">Sucursal de iShop :</div><div class="docs-val" id="dSuc"></div></div>
+      </div>
+      <div class="docs-sign">
+        <div class="docs-sign-head"><span>Captura tu firma (Cliente)</span>
+          <button type="button" class="docs-trash" id="dClear" aria-label="Borrar firma"><svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V5h4v2M8 7l1 12h6l1-12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
+        <canvas id="dSign"></canvas>
+      </div>
+    </div>
+    <button type="button" class="docs-accept" id="dNext"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Aceptar</span></button>
+    <button type="button" class="docs-link" id="dSkip">Omitir datos · solo fotos</button>
+    <button type="button" class="docs-link" id="dVer">Ver registros</button>
+  `;
+  docsInitHeader(wrap);
+  const $ = (s) => wrap.querySelector(s);
+  docsBindText(wrap, "dEmail", "email");
+  docsBindText(wrap, "dNombre", "nombre", { upper: true });
+  docsBindText(wrap, "dPaterno", "paterno", { upper: true });
+  docsBindText(wrap, "dMaterno", "materno", { upper: true });
+  docsBindText(wrap, "dTel", "telefono");
+  docsBindText(wrap, "dSerie", "serie", { upper: true });
+  $("#dFecha").textContent = docsFechaHoy();
+  $("#dSuc").textContent = DOCS_SUCURSAL;
+
+  // Firma
+  const cv = $("#dSign");
+  const ctx = cv.getContext("2d");
+  let drawing = false, last = null;
+  function sizeCanvas() {
+    const r = Math.min(window.devicePixelRatio || 1, 2);
+    const w = cv.clientWidth, h = cv.clientHeight;
+    if (!w || !h) return;
+    cv.width = Math.round(w * r); cv.height = Math.round(h * r);
+    ctx.setTransform(r, 0, 0, r, 0, 0);
+    ctx.lineWidth = 2.6; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.strokeStyle = "#111";
+    if (docsDraft.firmaUrl) {
+      const im = new Image();
+      im.onload = () => ctx.drawImage(im, 0, 0, w, h);
+      im.src = docsDraft.firmaUrl;
+    }
+  }
+  requestAnimationFrame(sizeCanvas);
+  const pos = (e) => { const b = cv.getBoundingClientRect(); return { x: e.clientX - b.left, y: e.clientY - b.top }; };
+  cv.addEventListener("pointerdown", (e) => {
+    drawing = true; last = pos(e);
+    cv.setPointerCapture(e.pointerId);
+    ctx.beginPath(); ctx.arc(last.x, last.y, 1.2, 0, Math.PI * 2); ctx.fillStyle = "#111"; ctx.fill();
+    e.preventDefault();
+  });
+  cv.addEventListener("pointermove", (e) => {
+    if (!drawing) return;
+    const p = pos(e);
+    ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+    last = p; e.preventDefault();
+  });
+  const end = () => { if (!drawing) return; drawing = false; docsDraft.firmaUrl = cv.toDataURL("image/png"); };
+  cv.addEventListener("pointerup", end);
+  cv.addEventListener("pointercancel", end);
+  $("#dClear").addEventListener("click", () => {
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height); ctx.restore();
+    docsDraft.firmaUrl = "";
+  });
+
+  const next = () => navigate({ screen: "docsFotos", title: "Documentos" });
+  $("#dNext").addEventListener("click", next);
+  $("#dSkip").addEventListener("click", next);
+  $("#dVer").addEventListener("click", () => navigate({ screen: "docsOk", title: "Registros", hero: false }));
+  return wrap;
+}
+
+/* ---------- Pantalla 2: fotos (el frente llena el nombre) ---------- */
+function buildDocsFotos() {
+  const wrap = document.createElement("div");
+  wrap.className = "docs-page";
+  wrap.innerHTML = `
+    ${docsHeaderHtml()}
     <div class="docs-card">
       <h3>Carga de documentos</h3>
-      <div class="docs-field">
-        <label for="docsNombre">Nombre</label>
-        <input id="docsNombre" class="docs-input" type="text" autocomplete="off" placeholder="Nombre del cliente">
-      </div>
       <div class="docs-field">
         <label>Documento</label>
         <div class="docs-seg" id="docsSeg" data-side="frente">
@@ -2114,36 +2434,59 @@ function buildDocs() {
         </div>
         <div class="docs-slot" id="docsSlotDoc"></div>
       </div>
+      <div class="docs-namebox">
+        <div class="docs-ocr" id="docsOcr"></div>
+        <div class="docs-field"><label for="fNombre">Nombre :</label><input id="fNombre" class="docs-input" type="text" autocomplete="off" autocapitalize="characters"></div>
+        <div class="docs-row2">
+          <div class="docs-field"><label for="fPaterno">Apellido Paterno :</label><input id="fPaterno" class="docs-input" type="text" autocomplete="off" autocapitalize="characters"></div>
+          <div class="docs-field"><label for="fMaterno">Apellido Materno :</label><input id="fMaterno" class="docs-input" type="text" autocomplete="off" autocapitalize="characters"></div>
+        </div>
+      </div>
       <div class="docs-field">
         <label>Ticket de compra :</label>
         <div class="docs-slot" id="docsSlotTicket"></div>
       </div>
     </div>
-    <button type="button" class="docs-accept" id="docsAccept" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Aceptar</span></button>
+    <button type="button" class="docs-accept" id="docsAccept"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Aceptar</span></button>
     <p class="docs-msg" id="docsMsg" role="status"></p>
-    <button type="button" class="docs-link" id="docsVer">Ver registros</button>
   `;
+  docsInitHeader(wrap);
   const $ = (s) => wrap.querySelector(s);
-  $(".docs-title").textContent = DOCS_TITULO;
-
-  // Banner: se ajusta al recuadro (object-fit: cover). Si no hay imagen, se oculta.
-  const ban = $(".docs-banner");
-  let bi = 0;
-  ban.onerror = () => { bi++; if (bi < DOCS_BANNERS.length) ban.src = DOCS_BANNERS[bi]; else $(".docs-banner-box").hidden = true; };
-  ban.src = DOCS_BANNERS[0];
-
-  const nombreEl = $("#docsNombre");
+  const d = docsDraft;
+  const inputs = {
+    nombre: docsBindText(wrap, "fNombre", "nombre", { upper: true }),
+    paterno: docsBindText(wrap, "fPaterno", "paterno", { upper: true }),
+    materno: docsBindText(wrap, "fMaterno", "materno", { upper: true }),
+  };
+  const ocrEl = $("#docsOcr");
   const seg = $("#docsSeg");
   const acceptBtn = $("#docsAccept");
-  const msg = $("#docsMsg");
-  const draft = { frente: null, reverso: null, ticket: null };
-  const names = { frente: "", reverso: "", ticket: "" };
   const urls = {};
   let side = "frente";
 
+  function paintName() {
+    if (docsNameHook !== paintName) return;   // pantalla vieja
+    Object.keys(inputs).forEach(k => {
+      if (document.activeElement !== inputs[k]) inputs[k].value = d[k] || "";
+      inputs[k].classList.toggle("dudoso", !!d.dudoso[k]);
+    });
+    const t = {
+      "": "",
+      leyendo: "⏳ Leyendo el nombre de la foto…",
+      ok: "✓ Nombre leído. Revísalo.",
+      parcial: "⚠ Leí el nombre, pero revisa los campos marcados.",
+      fallo: "No pude leer el nombre. Escríbelo si lo necesitas.",
+    }[d.ocr];
+    ocrEl.textContent = t;
+    ocrEl.className = "docs-ocr " + (d.ocr || "");
+    ocrEl.hidden = !t;
+  }
+  docsNameHook = paintName;
+  paintName();
+  docsGetWorker().catch(() => {});   // calienta el lector para que ya esté listo al tomar la foto
+
   const refresh = () => {
-    acceptBtn.disabled = !(draft.frente || draft.reverso || draft.ticket);
-    seg.querySelectorAll("button").forEach(b => b.classList.toggle("has", !!draft[b.dataset.side]));
+    seg.querySelectorAll("button").forEach(b => b.classList.toggle("has", !!d[b.dataset.side]));
   };
 
   function renderSlot(container, key) {
@@ -2158,7 +2501,7 @@ function buildDocs() {
     pick.addEventListener("click", () => inp.click());
     const nm = document.createElement("span");
     nm.className = "docs-file-name";
-    nm.textContent = draft[key] ? (names[key] || "foto") : "Ningún archivo seleccionado";
+    nm.textContent = d[key] ? (d.names[key] || "foto") : "Ningún archivo seleccionado";
     row.append(pick, nm, inp);
     container.appendChild(row);
 
@@ -2167,21 +2510,26 @@ function buildDocs() {
       inp.value = "";
       if (!f) return;
       nm.textContent = "Procesando…";
-      draft[key] = await docsShrink(f);
-      names[key] = f.name || "foto.jpg";
+      d[key] = await docsShrink(f);
+      d.names[key] = f.name || "foto.jpg";
       renderSlot(container, key);
       refresh();
+      if (key === "frente") docsRunOcr();
     });
 
-    if (draft[key]) {
-      urls[key] = URL.createObjectURL(draft[key]);
+    if (d[key]) {
+      urls[key] = URL.createObjectURL(d[key]);
       const prev = document.createElement("div");
       prev.className = "docs-preview";
       const img = document.createElement("img");
       img.alt = "Vista previa"; img.src = urls[key];
       const rm = document.createElement("button");
       rm.type = "button"; rm.className = "docs-remove"; rm.textContent = "Quitar foto";
-      rm.addEventListener("click", () => { draft[key] = null; names[key] = ""; renderSlot(container, key); refresh(); });
+      rm.addEventListener("click", () => {
+        d[key] = null; d.names[key] = "";
+        if (key === "frente") { docsOcrToken++; d.ocr = ""; paintName(); }
+        renderSlot(container, key); refresh();
+      });
       prev.append(img, rm);
       container.appendChild(prev);
     }
@@ -2197,37 +2545,121 @@ function buildDocs() {
     renderDoc();
   });
 
-  acceptBtn.addEventListener("click", async () => {
-    const faltan = [];
-    if (!draft.frente) faltan.push("Documento (frente)");
-    if (!draft.reverso) faltan.push("Documento (atrás)");
-    if (!draft.ticket) faltan.push("Ticket de compra");
-    if (faltan.length && !confirm(`Falta: ${faltan.join(", ")}.\n¿Guardar de todos modos?`)) return;
-    acceptBtn.disabled = true;
-    try {
-      await docsPut({
-        id: Date.now() + "-" + Math.random().toString(36).slice(2, 7),
-        nombre: nombreEl.value.trim() || "Sin nombre",
-        fecha: new Date().toISOString(),
-        usuarioFrente: draft.frente,
-        usuarioReverso: draft.reverso,
-        ticket: draft.ticket,
-      });
-      if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
-      navigate({ screen: "docsOk", title: "Registro", hero: true });
-    } catch (e) {
-      msg.textContent = "No se pudo guardar. Revisa el espacio del teléfono o abre la app en Safari normal (no privado).";
-      refresh();
+  acceptBtn.addEventListener("click", () => {
+    if (!(d.frente || d.reverso || d.ticket || docsHayDatos(d))) {
+      $("#docsMsg").textContent = "Agrega al menos una foto o algún dato.";
+      return;
     }
+    navigate({ screen: "docsConfirm", title: "Confirmar" });
   });
-  $("#docsVer").addEventListener("click", () => navigate({ screen: "docsOk", title: "Registros", hero: false }));
 
   renderDoc();
   renderSlot($("#docsSlotTicket"), "ticket");
+  refresh();
   return wrap;
 }
 
-/* ---- Pantalla 2: palomita verde + registros (deslizando hacia abajo) ---- */
+/* ---------- Pantalla 3: confirmar datos ---------- */
+async function docsDataUrlToWhitePng(url) {
+  const im = new Image();
+  await new Promise((ok, bad) => { im.onload = ok; im.onerror = bad; im.src = url; });
+  const c = document.createElement("canvas");
+  c.width = im.naturalWidth; c.height = im.naturalHeight;
+  const x = c.getContext("2d");
+  x.fillStyle = "#fff"; x.fillRect(0, 0, c.width, c.height);
+  x.drawImage(im, 0, 0);
+  return new Promise(r => c.toBlob(r, "image/png"));
+}
+
+function buildDocsConfirm() {
+  const d = docsDraft;
+  const wrap = document.createElement("div");
+  wrap.className = "docs-page";
+  wrap.innerHTML = `
+    <div class="docs-card docs-confirm">
+      <h3>Confirma los datos</h3>
+      <div id="cfRows"></div>
+      <div class="docs-cf-thumbs" id="cfThumbs"></div>
+      <div class="docs-warn" id="cfWarn" hidden></div>
+    </div>
+    <button type="button" class="docs-accept" id="cfOk"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Confirmar y guardar</span></button>
+    <button type="button" class="docs-link" id="cfBack">Editar</button>
+    <p class="docs-msg" id="cfMsg" role="status"></p>
+  `;
+  const rows = wrap.querySelector("#cfRows");
+  const addRow = (label, value) => {
+    const r = document.createElement("div");
+    r.className = "docs-cf-row";
+    const a = document.createElement("span"); a.textContent = label;
+    const b = document.createElement("strong"); b.textContent = value;
+    r.append(a, b); rows.appendChild(r);
+  };
+  const hayDatos = docsHayDatos(d);
+  if (hayDatos) {
+    DOCS_CAMPOS.forEach(([k, label]) => { if (d[k]) addRow(label, d[k]); });
+    addRow("Fecha", docsFechaHoy());
+    addRow("Sucursal", DOCS_SUCURSAL);
+  } else {
+    addRow("Registro", "Solo fotos");
+  }
+
+  const thumbs = wrap.querySelector("#cfThumbs");
+  const tUrls = [];
+  const addThumb = (label, src) => {
+    const fig = document.createElement("figure");
+    const im = document.createElement("img"); im.src = src; im.alt = label;
+    const cap = document.createElement("figcaption"); cap.textContent = label;
+    fig.append(im, cap); thumbs.appendChild(fig);
+  };
+  [["Frente", d.frente], ["Atrás", d.reverso], ["Ticket", d.ticket]].forEach(([l, b]) => {
+    if (!b) return; const u = URL.createObjectURL(b); tUrls.push(u); addThumb(l, u);
+  });
+  if (d.firmaUrl) addThumb("Firma", d.firmaUrl);
+
+  const faltan = [];
+  if (!d.frente) faltan.push("foto del frente");
+  if (!d.reverso) faltan.push("foto de atrás");
+  if (!d.ticket) faltan.push("ticket");
+  if (hayDatos && !d.firmaUrl) faltan.push("firma");
+  if (faltan.length) {
+    const w = wrap.querySelector("#cfWarn");
+    w.hidden = false; w.textContent = "Falta: " + faltan.join(", ") + ".";
+  }
+
+  wrap.querySelector("#cfBack").addEventListener("click", goBack);
+  const okBtn = wrap.querySelector("#cfOk");
+  okBtn.addEventListener("click", async () => {
+    okBtn.disabled = true;
+    try {
+      const firma = d.firmaUrl ? await docsDataUrlToWhitePng(d.firmaUrl) : null;
+      const rec = {
+        id: Date.now() + "-" + Math.random().toString(36).slice(2, 7),
+        nombre: docsFullName(d) || "Sin nombre",
+        fecha: new Date().toISOString(),
+        datos: hayDatos ? {
+          email: d.email.trim(), nombre: d.nombre.trim(), paterno: d.paterno.trim(), materno: d.materno.trim(),
+          telefono: d.telefono.trim(), serie: d.serie.trim(), sucursal: DOCS_SUCURSAL, fechaTexto: docsFechaHoy(),
+        } : null,
+        firma,
+        usuarioFrente: d.frente,
+        usuarioReverso: d.reverso,
+        ticket: d.ticket,
+      };
+      await docsPut(rec);
+      if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+      tUrls.forEach(u => URL.revokeObjectURL(u));
+      docsDraft = docsNewDraft(); docsOcrToken++; docsNameHook = null;
+      stack = [{ screen: "home", title: "iShop Tools" }];   // al regresar desde la palomita se va al inicio
+      navigate({ screen: "docsOk", title: "Registro", hero: true });
+    } catch (e) {
+      wrap.querySelector("#cfMsg").textContent = "No se pudo guardar. Revisa el espacio del teléfono o abre la app desde el icono de inicio (no en modo privado).";
+      okBtn.disabled = false;
+    }
+  });
+  return wrap;
+}
+
+/* ---------- Pantalla 4: palomita verde + registros (con la flechita) ---------- */
 let docsListUrls = [];
 function buildDocsOk(entry) {
   const wrap = document.createElement("div");
@@ -2286,9 +2718,32 @@ function buildDocsOk(entry) {
       meta.className = "docs-rec-meta";
       meta.textContent = new Date(rec.fecha).toLocaleString("es-MX", { dateStyle: "medium", timeStyle: "short" });
 
+      card.append(top, meta);
+
+      const d = rec.datos;
+      if (d) {
+        const box = document.createElement("div");
+        box.className = "docs-rec-data";
+        DOCS_CAMPOS.forEach(([k, label]) => {
+          if (!d[k]) return;
+          const row = document.createElement("div");
+          row.className = "docs-copy-row";
+          const txt = document.createElement("div");
+          const l = document.createElement("span"); l.textContent = label;
+          const v = document.createElement("strong"); v.textContent = d[k];
+          txt.append(l, v);
+          const b = document.createElement("button");
+          b.type = "button"; b.className = "docs-copy"; b.textContent = "Copiar";
+          b.addEventListener("click", () => docsCopy(d[k], b));
+          row.append(txt, b);
+          box.appendChild(row);
+        });
+        card.appendChild(box);
+      }
+
       const thumbs = document.createElement("div");
       thumbs.className = "docs-rec-thumbs";
-      [["Frente", rec.usuarioFrente || rec.usuario], ["Atrás", rec.usuarioReverso], ["Ticket", rec.ticket]].forEach(([label, blob]) => {
+      [["Frente", rec.usuarioFrente || rec.usuario], ["Atrás", rec.usuarioReverso], ["Ticket", rec.ticket], ["Firma", rec.firma]].forEach(([label, blob]) => {
         if (!blob) return;
         const fig = document.createElement("figure");
         const u = URL.createObjectURL(blob);
@@ -2300,22 +2755,23 @@ function buildDocsOk(entry) {
         fig.append(im, cap);
         thumbs.appendChild(fig);
       });
+      card.appendChild(thumbs);
 
       const actions = document.createElement("div");
       actions.className = "docs-actions";
-      const save = document.createElement("button");
-      save.type = "button"; save.className = "docs-btn"; save.textContent = "Guardar fotos";
-      save.addEventListener("click", () => docsShare(rec));
-      const del = document.createElement("button");
-      del.type = "button"; del.className = "docs-btn danger"; del.textContent = "Borrar";
-      del.addEventListener("click", async () => {
+      const mk = (text, cls, fn) => {
+        const b = document.createElement("button");
+        b.type = "button"; b.className = "docs-btn " + cls; b.textContent = text;
+        b.addEventListener("click", fn); return b;
+      };
+      actions.append(mk("Guardar fotos", "", () => docsShare(rec)));
+      if (d) actions.append(mk("Descargar datos", "sec", () => docsShareDatos(rec)));
+      actions.append(mk("Borrar", "danger", async () => {
         if (!confirm("¿Borrar este registro del teléfono? No se puede recuperar.")) return;
         try { await docsDelete(rec.id); } catch (e) {}
         renderList();
-      });
-      actions.append(save, del);
-
-      card.append(top, meta, thumbs, actions);
+      }));
+      card.appendChild(actions);
       listEl.appendChild(card);
     });
   }
