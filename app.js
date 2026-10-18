@@ -1961,7 +1961,8 @@ function openRepairViewer(src) {
    Todo se guarda en ESTE teléfono (IndexedDB) y se borra solo a las 48 h.
    Banner: imágenes/docs/banner.jpg (o .png). Lector de texto: libs/tesseract/.
    ===================================================================== */
-const DOCS_TITULO = "iPhone/iPad/Mac/Watch® For Life a 24 Meses";
+const DOCS_TITULO = "iPhone/iPad/Mac/Watch®";
+const DOCS_PROGRAMAS = ["For Life", "Get"];
 const DOCS_SUCURSAL = "Morelia";
 const DOCS_BANNERS = ["imágenes/docs/banner.jpg", "imágenes/docs/banner.png"];
 const DOCS_TTL_MS = 48 * 60 * 60 * 1000;
@@ -1974,14 +1975,11 @@ function docsNewDraft() {
     firmaUrl: "",
     frente: null, reverso: null, ticket: null,
     names: { frente: "", reverso: "", ticket: "" },
-    auto: { nombre: false, paterno: false, materno: false },   // true = lo llenó la lectura de la foto
-    dudoso: { nombre: false, paterno: false, materno: false }, // true = la lectura no está segura
-    ocr: "",                                                   // "", "leyendo", "ok", "parcial", "fallo"
+    nombreEnFotos: false,   // true = el nombre se escribió en la pantalla de fotos (no se bloquea)
+    programa: "",           // "For Life" | "Get" | ""
   };
 }
 let docsDraft = docsNewDraft();
-let docsOcrToken = 0;
-let docsNameHook = null;
 const docsFullName = (d) => [d.nombre, d.paterno, d.materno].filter(Boolean).join(" ");
 const docsHayDatos = (d) => !!(d.email || d.nombre || d.paterno || d.materno || d.telefono || d.serie || d.firmaUrl);
 const docsFechaHoy = () => new Date().toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" });
@@ -2092,7 +2090,9 @@ const DOCS_CAMPOS = [
 function docsDatosTexto(rec) {
   const d = rec.datos || {};
   const fecha = new Date(rec.fecha).toLocaleString("es-MX", { dateStyle: "long", timeStyle: "short" });
-  const lines = [`Registro iShop · ${fecha}`, `Sucursal: ${d.sucursal || DOCS_SUCURSAL}`, ""];
+  const lines = [`Registro iShop · ${fecha}`, `Sucursal: ${d.sucursal || DOCS_SUCURSAL}`];
+  if (rec.programa) lines.push(`Programa: ${rec.programa}`);
+  lines.push("");
   DOCS_CAMPOS.forEach(([k, label]) => { if (d[k]) lines.push(`${label}: ${d[k]}`); });
   return lines.join("\n") + "\n";
 }
@@ -2114,155 +2114,6 @@ async function docsCopy(text, btn) {
   btn.textContent = ok ? "✓ Copiado" : "No se pudo";
   btn.classList.toggle("done", ok);
   setTimeout(() => { btn.textContent = old; btn.classList.remove("done"); }, 1400);
-}
-
-/* ---------- Lector del nombre (INE) con Tesseract, todo dentro del teléfono ---------- */
-let docsOcrP = null;
-function docsGetWorker() {
-  if (docsOcrP) return docsOcrP;
-  const abs = (p) => new URL(p, location.href).href;
-  docsOcrP = (async () => {
-    if (!window.Tesseract) {
-      await new Promise((ok, bad) => {
-        const s = document.createElement("script");
-        s.src = "libs/tesseract/tesseract.min.js";
-        s.onload = ok; s.onerror = () => bad(new Error("no carga"));
-        document.head.appendChild(s);
-      });
-    }
-    return window.Tesseract.createWorker("spa", 1, {
-      workerPath: abs("libs/tesseract/worker.min.js"),
-      corePath: abs("libs/tesseract"),
-      langPath: abs("libs/tesseract"),
-      gzip: true,
-      cacheMethod: "none",
-    });
-  })();
-  docsOcrP.catch(() => { docsOcrP = null; });
-  return docsOcrP;
-}
-
-// Prepara la foto para leerla: tamaño parejo, escala de grises, contraste (y opcional blanco/negro).
-async function docsPrepOcr(blob, binarize) {
-  const url = URL.createObjectURL(blob);
-  try {
-    const img = new Image();
-    await new Promise((ok, bad) => { img.onload = ok; img.onerror = bad; img.src = url; });
-    const long = Math.max(img.naturalWidth, img.naturalHeight);
-    const scale = Math.max(0.5, Math.min(2, 1800 / long));
-    const c = document.createElement("canvas");
-    c.width = Math.round(img.naturalWidth * scale);
-    c.height = Math.round(img.naturalHeight * scale);
-    const ctx = c.getContext("2d", { willReadFrequently: true });
-    ctx.drawImage(img, 0, 0, c.width, c.height);
-    const im = ctx.getImageData(0, 0, c.width, c.height);
-    const px = im.data, n = px.length / 4;
-    const g = new Uint8ClampedArray(n), hist = new Uint32Array(256);
-    for (let i = 0; i < n; i++) {
-      const v = (px[i * 4] * 0.299 + px[i * 4 + 1] * 0.587 + px[i * 4 + 2] * 0.114) | 0;
-      g[i] = v; hist[v]++;
-    }
-    let acc = 0, lo = 0, hi = 255;
-    for (let v = 0; v < 256; v++) { acc += hist[v]; if (acc >= n * 0.02) { lo = v; break; } }
-    acc = 0;
-    for (let v = 255; v >= 0; v--) { acc += hist[v]; if (acc >= n * 0.02) { hi = v; break; } }
-    const span = Math.max(1, hi - lo);
-    for (let i = 0; i < n; i++) g[i] = Math.max(0, Math.min(255, ((g[i] - lo) * 255) / span));
-    let thr = 128;
-    if (binarize) {   // Otsu
-      const h2 = new Uint32Array(256);
-      for (let i = 0; i < n; i++) h2[g[i]]++;
-      let sum = 0; for (let t = 0; t < 256; t++) sum += t * h2[t];
-      let sB = 0, wB = 0, best = 0;
-      for (let t = 0; t < 256; t++) {
-        wB += h2[t]; if (!wB) continue;
-        const wF = n - wB; if (!wF) break;
-        sB += t * h2[t];
-        const mB = sB / wB, mF = (sum - sB) / wF;
-        const between = wB * wF * (mB - mF) * (mB - mF);
-        if (between > best) { best = between; thr = t; }
-      }
-    }
-    for (let i = 0; i < n; i++) {
-      const v = binarize ? (g[i] > thr ? 255 : 0) : g[i];
-      px[i * 4] = px[i * 4 + 1] = px[i * 4 + 2] = v; px[i * 4 + 3] = 255;
-    }
-    ctx.putImageData(im, 0, 0);
-    return c;
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-}
-
-// En la credencial el bloque va así:  NOMBRE / apellido paterno / apellido materno / nombre(s)
-function docsParseNombre(data) {
-  const UP = /^[A-ZÁÉÍÓÚÜÑ]{2,}$/;
-  const rows = (data.lines || []).map(l => {
-    const clean = (t) => (t || "").trim().replace(/^[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+|[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+$/g, "");
-    const ws = (l.words || []).map(w => ({ text: clean(w.text), confidence: w.confidence })).filter(w => UP.test(w.text));
-    const text = ws.map(w => w.text).join(" ");
-    const conf = ws.length ? ws.reduce((a, w) => a + w.confidence, 0) / ws.length : 0;
-    return { ws, text, conf, raw: (l.text || "").toUpperCase() };
-  });
-  const iLabel = rows.findIndex(r => r.ws.some(w => /^N[O0]MBRES?$/.test(w.text.trim())));
-  if (iLabel < 0) return null;
-  const STOP = /DOMICILIO|CALLE|COL\b|FECHA|SEXO|CLAVE|CURP|ESTADO|NACIMIENTO|\d/;
-  const got = [];
-  for (let i = iLabel + 1; i < rows.length && got.length < 5; i++) {
-    const r = rows[i];
-    if (STOP.test(r.raw)) break;
-    if (r.text && r.ws.some(w => w.text.trim().length >= 2)) got.push(r);
-  }
-  if (!got.length) return null;
-  const join = (arr) => arr.map(r => r.text).join(" ");
-  const avg = (arr) => arr.reduce((a, r) => a + r.conf, 0) / arr.length;
-  let paterno = "", materno = "", nombre = "", cP = 0, cM = 0, cN = 0;
-  if (got.length === 1) { nombre = got[0].text; cN = got[0].conf; }
-  else if (got.length === 2) { paterno = got[0].text; cP = got[0].conf; nombre = got[1].text; cN = got[1].conf; }
-  else {
-    paterno = got[0].text; cP = got[0].conf;
-    materno = got[1].text; cM = got[1].conf;
-    nombre = join(got.slice(2)); cN = avg(got.slice(2));
-  }
-  return { paterno, materno, nombre, cP, cM, cN, lines: got.length, score: avg(got) };
-}
-
-async function docsRunOcr() {
-  const token = ++docsOcrToken;
-  const d = docsDraft;
-  const blob = d.frente;
-  if (!blob) return;
-  d.ocr = "leyendo";
-  if (docsNameHook) docsNameHook();
-  let best = null;
-  try {
-    const worker = await docsGetWorker();
-    for (const bin of [false, true]) {
-      const canvas = await docsPrepOcr(blob, bin);
-      const { data } = await worker.recognize(canvas);
-      if (token !== docsOcrToken) return;
-      const r = docsParseNombre(data);
-      if (r && (!best || r.lines > best.lines || (r.lines === best.lines && r.score > best.score))) best = r;
-      if (best && best.lines >= 3 && best.score >= 85) break;
-    }
-  } catch (e) {
-    best = null;
-  }
-  if (token !== docsOcrToken) return;
-  if (!best) {
-    d.ocr = "fallo";
-  } else {
-    const put = (k, v, c) => {
-      if (!v) return;
-      if (d[k] && !d.auto[k]) return;   // lo que escribió la persona no se pisa
-      d[k] = v; d.auto[k] = true; d.dudoso[k] = c < 80;
-    };
-    put("paterno", best.paterno, best.cP);
-    put("materno", best.materno, best.cM);
-    put("nombre", best.nombre, best.cN);
-    d.ocr = best.lines >= 3 && !d.dudoso.paterno && !d.dudoso.materno && !d.dudoso.nombre ? "ok" : "parcial";
-  }
-  if (docsNameHook) docsNameHook();
 }
 
 /* ---------- Gesto secreto: mantener presionado "Código cajas" ---------- */
@@ -2287,7 +2138,6 @@ function setupDocsTrigger(el) {
       docsClickGuard = true;
       if (navigator.vibrate) navigator.vibrate(30);
       docsDraft = docsNewDraft();
-      docsOcrToken++;
       navigate({ screen: "docs", title: "Documentos" });
     }, DOCS_HOLD_MS);
   });
@@ -2315,13 +2165,28 @@ function docsInitHeader(wrap) {
 function docsBindText(wrap, id, key, opts = {}) {
   const el = wrap.querySelector("#" + id);
   el.value = docsDraft[key] || "";
-  if (docsDraft.dudoso[key]) el.classList.add("dudoso");
   el.addEventListener("input", () => {
     docsDraft[key] = opts.upper ? el.value.toUpperCase() : el.value;
     if (opts.upper && el.value !== docsDraft[key]) el.value = docsDraft[key];
-    if (docsDraft.auto[key] !== undefined) { docsDraft.auto[key] = false; docsDraft.dudoso[key] = false; el.classList.remove("dudoso"); }
+    if (opts.onInput) opts.onInput();
   });
   return el;
+}
+
+// Selector discreto For Life / Get (letra chica y gris; el área para tocar sí es grande). Toca de nuevo para quitarlo.
+function docsProgramaHtml() {
+  return `<div class="docs-prog" id="docsProg">${DOCS_PROGRAMAS.map(p => `<button type="button" data-p="${p}">${p}</button>`).join("")}</div>`;
+}
+function docsBindPrograma(wrap) {
+  const box = wrap.querySelector("#docsProg");
+  const paint = () => box.querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.p === docsDraft.programa));
+  box.addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-p]");
+    if (!b) return;
+    docsDraft.programa = docsDraft.programa === b.dataset.p ? "" : b.dataset.p;
+    paint();
+  });
+  paint();
 }
 
 /* ---------- Pantalla 1: datos del cliente + firma ---------- */
@@ -2359,6 +2224,7 @@ function buildDocs() {
     <button type="button" class="docs-accept" id="dNext"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Aceptar</span></button>
     <button type="button" class="docs-link" id="dSkip">Omitir datos · solo fotos</button>
     <button type="button" class="docs-link" id="dVer">Ver registros</button>
+    ${docsProgramaHtml()}
   `;
   docsInitHeader(wrap);
   const $ = (s) => wrap.querySelector(s);
@@ -2368,6 +2234,7 @@ function buildDocs() {
   docsBindText(wrap, "dMaterno", "materno", { upper: true });
   docsBindText(wrap, "dTel", "telefono");
   docsBindText(wrap, "dSerie", "serie", { upper: true });
+  docsBindPrograma(wrap);
   $("#dFecha").textContent = docsFechaHoy();
   $("#dSuc").textContent = DOCS_SUCURSAL;
 
@@ -2417,7 +2284,7 @@ function buildDocs() {
   return wrap;
 }
 
-/* ---------- Pantalla 2: fotos (el frente llena el nombre) ---------- */
+/* ---------- Pantalla 2: fotos ---------- */
 function buildDocsFotos() {
   const wrap = document.createElement("div");
   wrap.className = "docs-page";
@@ -2425,6 +2292,8 @@ function buildDocsFotos() {
     ${docsHeaderHtml()}
     <div class="docs-card">
       <h3>Carga de documentos</h3>
+      <div class="docs-field"><label for="fNombre">Nombre :</label>
+        <input id="fNombre" class="docs-input" type="text" autocomplete="off" autocapitalize="characters" placeholder="Nombre del cliente"></div>
       <div class="docs-field">
         <label>Documento</label>
         <div class="docs-seg" id="docsSeg" data-side="frente">
@@ -2434,14 +2303,6 @@ function buildDocsFotos() {
         </div>
         <div class="docs-slot" id="docsSlotDoc"></div>
       </div>
-      <div class="docs-namebox">
-        <div class="docs-ocr" id="docsOcr"></div>
-        <div class="docs-field"><label for="fNombre">Nombre :</label><input id="fNombre" class="docs-input" type="text" autocomplete="off" autocapitalize="characters"></div>
-        <div class="docs-row2">
-          <div class="docs-field"><label for="fPaterno">Apellido Paterno :</label><input id="fPaterno" class="docs-input" type="text" autocomplete="off" autocapitalize="characters"></div>
-          <div class="docs-field"><label for="fMaterno">Apellido Materno :</label><input id="fMaterno" class="docs-input" type="text" autocomplete="off" autocapitalize="characters"></div>
-        </div>
-      </div>
       <div class="docs-field">
         <label>Ticket de compra :</label>
         <div class="docs-slot" id="docsSlotTicket"></div>
@@ -2449,41 +2310,25 @@ function buildDocsFotos() {
     </div>
     <button type="button" class="docs-accept" id="docsAccept"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Aceptar</span></button>
     <p class="docs-msg" id="docsMsg" role="status"></p>
+    ${docsProgramaHtml()}
   `;
   docsInitHeader(wrap);
+  docsBindPrograma(wrap);
   const $ = (s) => wrap.querySelector(s);
   const d = docsDraft;
-  const inputs = {
-    nombre: docsBindText(wrap, "fNombre", "nombre", { upper: true }),
-    paterno: docsBindText(wrap, "fPaterno", "paterno", { upper: true }),
-    materno: docsBindText(wrap, "fMaterno", "materno", { upper: true }),
-  };
-  const ocrEl = $("#docsOcr");
+
+  // Si el nombre ya se capturó en la primera pantalla, aquí queda bloqueado. Si no, se puede escribir.
+  const nombreEl = docsBindText(wrap, "fNombre", "nombre", { upper: true, onInput: () => { d.nombreEnFotos = true; } });
+  if (d.nombre.trim() && !d.nombreEnFotos) {
+    nombreEl.readOnly = true;
+    nombreEl.classList.add("locked");
+    nombreEl.value = docsFullName(d);   // se muestra completo (nombre + apellidos si se capturaron)
+  }
+
   const seg = $("#docsSeg");
   const acceptBtn = $("#docsAccept");
   const urls = {};
   let side = "frente";
-
-  function paintName() {
-    if (docsNameHook !== paintName) return;   // pantalla vieja
-    Object.keys(inputs).forEach(k => {
-      if (document.activeElement !== inputs[k]) inputs[k].value = d[k] || "";
-      inputs[k].classList.toggle("dudoso", !!d.dudoso[k]);
-    });
-    const t = {
-      "": "",
-      leyendo: "⏳ Leyendo el nombre de la foto…",
-      ok: "✓ Nombre leído. Revísalo.",
-      parcial: "⚠ Leí el nombre, pero revisa los campos marcados.",
-      fallo: "No pude leer el nombre. Escríbelo si lo necesitas.",
-    }[d.ocr];
-    ocrEl.textContent = t;
-    ocrEl.className = "docs-ocr " + (d.ocr || "");
-    ocrEl.hidden = !t;
-  }
-  docsNameHook = paintName;
-  paintName();
-  docsGetWorker().catch(() => {});   // calienta el lector para que ya esté listo al tomar la foto
 
   const refresh = () => {
     seg.querySelectorAll("button").forEach(b => b.classList.toggle("has", !!d[b.dataset.side]));
@@ -2514,7 +2359,6 @@ function buildDocsFotos() {
       d.names[key] = f.name || "foto.jpg";
       renderSlot(container, key);
       refresh();
-      if (key === "frente") docsRunOcr();
     });
 
     if (d[key]) {
@@ -2525,11 +2369,7 @@ function buildDocsFotos() {
       img.alt = "Vista previa"; img.src = urls[key];
       const rm = document.createElement("button");
       rm.type = "button"; rm.className = "docs-remove"; rm.textContent = "Quitar foto";
-      rm.addEventListener("click", () => {
-        d[key] = null; d.names[key] = "";
-        if (key === "frente") { docsOcrToken++; d.ocr = ""; paintName(); }
-        renderSlot(container, key); refresh();
-      });
+      rm.addEventListener("click", () => { d[key] = null; d.names[key] = ""; renderSlot(container, key); refresh(); });
       prev.append(img, rm);
       container.appendChild(prev);
     }
@@ -2595,6 +2435,7 @@ function buildDocsConfirm() {
     r.append(a, b); rows.appendChild(r);
   };
   const hayDatos = docsHayDatos(d);
+  if (d.programa) addRow("Programa", d.programa);
   if (hayDatos) {
     DOCS_CAMPOS.forEach(([k, label]) => { if (d[k]) addRow(label, d[k]); });
     addRow("Fecha", docsFechaHoy());
@@ -2621,6 +2462,7 @@ function buildDocsConfirm() {
   if (!d.reverso) faltan.push("foto de atrás");
   if (!d.ticket) faltan.push("ticket");
   if (hayDatos && !d.firmaUrl) faltan.push("firma");
+  if (!d.programa) faltan.push("programa (For Life / Get)");
   if (faltan.length) {
     const w = wrap.querySelector("#cfWarn");
     w.hidden = false; w.textContent = "Falta: " + faltan.join(", ") + ".";
@@ -2635,6 +2477,7 @@ function buildDocsConfirm() {
       const rec = {
         id: Date.now() + "-" + Math.random().toString(36).slice(2, 7),
         nombre: docsFullName(d) || "Sin nombre",
+        programa: d.programa,
         fecha: new Date().toISOString(),
         datos: hayDatos ? {
           email: d.email.trim(), nombre: d.nombre.trim(), paterno: d.paterno.trim(), materno: d.materno.trim(),
@@ -2648,7 +2491,7 @@ function buildDocsConfirm() {
       await docsPut(rec);
       if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
       tUrls.forEach(u => URL.revokeObjectURL(u));
-      docsDraft = docsNewDraft(); docsOcrToken++; docsNameHook = null;
+      docsDraft = docsNewDraft();
       stack = [{ screen: "home", title: "iShop Tools" }];   // al regresar desde la palomita se va al inicio
       navigate({ screen: "docsOk", title: "Registro", hero: true });
     } catch (e) {
@@ -2718,7 +2561,14 @@ function buildDocsOk(entry) {
       meta.className = "docs-rec-meta";
       meta.textContent = new Date(rec.fecha).toLocaleString("es-MX", { dateStyle: "medium", timeStyle: "short" });
 
-      card.append(top, meta);
+      card.append(top);
+      if (rec.programa) {
+        const pr = document.createElement("div");
+        pr.className = "docs-rec-prog";
+        pr.textContent = rec.programa;
+        card.append(pr);
+      }
+      card.append(meta);
 
       const d = rec.datos;
       if (d) {
