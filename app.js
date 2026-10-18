@@ -2069,7 +2069,7 @@ function docsFile(blob, base, tag) {
   const ext = blob.type === "image/png" ? "png" : "jpg";
   return new File([blob], `${base}_${tag}.${ext}`, { type: blob.type || "image/jpeg" });
 }
-const docsBase = (nombre) => ((nombre || "registro").replace(/[^\w-]+/g, "_").slice(0, 40)) || "registro";
+const docsBase = (nombre) => ((nombre || "registro").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\w-]+/g, "_").slice(0, 40)) || "registro";
 
 async function docsShare(rec) {
   const base = docsBase(rec.nombre);
@@ -2114,6 +2114,124 @@ async function docsCopy(text, btn) {
   btn.textContent = ok ? "✓ Copiado" : "No se pudo";
   btn.classList.toggle("done", ok);
   setTimeout(() => { btn.textContent = old; btn.classList.remove("done"); }, 1400);
+}
+
+
+/* ---------- Contrato en PDF (For Life) ---------- */
+// Plantilla en blanco: contrato/for_life.pdf  ·  Librería: libs/pdf-lib.min.js
+const DOCS_PDF_TEMPLATES = { "For Life": "contrato/for_life.pdf" };
+let docsPdfLibP = null;
+function docsLoadPdfLib() {
+  if (window.PDFLib) return Promise.resolve(window.PDFLib);
+  if (docsPdfLibP) return docsPdfLibP;
+  docsPdfLibP = new Promise((ok, bad) => {
+    const s = document.createElement("script");
+    s.src = "libs/pdf-lib.min.js";
+    s.onload = () => ok(window.PDFLib);
+    s.onerror = () => { docsPdfLibP = null; bad(new Error("no carga pdf-lib")); };
+    document.head.appendChild(s);
+  });
+  return docsPdfLibP;
+}
+const docsDmy = (dt) => `${String(dt.getDate()).padStart(2, "0")}/${String(dt.getMonth() + 1).padStart(2, "0")}/${dt.getFullYear()}`;
+function docsPlusMonths(dt, m) {
+  const d = new Date(dt.getFullYear(), dt.getMonth() + m, 1);
+  const last = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  d.setDate(Math.min(dt.getDate(), last));
+  return d;
+}
+// Recorta la firma al área con tinta para que se vea grande en el contrato.
+async function docsCropInk(blob) {
+  const url = URL.createObjectURL(blob);
+  try {
+    const im = new Image();
+    await new Promise((ok, bad) => { im.onload = ok; im.onerror = bad; im.src = url; });
+    const c = document.createElement("canvas");
+    c.width = im.naturalWidth; c.height = im.naturalHeight;
+    const x = c.getContext("2d", { willReadFrequently: true });
+    x.fillStyle = "#fff"; x.fillRect(0, 0, c.width, c.height); x.drawImage(im, 0, 0);
+    const px = x.getImageData(0, 0, c.width, c.height).data;
+    let x0 = c.width, y0 = c.height, x1 = -1, y1 = -1;
+    for (let y = 0; y < c.height; y++) for (let xx = 0; xx < c.width; xx++) {
+      const i = (y * c.width + xx) * 4;
+      if (px[i] < 200 || px[i + 1] < 200 || px[i + 2] < 200) { if (xx < x0) x0 = xx; if (xx > x1) x1 = xx; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    }
+    if (x1 < 0) return null;
+    const pad = 6;
+    x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad); x1 = Math.min(c.width - 1, x1 + pad); y1 = Math.min(c.height - 1, y1 + pad);
+    const o = document.createElement("canvas");
+    o.width = x1 - x0 + 1; o.height = y1 - y0 + 1;
+    o.getContext("2d").drawImage(c, x0, y0, o.width, o.height, 0, 0, o.width, o.height);
+    const out = await new Promise(r => o.toBlob(r, "image/png"));
+    return new Uint8Array(await out.arrayBuffer());
+  } finally { URL.revokeObjectURL(url); }
+}
+
+async function docsMakePdf(rec) {
+  const PDFLib = await docsLoadPdfLib();
+  const { PDFDocument, StandardFonts, rgb } = PDFLib;
+  const tplUrl = DOCS_PDF_TEMPLATES[rec.programa] || DOCS_PDF_TEMPLATES["For Life"];
+  const resp = await fetch(tplUrl);
+  if (!resp.ok) throw new Error("no hay plantilla");
+  const pdf = await PDFDocument.load(await resp.arrayBuffer());
+  const font = await pdf.embedFont(StandardFonts.Helvetica);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const pages = pdf.getPages();
+  const p1 = pages[0], pl = pages[pages.length - 1];
+  const H = 792;                       // alto carta; las coordenadas se miden desde arriba
+  const d = rec.datos || {};
+  const black = rgb(0, 0, 0);
+
+  const safe = (t, f) => Array.from(String(t || "").normalize("NFC")).map(ch => { try { f.encodeText(ch); return ch; } catch (e) { return "?"; } }).join("");
+  const fit = (t, f, size, maxW) => { let s = size; while (s > 4.5 && f.widthOfTextAtSize(t, s) > maxW) s -= 0.25; return s; };
+  const put = (page, text, x, baseTop, f, size, maxW) => {
+    const t = safe(text, f); if (!t) return;
+    page.drawText(t, { x, y: H - baseTop, size: fit(t, f, size, maxW), font: f, color: black });
+  };
+  const putC = (page, text, cx, baseTop, f, size, maxW) => {
+    const t = safe(text, f); if (!t) return;
+    const sz = fit(t, f, size, maxW);
+    page.drawText(t, { x: cx - f.widthOfTextAtSize(t, sz) / 2, y: H - baseTop, size: sz, font: f, color: black });
+  };
+
+  // Página 1: cliente y vigencia
+  put(p1, d.paterno, 55.9, 118.7, font, 7, 155);
+  put(p1, d.materno, 223.7, 118.7, font, 7, 145);
+  put(p1, d.nombre, 379.9, 118.7, font, 7, 170);
+  put(p1, d.telefono, 55.9, 149.5, font, 7, 220);
+  put(p1, d.email, 292.2, 149.5, font, 7, 250);
+  const inicio = new Date(rec.fecha);
+  put(p1, docsDmy(inicio), 223.7, 294.6, bold, 7, 140);
+  put(p1, docsDmy(docsPlusMonths(inicio, 24)), 379.9, 294.6, bold, 7, 140);
+
+  // Última página: firma, nombre, fecha, sucursal
+  const nombreCompleto = [d.nombre, d.paterno, d.materno].filter(Boolean).join(" ");
+  putC(pl, nombreCompleto, 164.2, 695.9, font, 9.5, 185);
+  putC(pl, docsDmy(inicio), 336.9, 695.9, font, 9.5, 90);
+  putC(pl, d.sucursal || DOCS_SUCURSAL, 467.2, 695.9, font, 9.5, 100);
+  if (rec.firma) {
+    const bytes = await docsCropInk(rec.firma);
+    if (bytes) {
+      const img = await pdf.embedPng(bytes);
+      const boxW = 160, boxH = 86, boxCx = 164.2, boxTop = 598;   // zona sobre la línea del nombre
+      const sc = Math.min(boxW / img.width, boxH / img.height);
+      const w = img.width * sc, h = img.height * sc;
+      pl.drawImage(img, { x: boxCx - w / 2, y: H - (boxTop + boxH / 2) - h / 2, width: w, height: h });
+    }
+  }
+  return new Blob([await pdf.save()], { type: "application/pdf" });
+}
+async function docsShareContrato(rec, btn) {
+  const old = btn.textContent;
+  btn.disabled = true; btn.textContent = "Generando…";
+  try {
+    const blob = await docsMakePdf(rec);
+    const f = new File([blob], `${docsBase(rec.nombre)}_${(rec.programa || "contrato").replace(/\s+/g, "")}.pdf`, { type: "application/pdf" });
+    await docsShareFiles([f], docsBase(rec.nombre));
+  } catch (e) {
+    alert("No se pudo generar el PDF. Revisa que existan libs/pdf-lib.min.js y contrato/for_life.pdf en tu proyecto.");
+  }
+  btn.disabled = false; btn.textContent = old;
 }
 
 /* ---------- Gesto secreto: mantener presionado "Código cajas" ---------- */
@@ -2615,6 +2733,10 @@ function buildDocsOk(entry) {
         b.addEventListener("click", fn); return b;
       };
       actions.append(mk("Guardar fotos", "", () => docsShare(rec)));
+      if (d && DOCS_PDF_TEMPLATES[rec.programa]) {
+        const pb = mk("Descargar PDF", "", () => docsShareContrato(rec, pb));
+        actions.append(pb);
+      }
       if (d) actions.append(mk("Descargar datos", "sec", () => docsShareDatos(rec)));
       actions.append(mk("Borrar", "danger", async () => {
         if (!confirm("¿Borrar este registro del teléfono? No se puede recuperar.")) return;
