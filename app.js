@@ -5,6 +5,46 @@
    placeholder que confirma que la navegación funciona.
    ========================================================= */
 
+/* =====================================================================
+   Ajustes personales (se guardan en ESTE teléfono): nombre, color, apariencia y mosaicos
+   ===================================================================== */
+const ISHOP_ACENTOS = [
+  ["Azul", "#0071e3"], ["Morado", "#5856d6"], ["Rosa", "#d6336c"], ["Rojo", "#e03131"],
+  ["Naranja", "#e8590c"], ["Verde", "#2b8a3e"], ["Turquesa", "#0c8599"], ["Grafito", "#495057"],
+];
+const ISHOP_AJUSTES_DEF = { nombre: "", acento: "#0071e3", modo: "claro", mosaicos: "original", listo: false };
+function ishopAjustes() {
+  try { return Object.assign({}, ISHOP_AJUSTES_DEF, JSON.parse(localStorage.getItem("ishop_ajustes") || "{}")); }
+  catch (e) { return Object.assign({}, ISHOP_AJUSTES_DEF); }
+}
+function ishopGuardarAjustes(patch) {
+  const a = Object.assign(ishopAjustes(), patch);
+  try { localStorage.setItem("ishop_ajustes", JSON.stringify(a)); } catch (e) {}
+  ishopAplicarTema();
+  return a;
+}
+function ishopEsOscuro(a) {
+  return a.modo === "oscuro" || (a.modo === "auto" && window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches);
+}
+function ishopColorBarra() { return ishopEsOscuro(ishopAjustes()) ? "#000000" : "#f5f5f7"; }
+function ishopAplicarTema() {
+  const a = ishopAjustes();
+  const root = document.documentElement;
+  root.style.setProperty("--accent", a.acento);
+  root.style.setProperty("--accent-press", `color-mix(in srgb, ${a.acento} 78%, black)`);
+  root.dataset.mode = ishopEsOscuro(a) ? "dark" : "light";
+  root.dataset.tiles = a.mosaicos;
+  if (!root.classList.contains("rep-mode")) {
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute("content", ishopColorBarra());
+  }
+}
+ishopAplicarTema();
+if (window.matchMedia) {
+  const mq = matchMedia("(prefers-color-scheme: dark)");
+  if (mq.addEventListener) mq.addEventListener("change", ishopAplicarTema);
+}
+
 // ---- Definición del menú principal ----
 const MENU = [
   { id: "tradein",   icon: "💰", label: "Trade In",       color: "#0071e3" },
@@ -250,6 +290,16 @@ function goHome() {
   render(false);
 }
 
+// Botón de ajustes (engrane): solo se ve en el inicio
+const settingsBtn = document.createElement("button");
+settingsBtn.id = "settingsBtn";
+settingsBtn.className = "nav-btn";
+settingsBtn.setAttribute("aria-label", "Ajustes");
+settingsBtn.hidden = true;
+settingsBtn.innerHTML = `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 3v2.4M12 18.6V21M3 12h2.4M18.6 12H21M5.6 5.6l1.7 1.7M16.7 16.7l1.7 1.7M5.6 18.4l1.7-1.7M16.7 7.3l1.7-1.7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
+document.getElementById("topbar").appendChild(settingsBtn);
+settingsBtn.addEventListener("click", () => navigate({ screen: "settings", title: "Ajustes" }));
+
 backBtn.addEventListener("click", goBack);
 homeBtn.addEventListener("click", goHome);
 
@@ -284,6 +334,7 @@ function render(isForward) {
   titleEl.textContent = entry.title;
   backBtn.hidden = stack.length === 1;
   homeBtn.hidden = stack.length === 1;
+  settingsBtn.hidden = entry.screen !== "home";
   setRepairTheme(entry.screen === "repair");
 
   const node = buildScreen(entry);
@@ -329,6 +380,8 @@ function buildScreen(entry) {
   } else if (entry.screen === "repair") {
     el.classList.add("rep-screen");
     el.appendChild(buildRepair(entry.category, entry.model, entry.variant));
+  } else if (entry.screen === "settings") {
+    el.appendChild(buildSettings(entry));
   } else if (entry.screen === "docs") {
     el.appendChild(buildDocs());
   } else if (entry.screen === "docsFotos") {
@@ -382,6 +435,7 @@ function buildHome() {
     </div>
   `;
   wrap.appendChild(heading);
+  { const nom = ishopAjustes().nombre; if (nom) heading.querySelector("p").textContent = `Hola, ${nom}. ¿Qué herramienta necesitas?`; }
   setupArcadeTrigger(heading.querySelector("#ishopArcadeTrigger"));
 
   const listWrap = document.createElement("div");
@@ -1673,7 +1727,7 @@ const REPAIR_PARTS = [
 function setRepairTheme(on) {
   document.documentElement.classList.toggle("rep-mode", !!on);
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute("content", on ? "#0a0a0c" : "#f5f5f7");
+  if (meta) meta.setAttribute("content", on ? "#0a0a0c" : ishopColorBarra());
 }
 
 function setupRepairTrigger(el, onOpen) {
@@ -1953,6 +2007,73 @@ function openRepairViewer(src) {
   }, { passive: false });
 }
 
+
+/* ---------- Pantalla de ajustes ---------- */
+function buildSettings(entry) {
+  const a0 = ishopAjustes();
+  const wrap = document.createElement("div");
+  wrap.className = "set-page";
+  wrap.innerHTML = `
+    <div class="home-heading"><h2>${entry.welcome ? "¡Bienvenido!" : "Ajustes"}</h2>
+      <p>${entry.welcome ? "Configura tu app. Esto se guarda solo en tu teléfono y lo cambias cuando quieras." : "Se guardan solos en este teléfono."}</p></div>
+    <div class="set-card"><label class="set-label" for="setNombre">Tu nombre</label>
+      <input id="setNombre" class="set-input" type="text" maxlength="30" autocomplete="off" autocapitalize="words" placeholder="Escribe tu nombre"></div>
+    <div class="set-card"><div class="set-label">Color</div>
+      <div class="set-swatches" id="setSw"></div></div>
+    <div class="set-card"><div class="set-label">Apariencia</div>
+      <div class="set-seg" id="setModo">
+        <button type="button" data-v="claro">Claro</button><button type="button" data-v="oscuro">Oscuro</button><button type="button" data-v="auto">Automático</button>
+      </div></div>
+    <div class="set-card"><div class="set-label">Mosaicos del menú</div>
+      <div class="set-seg" id="setTiles">
+        <button type="button" data-v="original">Colores variados</button><button type="button" data-v="acento">Un solo color</button>
+      </div></div>
+    ${entry.welcome ? `<button type="button" class="set-go" id="setGo">Empezar</button>` : `<button type="button" class="set-reset" id="setReset">Restablecer colores</button>`}
+  `;
+  const $ = (q) => wrap.querySelector(q);
+  const nom = $("#setNombre");
+  nom.value = a0.nombre;
+  nom.addEventListener("input", () => ishopGuardarAjustes({ nombre: nom.value.trim().slice(0, 30), listo: true }));
+
+  const sw = $("#setSw");
+  ISHOP_ACENTOS.forEach(([name, hex]) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "set-sw"; b.dataset.hex = hex; b.setAttribute("aria-label", name);
+    b.style.background = hex;
+    b.addEventListener("click", () => { ishopGuardarAjustes({ acento: hex, listo: true }); paint(); });
+    sw.appendChild(b);
+  });
+  const custom = document.createElement("label");
+  custom.className = "set-sw set-sw-custom"; custom.setAttribute("aria-label", "Otro color");
+  custom.innerHTML = `<span>+</span><input type="color" value="${a0.acento}">`;
+  custom.querySelector("input").addEventListener("input", (e) => { ishopGuardarAjustes({ acento: e.target.value, listo: true }); paint(); });
+  sw.appendChild(custom);
+
+  const bindSeg = (id, key) => {
+    $(id).addEventListener("click", (e) => {
+      const b = e.target.closest("button[data-v]"); if (!b) return;
+      ishopGuardarAjustes({ [key]: b.dataset.v, listo: true }); paint();
+    });
+  };
+  bindSeg("#setModo", "modo"); bindSeg("#setTiles", "mosaicos");
+
+  function paint() {
+    const a = ishopAjustes();
+    sw.querySelectorAll(".set-sw[data-hex]").forEach(b => b.classList.toggle("on", b.dataset.hex.toLowerCase() === a.acento.toLowerCase()));
+    custom.classList.toggle("on", !ISHOP_ACENTOS.some(([, h]) => h.toLowerCase() === a.acento.toLowerCase()));
+    custom.style.background = custom.classList.contains("on") ? a.acento : "";
+    $("#setModo").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.v === a.modo));
+    $("#setTiles").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.v === a.mosaicos));
+  }
+  paint();
+
+  const go = $("#setGo");
+  if (go) go.addEventListener("click", () => { ishopGuardarAjustes({ nombre: nom.value.trim().slice(0, 30), listo: true }); goHome(); });
+  const rs = $("#setReset");
+  if (rs) rs.addEventListener("click", () => { ishopGuardarAjustes({ acento: ISHOP_AJUSTES_DEF.acento, modo: ISHOP_AJUSTES_DEF.modo, mosaicos: ISHOP_AJUSTES_DEF.mosaicos }); paint(); });
+  return wrap;
+}
+
 /* =====================================================================
    Registro de documentos (oculto)
    Se abre manteniendo presionado "Código cajas" ~3 segundos.
@@ -2092,6 +2213,7 @@ function docsDatosTexto(rec) {
   const fecha = new Date(rec.fecha).toLocaleString("es-MX", { dateStyle: "long", timeStyle: "short" });
   const lines = [`Registro iShop · ${fecha}`, `Sucursal: ${d.sucursal || DOCS_SUCURSAL}`];
   if (rec.programa) lines.push(`Programa: ${rec.programa}`);
+  if (rec.empleado) lines.push(`Registrado por: ${rec.empleado}`);
   lines.push("");
   DOCS_CAMPOS.forEach(([k, label]) => { if (d[k]) lines.push(`${label}: ${d[k]}`); });
   return lines.join("\n") + "\n";
@@ -2596,6 +2718,7 @@ function buildDocsConfirm() {
         id: Date.now() + "-" + Math.random().toString(36).slice(2, 7),
         nombre: docsFullName(d) || "Sin nombre",
         programa: d.programa,
+        empleado: ishopAjustes().nombre,
         fecha: new Date().toISOString(),
         datos: hayDatos ? {
           email: d.email.trim(), nombre: d.nombre.trim(), paterno: d.paterno.trim(), materno: d.materno.trim(),
@@ -2677,7 +2800,7 @@ function buildDocsOk(entry) {
 
       const meta = document.createElement("div");
       meta.className = "docs-rec-meta";
-      meta.textContent = new Date(rec.fecha).toLocaleString("es-MX", { dateStyle: "medium", timeStyle: "short" });
+      meta.textContent = new Date(rec.fecha).toLocaleString("es-MX", { dateStyle: "medium", timeStyle: "short" }) + (rec.empleado ? " · " + rec.empleado : "");
 
       card.append(top);
       if (rec.programa) {
@@ -2987,6 +3110,12 @@ function buildFinanceColumnsGrid(finData, ac, cfg) {
 }
 
 render(true);
+
+// Primera vez: pantalla de bienvenida para poner nombre y colores (solo se muestra una vez)
+if (!ishopAjustes().listo) {
+  ishopGuardarAjustes({ listo: true });
+  navigate({ screen: "settings", title: "Bienvenido", welcome: true });
+}
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {

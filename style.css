@@ -73,6 +73,8 @@ html,body{
 .nav-btn svg{ width:22px; height:22px; }
 #backBtn{ left:2px; }
 #homeBtn{ right:6px; }
+#settingsBtn{ right:6px; }
+.nav-btn[hidden]{ display:none; }
 #homeBtn svg{ width:20px; height:20px; }
 .nav-btn:active{ opacity:0.4; }
 
@@ -296,17 +298,17 @@ html,body{
   padding:16px;
   border:none;
   border-radius:14px;
-  background: linear-gradient(135deg, #0071e3, #0058b0);
+  background: linear-gradient(135deg, var(--accent), var(--accent-press));
   color:#fff;
   font-size:16px;
   font-weight:650;
-  box-shadow: 0 6px 16px rgba(0,113,227,0.28);
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--accent) 30%, transparent);
 }
 .primary-btn:active{ transform: scale(0.98); opacity:0.92; }
 
 .sub-btn.selected{
   border-color: var(--accent);
-  background: rgba(0,113,227,0.08);
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
   box-shadow: 0 0 0 1.5px var(--accent) inset;
 }
 
@@ -314,7 +316,7 @@ html,body{
 .trade-banner{
   position:relative;
   overflow:hidden;
-  background: linear-gradient(135deg, #0071e3 0%, #5856d6 60%, #0058b0 100%);
+  background: linear-gradient(135deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 55%, #5856d6) 60%, var(--accent-press) 100%);
   color:#fff;
   border-radius: var(--radius);
   padding:18px 20px;
@@ -322,7 +324,7 @@ html,body{
   display:flex;
   flex-direction:column;
   gap:6px;
-  box-shadow: 0 12px 26px rgba(0,113,227,0.32);
+  box-shadow: 0 12px 26px color-mix(in srgb, var(--accent) 34%, transparent);
 }
 .trade-banner::after{
   content:"";
@@ -1127,3 +1129,59 @@ html.rep-mode .nav-btn{ color:#2997ff; }
 .docs-prog button.on{ color:#6e6e73; font-weight:600; text-decoration:underline; text-underline-offset:3px; }
 .docs-input.locked{ background:#f0f0f2; color:#6e6e73; }
 .docs-rec-prog{ font-size:12px; font-weight:700; color:#6e6e73; letter-spacing:.02em; margin-top:-4px; }
+
+
+/* =====================================================================
+   Ajustes personales + modo oscuro
+   ===================================================================== */
+html[data-tiles="acento"] .coverage-tile{ --tile-color: var(--accent) !important; }
+
+.set-card{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px; margin-bottom:12px; }
+.set-label{ display:block; font-size:13px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:.04em; margin-bottom:10px; }
+.set-input{ width:100%; font:inherit; font-size:17px; padding:11px 12px; color:var(--text); background:var(--bg); border:1px solid var(--border); border-radius:12px; }
+.set-swatches{ display:grid; grid-template-columns:repeat(5, 1fr); gap:12px; }
+.set-sw{ position:relative; aspect-ratio:1; border-radius:50%; border:3px solid transparent; box-shadow:0 0 0 1px var(--border); padding:0; }
+.set-sw.on{ border-color:var(--surface); box-shadow:0 0 0 3px var(--text); }
+.set-sw-custom{ display:flex; align-items:center; justify-content:center; background:conic-gradient(#ff3b30,#ff9500,#ffcc00,#34c759,#0a84ff,#af52de,#ff3b30); color:#fff; font-size:22px; font-weight:700; overflow:hidden; }
+.set-sw-custom span{ text-shadow:0 1px 3px rgba(0,0,0,.5); }
+.set-sw-custom input{ position:absolute; inset:0; width:100%; height:100%; opacity:0; border:none; padding:0; }
+.set-seg{ display:flex; gap:4px; background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:3px; }
+.set-seg button{ flex:1; font:inherit; font-size:14px; font-weight:600; color:var(--text-secondary); background:none; border:none; border-radius:9px; padding:10px 4px; }
+.set-seg button.on{ background:var(--accent); color:#fff; }
+.set-go{ width:100%; margin-top:6px; padding:16px; border:none; border-radius:14px; font:inherit; font-size:17px; font-weight:650; color:#fff; background:linear-gradient(135deg, var(--accent), var(--accent-press)); }
+.set-reset{ display:block; margin:10px auto 0; font:inherit; font-size:14px; color:var(--accent); background:none; border:none; padding:10px 14px; }
+
+html[data-mode="dark"]{
+  --bg:#000000; --surface:#1c1c1e; --text:#f5f5f7; --text-secondary:#98989d; --border:rgba(255,255,255,0.12);
+  color-scheme:dark;
+}
+html[data-mode="dark"] #topbar{ background:rgba(28,28,30,0.86); }
+html[data-mode="dark"] .tool-btn:active, html[data-mode="dark"] .sub-btn:active{ background:#2c2c2e; }
+html[data-mode="dark"] .tool-btn-neutral .tool-icon,
+html[data-mode="dark"] .plan-tabs{ background:#2c2c2e; }
+html[data-mode="dark"] .plan-tab.active{ background:#48484a; }
+html[data-mode="dark"] .ac-hero .coverage-years{ background:#2c2c2e; }
+html[data-mode="dark"] .docs-note, html[data-mode="dark"] .docs-warn{ background:#3a2e12; color:#ffd78a; border-color:#5a4720; }
+html[data-mode="dark"] .docs-card{ background:#1c1c1e; border-color:rgba(255,255,255,0.12); box-shadow:none; }
+html[data-mode="dark"] .docs-input, html[data-mode="dark"] .docs-file{ background:#2c2c2e; border-color:rgba(255,255,255,0.18); color:var(--text); }
+html[data-mode="dark"] .docs-input.locked{ background:#242426; color:#98989d; }
+html[data-mode="dark"] .docs-seg{ background:#3a3a3c; }
+html[data-mode="dark"] .docs-seg-knob{ background:#636366; }
+html[data-mode="dark"] .docs-seg button{ color:#c7c7cc; }
+html[data-mode="dark"] .docs-seg[data-side="frente"] button[data-side="frente"],
+html[data-mode="dark"] .docs-seg[data-side="reverso"] button[data-side="reverso"]{ color:#fff; }
+html[data-mode="dark"] .docs-pick, html[data-mode="dark"] .docs-btn.sec{ background:#3a3a3c; color:var(--text); }
+html[data-mode="dark"] .docs-sign-head{ background:#2c2c2e; border-color:rgba(255,255,255,0.18); }
+html[data-mode="dark"] .docs-sign{ border-color:rgba(255,255,255,0.18); }
+html[data-mode="dark"] .docs-val{ color:var(--text); }
+html[data-mode="dark"] .docs-copy{ background:#1f3550; }
+html[data-mode="dark"] .docs-copy.done{ background:#173a25; color:#7ee2a0; }
+html[data-mode="dark"] .docs-chip{ background:#4a3a14; color:#ffd78a; }
+html[data-mode="dark"] .docs-accept{ background:#f5f5f7; color:#1d1d1f; }
+html[data-mode="dark"] .docs-prog button{ color:#636366; }
+html[data-mode="dark"] .docs-prog button.on{ color:#a1a1a6; }
+html[data-mode="dark"] .docs-cf-row span, html[data-mode="dark"] .docs-rec-meta{ color:var(--text-secondary); }
+html[data-mode="dark"] .chip-bad{ color:#ff8a80; }
+html[data-mode="dark"] .tradein-card{ color:#1d1d1f; }
+html[data-mode="dark"] .tradein-card-label{ color:#1d1d1f; }
+html[data-mode="dark"] .tradein-card .chev{ border-color:#6e6e73; }
