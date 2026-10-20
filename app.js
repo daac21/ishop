@@ -45,16 +45,35 @@ if (window.matchMedia) {
   if (mq.addEventListener) mq.addEventListener("change", ishopAplicarTema);
 }
 
+// Iconos de línea (estilo SF Symbols) para el menú principal y Registros
+const ISHOP_ICONS = (() => {
+  const s = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+  return {
+    tradein:   s(`<rect x="6.5" y="2.5" width="11" height="19" rx="2.6"/><path d="M10.5 5.2h3"/>`),
+    switchup:  s(`<path d="M19.5 11a7.5 7.5 0 0 0-13-4.6L4.5 8.5"/><path d="M4.5 4v4.5H9"/><path d="M4.5 13a7.5 7.5 0 0 0 13 4.6l2-2.1"/><path d="M19.5 20v-4.5H15"/>`),
+    applecare: s(`<path d="M12 2.8 4.5 5.6v5.6c0 4.5 3.1 8.2 7.5 9.9 4.4-1.7 7.5-5.4 7.5-9.9V5.6L12 2.8z"/>`),
+    forlife:   s(`<rect x="5" y="3" width="11" height="18" rx="2.4"/><path d="M8.5 5.6h4"/><path d="M19.5 3.5v5M17 6h5"/>`),
+    getac:     s(`<path d="M6 2.8h8.5L19 7.3V20a1.2 1.2 0 0 1-1.2 1.2H6A1.2 1.2 0 0 1 4.8 20V4A1.2 1.2 0 0 1 6 2.8z"/><path d="M14 3v4.5h4.5"/><path d="M8 12h8M8 15.5h8M8 8.8h3"/>`),
+    cubre:     s(`<path d="M12 2.8 4.5 5.6v5.6c0 4.5 3.1 8.2 7.5 9.9 4.4-1.7 7.5-5.4 7.5-9.9V5.6L12 2.8z"/><path d="m9 12 2.2 2.2L15.5 10"/>`),
+    scanner:   s(`<path d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16"/><rect x="8.5" y="8.5" width="7" height="7" rx="1.2"/>`),
+    cajas:     s(`<path d="M12 2.8 20 7v10l-8 4.2L4 17V7l8-4.2z"/><path d="M4 7l8 4.2L20 7M12 11.2v10"/>`),
+    registros: s(`<rect x="3.5" y="4" width="17" height="16" rx="3"/><path d="M10 9h7M10 12.5h7M10 16h7"/><circle cx="7" cy="9" r=".6" fill="currentColor"/><circle cx="7" cy="12.5" r=".6" fill="currentColor"/><circle cx="7" cy="16" r=".6" fill="currentColor"/>`),
+    coins:     s(`<ellipse cx="12" cy="6.5" rx="7" ry="3"/><path d="M5 6.5v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5"/><path d="M5 11.5v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5"/>`),
+    tag:       s(`<path d="M20.5 12.6 12.6 20.5a1.6 1.6 0 0 1-2.3 0L3.5 13.7V3.5h10.2l6.8 6.8a1.6 1.6 0 0 1 0 2.3z"/><circle cx="8" cy="8" r="1.3"/>`),
+    cancel:    s(`<path d="M6 6l12 12M18 6 6 18"/>`),
+  };
+})();
+
 // ---- Definición del menú principal ----
 const MENU = [
-  { id: "tradein",   icon: "💰", label: "Trade In",       color: "#0071e3" },
-  { id: "switchup",  icon: "🔄", label: "Switch Up",      color: "#ff9500" },
-  { id: "applecare", icon: "🛡️", label: "AppleCare+",     color: "#34c759" },
-  { id: "forlife",   icon: "💳", label: "For Life + AC",  color: "#5856d6" },
-  { id: "getac",     icon: "💳", label: "GET + AC",       color: "#af52de" },
-  { id: "cubre",     icon: "🛠️", label: "¿Qué cubre?",    color: "#ff3b30" },
-  { id: "scanner",   icon: "📷", label: "Escáner",        color: "#1d1d1f" },
-  { id: "cajas",     icon: "𝄃𝄃𝄂𝄂𝄀𝄁𝄃𝄂𝄂𝄃", label: "Código cajas",   color: "#8e8e93" },
+  { id: "tradein",   label: "Trade In",       c1: "#5b8def", c2: "#4a4fe0" },
+  { id: "switchup",  label: "Switch Up",      c1: "#ffb35c", c2: "#f2706a" },
+  { id: "applecare", label: "AppleCare+",     c1: "#6fcf97", c2: "#3b9b86" },
+  { id: "forlife",   label: "For Life + AC",  c1: "#8a6df0", c2: "#5a43c9" },
+  { id: "getac",     label: "GET + AC",       c1: "#f2709c", c2: "#d6457a" },
+  { id: "cubre",     label: "¿Qué cubre?",    c1: "#78c8d8", c2: "#4aa3bd" },
+  { id: "scanner",   label: "Escáner",        c1: "#e9ebf3", c2: "#d4d8e6", light: true },
+  { id: "cajas",     label: "Código cajas",   c1: "#e9ebf3", c2: "#d4d8e6", light: true },
 ];
 
 // ---- iShop Arcade (oculto: se abre manteniendo presionado el nombre "iShop Tools") ----
@@ -302,6 +321,7 @@ settingsBtn.addEventListener("click", () => navigate({ screen: "settings", title
 
 backBtn.addEventListener("click", goBack);
 homeBtn.addEventListener("click", goHome);
+setupArcadeTrigger(titleEl);
 
 /* ---- Deslizar con el dedo hacia la derecha para regresar (como el gesto de iOS) ---- */
 (function setupSwipeBack() {
@@ -335,6 +355,7 @@ function render(isForward) {
   backBtn.hidden = stack.length === 1;
   homeBtn.hidden = stack.length === 1;
   settingsBtn.hidden = entry.screen !== "home";
+  document.documentElement.classList.toggle("home-mode", entry.screen === "home");
   setRepairTheme(entry.screen === "repair");
 
   const node = buildScreen(entry);
@@ -382,6 +403,8 @@ function buildScreen(entry) {
     el.appendChild(buildRepair(entry.category, entry.model, entry.variant));
   } else if (entry.screen === "settings") {
     el.appendChild(buildSettings(entry));
+  } else if (entry.screen === "registros") {
+    el.appendChild(buildRegistros());
   } else if (entry.screen === "docs") {
     el.appendChild(buildDocs());
   } else if (entry.screen === "docsFotos") {
@@ -409,9 +432,7 @@ function buildScreen(entry) {
   } else if (entry.screen === "dino") {
     el.appendChild(buildDino());
   } else if (entry.screen === "tool") {
-    const meta = MENU.find(m => m.id === entry.id);
-    el.appendChild(buildPlaceholder(entry.title, meta ? meta.icon : "🔧",
-      "Esta sección se conectará próximamente a datos/" + entry.id + ".json."));
+    el.appendChild(buildPlaceholder(entry.title, "🛠️", "Esta sección estará disponible próximamente."));
   }
 
   return el;
@@ -419,67 +440,39 @@ function buildScreen(entry) {
 
 function buildHome() {
   const wrap = document.createElement("div");
+  wrap.className = "home-wrap";
 
   const heading = document.createElement("div");
   heading.className = "home-heading";
-  heading.innerHTML = `
-    <div class="home-heading-row">
-      <div>
-        <h2 id="ishopArcadeTrigger">iShop Tools</h2>
-        <p>¿Qué herramienta necesitas?</p>
-      </div>
-      <div class="view-toggle">
-        <button class="view-toggle-btn" data-view="grid" title="Cuadrícula">⊞</button>
-        <button class="view-toggle-btn" data-view="list" title="Lista">☰</button>
-      </div>
-    </div>
-  `;
+  const nom = ishopAjustes().nombre;
+  heading.innerHTML = `<h2></h2><p>¿Qué herramienta necesitas?</p>`;
+  heading.querySelector("h2").textContent = nom ? `Hola, ${nom}.` : "Hola.";
   wrap.appendChild(heading);
-  { const nom = ishopAjustes().nombre; if (nom) heading.querySelector("p").textContent = `Hola, ${nom}. ¿Qué herramienta necesitas?`; }
-  setupArcadeTrigger(heading.querySelector("#ishopArcadeTrigger"));
 
-  const listWrap = document.createElement("div");
-  wrap.appendChild(listWrap);
+  const grid = document.createElement("div");
+  grid.className = "home-grid";
+  MENU.forEach(item => {
+    const tile = document.createElement("button");
+    tile.className = "home-tile" + (item.light ? " light" : "");
+    tile.style.setProperty("--t1", item.c1);
+    tile.style.setProperty("--t2", item.c2);
+    tile.innerHTML = `
+      <span class="home-tile-icon">${ISHOP_ICONS[item.id] || ""}</span>
+      <span class="home-tile-label">${item.label}</span>
+      <span class="home-tile-chev"></span>`;
+    tile.addEventListener("click", () => handleMenuClick(item));
+    grid.appendChild(tile);
+  });
+  wrap.appendChild(grid);
 
-  function renderMenu() {
-    const view = localStorage.getItem("ishop_home_view") || "grid";
-    heading.querySelectorAll(".view-toggle-btn").forEach(b => {
-      b.classList.toggle("active", b.dataset.view === view);
-    });
-
-    listWrap.innerHTML = "";
-
-    if (view === "grid") {
-      const grid = document.createElement("div");
-      grid.className = "coverage-tile-grid";
-      MENU.forEach(item => {
-        const tile = document.createElement("button");
-        tile.className = "coverage-tile";
-        tile.style.setProperty("--tile-color", item.color);
-        tile.innerHTML = `<span class="coverage-tile-icon">${item.icon}</span><span>${item.label}</span>`;
-        if (item.id === "cajas") setupDocsTrigger(tile);
-        tile.addEventListener("click", () => handleMenuClick(item));
-        grid.appendChild(tile);
-      });
-      listWrap.appendChild(grid);
-    } else {
-      const list = document.createElement("div");
-      list.className = "tool-list";
-      MENU.forEach(item => {
-        const btn = document.createElement("button");
-        btn.className = "tool-btn tool-btn-neutral";
-        btn.innerHTML = `
-          <span class="tool-icon">${item.icon}</span>
-          <span class="tool-label">${item.label}</span>
-          <span class="chev"></span>
-        `;
-        if (item.id === "cajas") setupDocsTrigger(btn);
-        btn.addEventListener("click", () => handleMenuClick(item));
-        list.appendChild(btn);
-      });
-      listWrap.appendChild(list);
-    }
-  }
+  const reg = document.createElement("button");
+  reg.className = "home-reg";
+  reg.innerHTML = `
+    <span class="home-reg-icon">${ISHOP_ICONS.registros}</span>
+    <span class="home-reg-text"><strong>Registros</strong><small>Ver y crear registros</small></span>
+    <span class="home-tile-chev"></span>`;
+  reg.addEventListener("click", () => navigate({ screen: "registros", title: "Registros" }));
+  wrap.appendChild(reg);
 
   async function handleMenuClick(item) {
     if (item.id === "cubre") {
@@ -508,15 +501,48 @@ function buildHome() {
       navigate({ screen: "tool", id: item.id, title: item.label });
     }
   }
+  return wrap;
+}
 
-  heading.querySelectorAll(".view-toggle-btn").forEach(b => {
-    b.addEventListener("click", () => {
-      localStorage.setItem("ishop_home_view", b.dataset.view);
-      renderMenu();
+/* ---- Registros (antes era un menú secreto en Código cajas) ---- */
+const REGISTROS_TIPOS = [
+  { label: "For Life",            programa: "For Life",  icon: "forlife",   c1: "#c9a6f5", c2: "#8e5fe0" },
+  { label: "Get",                 programa: "Get",       icon: "coins",     c1: "#9aa2f7", c2: "#6a62e0" },
+  { label: "Switch Up",           programa: "Switch Up", icon: "switchup",  c1: "#ffc46b", c2: "#f59a23" },
+  { label: "Trade In",            programa: "Trade In",  icon: "tag",       c1: "#6ea8ff", c2: "#2f6fe4" },
+  { label: "Cancelación For Life", programa: "",          icon: "cancel",    c1: "#b4b8c2", c2: "#7c808b", pendiente: true },
+];
+
+function buildRegistros() {
+  const wrap = document.createElement("div");
+  wrap.className = "reg-wrap";
+  wrap.innerHTML = `<div class="reg-heading"><h2>Registros</h2><p>Elige el tipo de registro.</p></div>`;
+  const list = document.createElement("div");
+  list.className = "reg-list";
+  REGISTROS_TIPOS.forEach(t => {
+    const row = document.createElement("button");
+    row.className = "reg-row";
+    row.innerHTML = `
+      <span class="reg-icon" style="--r1:${t.c1};--r2:${t.c2}">${ISHOP_ICONS[t.icon]}</span>
+      <span class="reg-name">${t.label}</span>
+      <span class="reg-chev"></span>`;
+    row.addEventListener("click", () => {
+      if (t.pendiente) {
+        navigate({ screen: "tool", id: "cancelacion", title: t.label });
+        return;
+      }
+      docsDraft = docsNewDraft();
+      docsDraft.programa = t.programa;
+      navigate({ screen: "docs", title: t.label });
     });
+    list.appendChild(row);
   });
-
-  renderMenu();
+  wrap.appendChild(list);
+  const saved = document.createElement("button");
+  saved.className = "docs-link";
+  saved.textContent = "Registros guardados";
+  saved.addEventListener("click", () => navigate({ screen: "docsOk", title: "Registros", hero: false }));
+  wrap.appendChild(saved);
   return wrap;
 }
 
@@ -528,6 +554,7 @@ function setupArcadeTrigger(titleEl2) {
 
   const start = (e) => {
     if (e.pointerType === "mouse" && e.button !== 0) return;
+    if (currentEntry().screen !== "home") return;
     titleEl2.classList.add("title-pressing");
     pressTimer = setTimeout(() => {
       titleEl2.classList.remove("title-pressing");
@@ -1195,6 +1222,12 @@ function buildTradeNode(path) {
     return wrap;
   }
 
+  // Elegir modelo dentro de una categoría (iPhone, iPad, Watch, Mac): selector visual agrupado.
+  if (path.length === 1 && Object.values(node).every(v => v && typeof v === "object" && !isPriceLeaf(v))) {
+    buildTradeModelPicker(path, node, wrap);
+    return wrap;
+  }
+
   const heading = document.createElement("div");
   heading.className = "section-heading";
   const label = path.length === 0 ? "Trade In" : path[path.length - 1];
@@ -1255,6 +1288,170 @@ function buildTradeNode(path) {
   });
   wrap.appendChild(list);
   return wrap;
+}
+
+/* =====================================================================
+   Selector de modelos de Trade In (iPhone / iPad / Watch / Mac)
+   Es solo visual: las claves y los precios siguen saliendo de datos/tradein.json,
+   así que al reemplazar ese JSON el selector se reacomoda solo. Los grupos y filtros
+   se calculan a partir de los nombres de los modelos.
+   Imágenes opcionales por modelo: datos/tradein_categorias.json -> "_modelos":
+     { "iPhone 14 PRO": { "imagen": "imágenes/tradein/modelos/iphone-14-pro.png" } }
+   Si un modelo no tiene imagen se dibuja el dispositivo automáticamente.
+   ===================================================================== */
+const TRADE_RECIENTES_KEY = "ishop_tradein_recientes";
+
+function modeloNombre(key) { return normalizarClave(String(key).replace(/ /g, " ")); }
+
+function modeloGrupo(cat, key) {
+  const n = modeloNombre(key);
+  if (cat === "iPhone") {
+    const t = n.replace(/^iPhone\s+/i, "").split(" ")[0] || "";
+    if (/^SE/i.test(t)) return { id: "SE", titulo: "iPhone SE", orden: 0, chip: "SE" };
+    const num = t.match(/^(\d+)/);
+    if (num) return { id: num[1], titulo: "iPhone " + num[1], orden: Number(num[1]), chip: num[1] };
+    const nm = t ? t.charAt(0).toUpperCase() + t.slice(1).toLowerCase() : "Otros";
+    return { id: nm, titulo: "iPhone " + nm, orden: 1000, chip: nm };
+  }
+  if (cat === "iPad") {
+    const g = /mini/i.test(n) ? ["mini", 3] : /air/i.test(n) ? ["Air", 1] : /pro/i.test(n) ? ["Pro", 2] : ["iPad", 0];
+    return { id: g[0], titulo: g[0] === "iPad" ? "iPad" : "iPad " + g[0], orden: g[1], chip: g[0] };
+  }
+  if (cat === "Apple Watch") {
+    const g = /ultra/i.test(n) ? ["Ultra", 2] : /\bSE/i.test(n) ? ["SE", 1] : ["Series", 0];
+    return { id: g[0], titulo: "Apple Watch " + g[0], orden: g[1], chip: g[0] };
+  }
+  const m = n.match(/^(MacBook (?:Air|Pro)|iMac|Mac mini|Mac Studio|Mac Pro|Mac)/i);
+  const nm = m ? m[1] : n.split(" ").slice(0, 2).join(" ");
+  return { id: nm, titulo: nm, orden: /Air/i.test(nm) ? 0 : /Pro/i.test(nm) ? 1 : 2, chip: nm.replace(/^MacBook /i, "") };
+}
+
+const MODELO_PALETA = {
+  SE: "#3a3a3c", "12": "#7a5bb5", "13": "#e8708a", "14": "#6a8fd8", "15": "#e0b8a8",
+  "16": "#5fa39a", "17": "#7f9fd0", "18": "#d4784f", Air: "#c9ced6", Duo: "#4a4a4e",
+};
+function modeloColor(cat, g, key) {
+  let c = MODELO_PALETA[g.id];
+  if (!c) { let h = 0; for (const ch of g.id) h = (h * 31 + ch.charCodeAt(0)) % 360; c = `hsl(${h} 38% 58%)`; }
+  if (/pro|ultra/i.test(modeloNombre(key))) c = `color-mix(in srgb, ${c} 62%, #1c1c1e)`;
+  return c;
+}
+
+function modeloThumb(cat, key, g) {
+  const vis = TRADEIN_VISUAL && TRADEIN_VISUAL._modelos && (TRADEIN_VISUAL._modelos[key] || TRADEIN_VISUAL._modelos[modeloNombre(key)]);
+  if (vis && vis.imagen) return `<img class="mp-img" src="${vis.imagen}" alt="" loading="lazy">`;
+  const c = modeloColor(cat, g, key);
+  const n = modeloNombre(key);
+  let body = "";
+  if (cat === "iPhone") {
+    const lens = /pro/i.test(n) ? 3 : /^iPhone (SE|Air)/i.test(n) ? 1 : 2;
+    const cam = lens === 3
+      ? `<rect x="6" y="6" width="17" height="17" rx="5" fill="rgba(255,255,255,.28)"/><circle cx="11.5" cy="11.5" r="2.5" fill="#1c1c1e"/><circle cx="18" cy="11.5" r="2.5" fill="#1c1c1e"/><circle cx="14.8" cy="18" r="2.5" fill="#1c1c1e"/>`
+      : lens === 2
+      ? `<rect x="6" y="6" width="16" height="16" rx="5" fill="rgba(255,255,255,.28)"/><circle cx="11" cy="11" r="2.6" fill="#1c1c1e"/><circle cx="17.2" cy="17.2" r="2.6" fill="#1c1c1e"/>`
+      : `<circle cx="12" cy="11" r="3" fill="#1c1c1e"/>`;
+    body = `<svg viewBox="0 0 40 64"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".35"/><stop offset="1" stop-color="#000" stop-opacity=".25"/></linearGradient></defs><rect x="3" y="2" width="34" height="60" rx="8" fill="${c}"/><rect x="3" y="2" width="34" height="60" rx="8" fill="url(#g)"/>${cam}</svg>`;
+  } else if (cat === "iPad") {
+    body = `<svg viewBox="0 0 48 64"><rect x="3" y="3" width="42" height="58" rx="6" fill="#1c1c1e"/><rect x="6" y="6" width="36" height="52" rx="3" fill="${c}"/><rect x="6" y="6" width="36" height="52" rx="3" fill="#fff" fill-opacity=".18"/></svg>`;
+  } else if (cat === "Apple Watch") {
+    body = `<svg viewBox="0 0 40 64"><rect x="10" y="2" width="20" height="14" rx="4" fill="${c}" fill-opacity=".7"/><rect x="10" y="48" width="20" height="14" rx="4" fill="${c}" fill-opacity=".7"/><rect x="5" y="14" width="30" height="36" rx="9" fill="${c}"/><rect x="8.5" y="17.5" width="23" height="29" rx="6" fill="#1c1c1e"/><rect x="35" y="26" width="2.6" height="7" rx="1.3" fill="${c}"/></svg>`;
+  } else {
+    body = `<svg viewBox="0 0 64 44"><rect x="9" y="4" width="46" height="29" rx="3" fill="#1c1c1e"/><rect x="11" y="6" width="42" height="25" rx="1.5" fill="${c}"/><path d="M3 35h58l-3 5H6z" fill="${c}"/><path d="M3 35h58l-.6 1.2H3.6z" fill="#fff" fill-opacity=".4"/></svg>`;
+  }
+  return `<span class="mp-draw">${body}</span>`;
+}
+
+function tradeRecientes(cat) {
+  try { return (JSON.parse(localStorage.getItem(TRADE_RECIENTES_KEY) || "[]") || []).filter(r => r.cat === cat); }
+  catch (e) { return []; }
+}
+function tradeGuardarReciente(cat, key) {
+  try {
+    const all = JSON.parse(localStorage.getItem(TRADE_RECIENTES_KEY) || "[]") || [];
+    const next = [{ cat, key }].concat(all.filter(r => !(r.cat === cat && r.key === key))).slice(0, 12);
+    localStorage.setItem(TRADE_RECIENTES_KEY, JSON.stringify(next));
+  } catch (e) {}
+}
+
+function buildTradeModelPicker(path, node, wrap) {
+  const cat = path[0];
+  const keys = Object.keys(node);
+
+  // Agrupar por generación / línea
+  const groups = new Map();
+  keys.forEach(key => {
+    const g = modeloGrupo(cat, key);
+    if (!groups.has(g.id)) groups.set(g.id, Object.assign({ keys: [] }, g));
+    groups.get(g.id).keys.push(key);
+  });
+  const ordered = [...groups.values()].sort((a, b) => a.orden - b.orden);
+
+  let filtro = "Todos";
+  const collapsed = new Set();
+
+  const chips = document.createElement("div");
+  chips.className = "mp-chips";
+  const body = document.createElement("div");
+  body.className = "mp-body";
+
+  const chevSvg = `<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M6 15l6-6 6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+  function modelRow(key, g) {
+    const row = document.createElement("button");
+    row.className = "mp-row";
+    row.innerHTML = `<span class="mp-thumb">${modeloThumb(cat, key, g)}</span><span class="mp-name"></span><span class="mp-chev"></span>`;
+    row.querySelector(".mp-name").textContent = modeloNombre(key);
+    row.addEventListener("click", () => {
+      tradeGuardarReciente(cat, key);
+      navigate({ screen: "tradeNode", path: [...path, key], title: modeloNombre(key) });
+    });
+    return row;
+  }
+
+  function panel(id, titulo, iconHtml, rows) {
+    const sec = document.createElement("section");
+    sec.className = "mp-card" + (collapsed.has(id) ? " closed" : "");
+    const head = document.createElement("button");
+    head.className = "mp-head";
+    head.innerHTML = `${iconHtml || ""}<span class="mp-title"></span><span class="mp-toggle">${chevSvg}</span>`;
+    head.querySelector(".mp-title").textContent = titulo;
+    head.addEventListener("click", () => {
+      if (collapsed.has(id)) collapsed.delete(id); else collapsed.add(id);
+      sec.classList.toggle("closed", collapsed.has(id));
+    });
+    const list = document.createElement("div");
+    list.className = "mp-list";
+    rows.forEach(r => list.appendChild(r));
+    sec.append(head, list);
+    return sec;
+  }
+
+  function paint() {
+    chips.querySelectorAll(".mp-chip").forEach(b => b.classList.toggle("on", b.dataset.f === filtro));
+    body.innerHTML = "";
+    if (filtro === "Todos") {
+      const rec = tradeRecientes(cat).filter(r => keys.includes(r.key)).slice(0, 3);
+      if (rec.length) {
+        const clock = `<span class="mp-clock"><svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>`;
+        body.appendChild(panel("_rec", "Usados recientemente", clock, rec.map(r => modelRow(r.key, modeloGrupo(cat, r.key)))));
+      }
+    }
+    ordered.filter(g => filtro === "Todos" || g.id === filtro).forEach(g => {
+      body.appendChild(panel(g.id, g.titulo, "", g.keys.map(k => modelRow(k, g))));
+    });
+  }
+
+  ["Todos", ...ordered.map(g => g.id)].forEach(id => {
+    const b = document.createElement("button");
+    b.className = "mp-chip";
+    b.dataset.f = id;
+    b.textContent = id === "Todos" ? "Todos" : groups.get(id).chip;
+    b.addEventListener("click", () => { filtro = id; paint(); });
+    chips.appendChild(b);
+  });
+
+  wrap.append(chips, body);
+  paint();
 }
 
 function buildQuoteSelectNew(path, tradeIn) {
@@ -2083,7 +2280,7 @@ function buildSettings(entry) {
    Banner: imágenes/docs/banner.jpg (o .png). Lector de texto: libs/tesseract/.
    ===================================================================== */
 const DOCS_TITULO = "iPhone/iPad/Mac/Watch®";
-const DOCS_PROGRAMAS = ["For Life", "Get"];
+const DOCS_PROGRAMAS = ["For Life", "Get", "Switch Up", "Trade In"];
 const DOCS_SUCURSAL = "Morelia";
 const DOCS_BANNERS = ["imágenes/docs/banner.jpg", "imágenes/docs/banner.png"];
 const DOCS_TTL_MS = 48 * 60 * 60 * 1000;
@@ -2097,7 +2294,7 @@ function docsNewDraft() {
     frente: null, reverso: null, ticket: null,
     names: { frente: "", reverso: "", ticket: "" },
     nombreEnFotos: false,   // true = el nombre se escribió en la pantalla de fotos (no se bloquea)
-    programa: "",           // "For Life" | "Get" | ""
+    programa: "",           // "For Life" | "Get" | "Switch Up" | "Trade In" (se elige en Registros)
   };
 }
 let docsDraft = docsNewDraft();
@@ -2364,33 +2561,6 @@ document.addEventListener("click", (e) => {
   if (docsClickGuard) { e.stopPropagation(); e.preventDefault(); }
 }, true);
 
-function setupDocsTrigger(el) {
-  let timer = null;
-  let fired = false;
-  el.classList.add("hold-guard");
-
-  el.addEventListener("pointerdown", (e) => {
-    if (e.pointerType === "mouse" && e.button !== 0) return;
-    fired = false;
-    clearTimeout(timer);
-    timer = setTimeout(() => {
-      fired = true;
-      docsClickGuard = true;
-      if (navigator.vibrate) navigator.vibrate(30);
-      docsDraft = docsNewDraft();
-      navigate({ screen: "docs", title: "Documentos" });
-    }, DOCS_HOLD_MS);
-  });
-  const cancel = () => clearTimeout(timer);
-  el.addEventListener("pointerup", cancel);
-  el.addEventListener("pointerleave", cancel);
-  el.addEventListener("pointercancel", cancel);
-  el.addEventListener("contextmenu", (e) => e.preventDefault());
-  el.addEventListener("click", (e) => {
-    if (fired) { fired = false; e.stopImmediatePropagation(); e.preventDefault(); }
-  });
-}
-
 /* ---------- Piezas comunes de pantalla ---------- */
 function docsHeaderHtml() {
   return `<div class="docs-banner-box"><img class="docs-banner" alt=""></div><h2 class="docs-title"></h2>`;
@@ -2411,22 +2581,6 @@ function docsBindText(wrap, id, key, opts = {}) {
     if (opts.onInput) opts.onInput();
   });
   return el;
-}
-
-// Selector discreto For Life / Get (letra chica y gris; el área para tocar sí es grande). Toca de nuevo para quitarlo.
-function docsProgramaHtml() {
-  return `<div class="docs-prog" id="docsProg">${DOCS_PROGRAMAS.map(p => `<button type="button" data-p="${p}">${p}</button>`).join("")}</div>`;
-}
-function docsBindPrograma(wrap) {
-  const box = wrap.querySelector("#docsProg");
-  const paint = () => box.querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.p === docsDraft.programa));
-  box.addEventListener("click", (e) => {
-    const b = e.target.closest("button[data-p]");
-    if (!b) return;
-    docsDraft.programa = docsDraft.programa === b.dataset.p ? "" : b.dataset.p;
-    paint();
-  });
-  paint();
 }
 
 /* ---------- Pantalla 1: datos del cliente + firma ---------- */
@@ -2464,7 +2618,6 @@ function buildDocs() {
     <button type="button" class="docs-accept" id="dNext"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Aceptar</span></button>
     <button type="button" class="docs-link" id="dSkip">Omitir datos · solo fotos</button>
     <button type="button" class="docs-link" id="dVer">Ver registros</button>
-    ${docsProgramaHtml()}
   `;
   docsInitHeader(wrap);
   const $ = (s) => wrap.querySelector(s);
@@ -2474,7 +2627,6 @@ function buildDocs() {
   docsBindText(wrap, "dMaterno", "materno", { upper: true });
   docsBindText(wrap, "dTel", "telefono");
   docsBindText(wrap, "dSerie", "serie", { upper: true });
-  docsBindPrograma(wrap);
   $("#dFecha").textContent = docsFechaHoy();
   $("#dSuc").textContent = DOCS_SUCURSAL;
 
@@ -2550,10 +2702,8 @@ function buildDocsFotos() {
     </div>
     <button type="button" class="docs-accept" id="docsAccept"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Aceptar</span></button>
     <p class="docs-msg" id="docsMsg" role="status"></p>
-    ${docsProgramaHtml()}
   `;
   docsInitHeader(wrap);
-  docsBindPrograma(wrap);
   const $ = (s) => wrap.querySelector(s);
   const d = docsDraft;
 
@@ -2702,7 +2852,7 @@ function buildDocsConfirm() {
   if (!d.reverso) faltan.push("foto de atrás");
   if (!d.ticket) faltan.push("ticket");
   if (hayDatos && !d.firmaUrl) faltan.push("firma");
-  if (!d.programa) faltan.push("programa (For Life / Get)");
+  if (!d.programa) faltan.push("tipo de registro");
   if (faltan.length) {
     const w = wrap.querySelector("#cfWarn");
     w.hidden = false; w.textContent = "Falta: " + faltan.join(", ") + ".";
