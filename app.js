@@ -26,13 +26,13 @@ function ishopGuardarAjustes(patch) {
 function ishopEsOscuro(a) {
   return a.modo === "oscuro" || (a.modo === "auto" && window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches);
 }
-function ishopColorBarra() { return ishopEsOscuro(ishopAjustes()) ? "#000000" : "#f5f5f7"; }
+function ishopColorBarra() { if (document.documentElement.classList.contains("docs-mode")) return "#ffffff"; return ishopEsOscuro(ishopAjustes()) ? "#000000" : "#f5f5f7"; }
 function ishopAplicarTema() {
   const a = ishopAjustes();
   const root = document.documentElement;
   root.style.setProperty("--accent", a.acento);
   root.style.setProperty("--accent-press", `color-mix(in srgb, ${a.acento} 78%, black)`);
-  root.dataset.mode = ishopEsOscuro(a) ? "dark" : "light";
+  root.dataset.mode = (!root.classList.contains("docs-mode") && ishopEsOscuro(a)) ? "dark" : "light";   // en los registros siempre fondo blanco
   root.dataset.tiles = a.mosaicos;
   if (!root.classList.contains("rep-mode")) {
     const meta = document.querySelector('meta[name="theme-color"]');
@@ -72,8 +72,8 @@ const MENU = [
   { id: "forlife",   label: "For Life + AC",  c1: "#8a6df0", c2: "#5a43c9" },
   { id: "getac",     label: "GET + AC",       c1: "#f2709c", c2: "#d6457a" },
   { id: "cubre",     label: "¿Qué cubre?",    c1: "#78c8d8", c2: "#4aa3bd" },
-  { id: "scanner",   label: "Escáner",        c1: "#e9ebf3", c2: "#d4d8e6", light: true },
-  { id: "cajas",     label: "Código cajas",   c1: "#e9ebf3", c2: "#d4d8e6", light: true },
+  { id: "scanner",   label: "Escáner",        c1: "#7b8497", c2: "#3d4455" },
+  { id: "cajas",     label: "Código cajas",   c1: "#e0b27a", c2: "#b9783a" },
 ];
 
 // ---- iShop Arcade (oculto: se abre manteniendo presionado el nombre "iShop Tools") ----
@@ -356,6 +356,8 @@ function render(isForward) {
   homeBtn.hidden = stack.length === 1;
   settingsBtn.hidden = entry.screen !== "home";
   document.documentElement.classList.toggle("home-mode", entry.screen === "home");
+  document.documentElement.classList.toggle("docs-mode", /^docs/.test(entry.screen));
+  ishopAplicarTema();
   setRepairTheme(entry.screen === "repair");
 
   const node = buildScreen(entry);
@@ -510,7 +512,7 @@ const REGISTROS_TIPOS = [
   { label: "Get",                 programa: "Get",       icon: "coins",     c1: "#9aa2f7", c2: "#6a62e0" },
   { label: "Switch Up",           programa: "Switch Up", icon: "switchup",  c1: "#ffc46b", c2: "#f59a23" },
   { label: "Trade In",            programa: "Trade In",  icon: "tag",       c1: "#6ea8ff", c2: "#2f6fe4" },
-  { label: "Cancelación For Life", programa: "",          icon: "cancel",    c1: "#b4b8c2", c2: "#7c808b", pendiente: true },
+  { label: "Cancelación For Life", programa: "Cancelación For Life", icon: "cancel", c1: "#b4b8c2", c2: "#7c808b" },
 ];
 
 function buildRegistros() {
@@ -2280,7 +2282,7 @@ function buildSettings(entry) {
    Banner: imágenes/docs/banner.jpg (o .png). Lector de texto: libs/tesseract/.
    ===================================================================== */
 const DOCS_TITULO = "iPhone/iPad/Mac/Watch®";
-const DOCS_PROGRAMAS = ["For Life", "Get", "Switch Up", "Trade In"];
+const DOCS_PROGRAMAS = ["For Life", "Get", "Switch Up", "Trade In", "Cancelación For Life"];
 const DOCS_SUCURSAL = "Morelia";
 const DOCS_BANNERS = ["imágenes/docs/banner.jpg", "imágenes/docs/banner.png"];
 const DOCS_TTL_MS = 48 * 60 * 60 * 1000;
@@ -2438,7 +2440,13 @@ async function docsCopy(text, btn) {
 
 /* ---------- Contrato en PDF (For Life) ---------- */
 // Plantilla en blanco: contrato/for_life.pdf  ·  Librería: libs/pdf-lib.min.js
-const DOCS_PDF_TEMPLATES = { "For Life": "contrato/for_life.pdf" };
+const DOCS_PDF_TEMPLATES = {
+  "For Life": "contrato/for_life.pdf",
+  "Get": "contrato/get.pdf",
+  "Switch Up": "contrato/switch_up.pdf",
+  "Trade In": "contrato/trade_in.pdf",
+  "Cancelación For Life": "contrato/cancelacion.pdf",
+};
 let docsPdfLibP = null;
 function docsLoadPdfLib() {
   if (window.PDFLib) return Promise.resolve(window.PDFLib);
@@ -2486,57 +2494,130 @@ async function docsCropInk(blob) {
   } finally { URL.revokeObjectURL(url); }
 }
 
+const DOCS_MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+const docsFechaLarga = (dt, cap) => { const m = DOCS_MESES[dt.getMonth()]; return `${dt.getDate()} de ${cap ? m[0].toUpperCase() + m.slice(1) : m} de ${dt.getFullYear()}`; };
+
 async function docsMakePdf(rec) {
   const PDFLib = await docsLoadPdfLib();
   const { PDFDocument, StandardFonts, rgb } = PDFLib;
-  const tplUrl = DOCS_PDF_TEMPLATES[rec.programa] || DOCS_PDF_TEMPLATES["For Life"];
+  const tplUrl = DOCS_PDF_TEMPLATES[rec.programa];
+  if (!tplUrl) throw new Error("no hay plantilla");
   const resp = await fetch(tplUrl);
   if (!resp.ok) throw new Error("no hay plantilla");
   const pdf = await PDFDocument.load(await resp.arrayBuffer());
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
   const pages = pdf.getPages();
-  const p1 = pages[0], pl = pages[pages.length - 1];
-  const H = 792;                       // alto carta; las coordenadas se miden desde arriba
-  const d = rec.datos || {};
   const black = rgb(0, 0, 0);
+  const d = rec.datos || {};
+  const inicio = new Date(rec.fecha);
+  const nombreCompleto = [d.nombre, d.paterno, d.materno].filter(Boolean).join(" ");
+  const sucursal = d.sucursal || DOCS_SUCURSAL;
+  const empleado = rec.empleado || "";
+  const Hof = (page) => page.getHeight();   // las coordenadas de abajo se miden desde arriba de la hoja
 
   const safe = (t, f) => Array.from(String(t || "").normalize("NFC")).map(ch => { try { f.encodeText(ch); return ch; } catch (e) { return "?"; } }).join("");
   const fit = (t, f, size, maxW) => { let s = size; while (s > 4.5 && f.widthOfTextAtSize(t, s) > maxW) s -= 0.25; return s; };
-  const put = (page, text, x, baseTop, f, size, maxW) => {
+  // texto alineado a la izquierda, al centro o a la derecha; "top" es la línea base medida desde arriba
+  const put = (page, text, x, top, f, size, maxW, align) => {
     const t = safe(text, f); if (!t) return;
-    page.drawText(t, { x, y: H - baseTop, size: fit(t, f, size, maxW), font: f, color: black });
+    const sz = fit(t, f, size, maxW || 9999);
+    const w = f.widthOfTextAtSize(t, sz);
+    const px = align === "c" ? x - w / 2 : align === "r" ? x - w : x;
+    page.drawText(t, { x: px, y: Hof(page) - top, size: sz, font: f, color: black });
   };
-  const putC = (page, text, cx, baseTop, f, size, maxW) => {
-    const t = safe(text, f); if (!t) return;
-    const sz = fit(t, f, size, maxW);
-    page.drawText(t, { x: cx - f.widthOfTextAtSize(t, sz) / 2, y: H - baseTop, size: sz, font: f, color: black });
+  let sigBytes = null;
+  const sign = async (page, cx, top, boxW, boxH) => {
+    if (!rec.firma) return;
+    if (!sigBytes) sigBytes = await docsCropInk(rec.firma);
+    if (!sigBytes) return;
+    const img = await pdf.embedPng(sigBytes);
+    const sc = Math.min(boxW / img.width, boxH / img.height);
+    const w = img.width * sc, h = img.height * sc;
+    page.drawImage(img, { x: cx - w / 2, y: Hof(page) - (top + boxH / 2) - h / 2, width: w, height: h });
   };
 
-  // Página 1: cliente y vigencia
-  put(p1, d.paterno, 55.9, 118.7, font, 7, 155);
-  put(p1, d.materno, 223.7, 118.7, font, 7, 145);
-  put(p1, d.nombre, 379.9, 118.7, font, 7, 170);
-  put(p1, d.telefono, 55.9, 149.5, font, 7, 220);
-  put(p1, d.email, 292.2, 149.5, font, 7, 250);
-  const inicio = new Date(rec.fecha);
-  put(p1, docsDmy(inicio), 223.7, 294.6, bold, 7, 140);
-  put(p1, docsDmy(docsPlusMonths(inicio, 24)), 379.9, 294.6, bold, 7, 140);
+  const prog = rec.programa;
+  if (prog === "For Life") {
+    const p1 = pages[0], pl = pages[pages.length - 1];
+    put(p1, d.paterno, 55.9, 118.7, font, 7, 155);
+    put(p1, d.materno, 223.7, 118.7, font, 7, 145);
+    put(p1, d.nombre, 379.9, 118.7, font, 7, 170);
+    put(p1, d.telefono, 55.9, 149.5, font, 7, 220);
+    put(p1, d.email, 292.2, 149.5, font, 7, 250);
+    put(p1, docsDmy(inicio), 223.7, 294.6, bold, 7, 140);
+    put(p1, docsDmy(docsPlusMonths(inicio, 24)), 379.9, 294.6, bold, 7, 140);
+    put(pl, nombreCompleto, 164.2, 695.9, font, 9.5, 185, "c");
+    put(pl, docsDmy(inicio), 336.9, 695.9, font, 9.5, 90, "c");
+    put(pl, sucursal, 467.2, 695.9, font, 9.5, 100, "c");
+    await sign(pl, 164.2, 598, 160, 86);
 
-  // Última página: firma, nombre, fecha, sucursal
-  const nombreCompleto = [d.nombre, d.paterno, d.materno].filter(Boolean).join(" ");
-  putC(pl, nombreCompleto, 164.2, 695.9, font, 9.5, 185);
-  putC(pl, docsDmy(inicio), 336.9, 695.9, font, 9.5, 90);
-  putC(pl, d.sucursal || DOCS_SUCURSAL, 467.2, 695.9, font, 9.5, 100);
-  if (rec.firma) {
-    const bytes = await docsCropInk(rec.firma);
-    if (bytes) {
-      const img = await pdf.embedPng(bytes);
-      const boxW = 160, boxH = 86, boxCx = 164.2, boxTop = 598;   // zona sobre la línea del nombre
-      const sc = Math.min(boxW / img.width, boxH / img.height);
-      const w = img.width * sc, h = img.height * sc;
-      pl.drawImage(img, { x: boxCx - w / 2, y: H - (boxTop + boxH / 2) - h / 2, width: w, height: h });
+  } else if (prog === "Get") {
+    const p1 = pages[0], pl = pages[pages.length - 1];
+    put(p1, d.paterno, 55.9, 140.6, font, 7, 155);
+    put(p1, d.materno, 223.7, 140.6, font, 7, 145);
+    put(p1, d.nombre, 379.9, 140.6, font, 7, 170);
+    put(p1, d.telefono, 55.9, 171.3, font, 7, 220);
+    put(p1, d.email, 292.2, 171.3, font, 7, 250);
+    put(p1, docsDmy(inicio), 223.7, 316.5, bold, 7, 140);
+    put(p1, docsDmy(docsPlusMonths(inicio, 20)), 379.9, 316.5, bold, 7, 140);
+    put(pl, nombreCompleto, 155, 741.3, font, 9.5, 185, "c");
+    put(pl, docsDmy(inicio), 328, 741.3, font, 9.5, 90, "c");
+    put(pl, sucursal, 458, 741.3, font, 9.5, 100, "c");
+    await sign(pl, 155, 640, 150, 80);
+
+  } else if (prog === "Switch Up") {
+    const [p1, p2, , p4] = pages;
+    put(p1, d.paterno, 55.9, 118.9, font, 7, 155);
+    put(p1, d.materno, 223.7, 118.9, font, 7, 145);
+    put(p1, d.nombre, 379.9, 118.9, font, 7, 170);
+    put(p1, d.telefono, 55.9, 149.6, font, 7, 220);
+    put(p1, d.email, 292.2, 149.6, font, 7, 250);
+    put(p1, docsDmy(inicio), 223.7, 294.8, bold, 7, 140);
+    put(p1, docsDmy(docsPlusMonths(inicio, 24)), 379.9, 294.8, bold, 7, 140);
+    const vig = `Del ${docsFechaLarga(inicio, true)} al ${docsFechaLarga(docsPlusMonths(inicio, 13), true)}`;
+    put(p2, vig, 55.9, 296.4, font, 7.5, 260);
+    put(p2, nombreCompleto, 393, 403.2, font, 9, 185, "c");
+    await sign(p2, 393, 300, 130, 80);
+    put(p4, vig, 60.2, 398.5, font, 7.5, 260);
+    put(p4, empleado, 142.5, 604.2, font, 9, 120, "c");
+    put(p4, nombreCompleto, 414, 598.5, font, 9, 185, "c");
+    await sign(p4, 412, 488, 140, 84);
+
+  } else if (prog === "Cancelación For Life") {
+    const p = pages[0];
+    const hora = inicio.getHours();
+    const txt = `En mi carácter de tarjetahabiente de Citibanamex y en razón de que a través del programa iPhone For Life adquirí el iPhone con número de serie ${d.serie || "______________"}, haciendo uso del derecho de upgrade que el programa me confiere y que el citado teléfono cumple con todos los requisitos de elegibilidad, “bajo protesta de decir verdad” y siendo las ${hora} horas del día ${docsFechaLarga(inicio)}, hago devolución del citado equipo a Promotora Musical, S.A de C.V (APR), quien a partir de este momento recibe la propiedad y la posesión física y jurídica del citado iPhone, mismo que se entrega sin información del tarjetahabiente.`;
+    const words = safe(txt, font).split(/\s+/);
+    const SZ = 11, MAXW = 440, LH = 15.9;
+    let line = "", y = 308.5;
+    for (const w of words) {
+      const t = line ? line + " " + w : w;
+      if (font.widthOfTextAtSize(t, SZ) > MAXW && line) { put(p, line, 75.3, y, font, SZ); y += LH; line = w; } else line = t;
     }
+    if (line) put(p, line, 75.3, y, font, SZ);
+    put(p, nombreCompleto, 286, 578.8, font, 11.5, 250, "c");
+    await sign(p, 286, 485, 160, 80);
+
+  } else if (prog === "Trade In") {
+    const [p1, p2, p3, p4, p5] = pages;
+    put(p1, `México a ${docsFechaLarga(inicio)}`, 558.3, 122, font, 8.5, 200, "r");
+    put(p1, nombreCompleto, 235, 270.1, font, 8.5, 320);
+    put(p1, "INE", 235, 287.1, font, 8.5, 320);
+    put(p1, d.email, 235, 346.6, font, 8.5, 320);
+    put(p1, d.telefono, 235, 363.6, font, 8.5, 320);
+    put(p1, d.serie, 191.5, 466.4, bold, 8.5, 300);
+    put(p2, nombreCompleto, 162, 700.4, font, 8.5, 190, "c");
+    put(p2, empleado, 445.7, 700.4, font, 8.5, 120, "c");
+    await sign(p2, 162, 622, 130, 66);
+    put(p3, `${nombreCompleto}, en mi carácter de legítimo propietario del Equipo que aquí se detalla (en lo sucesivo el “Comitente”),`, 53, 38, font, 8.5, 495);
+    put(p3, d.serie, 191.5, 162.6, bold, 8.5, 300);
+    put(p4, d.email, 103.9, 216.1, font, 8.5, 440);
+    put(p5, nombreCompleto, 53, 328.3, bold, 8.5, 300);
+    put(p5, "México", 193.1, 464.4, font, 8.5, 140);
+    put(p5, d.email, 193.1, 481.3, font, 8.5, 300);
+    put(p5, nombreCompleto, 162, 524.4, font, 8.5, 190, "c");
+    await sign(p5, 162, 532, 140, 86);
   }
   return new Blob([await pdf.save()], { type: "application/pdf" });
 }
@@ -2548,7 +2629,7 @@ async function docsShareContrato(rec, btn) {
     const f = new File([blob], `${docsBase(rec.nombre)}_${(rec.programa || "contrato").replace(/\s+/g, "")}.pdf`, { type: "application/pdf" });
     await docsShareFiles([f], docsBase(rec.nombre));
   } catch (e) {
-    alert("No se pudo generar el PDF. Revisa que existan libs/pdf-lib.min.js y contrato/for_life.pdf en tu proyecto.");
+    alert("No se pudo generar el PDF. Revisa que existan libs/pdf-lib.min.js y la carpeta contrato/ con los PDF en tu proyecto.");
   }
   btn.disabled = false; btn.textContent = old;
 }

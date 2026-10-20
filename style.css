@@ -1276,3 +1276,9 @@ html[data-mode="dark"].home-mode #topbar{ background:var(--bg); }
 html[data-mode="dark"] .mp-chip{ background:#2c2c2e; }
 html[data-mode="dark"] .mp-chip.on{ background:var(--accent); }
 html[data-mode="dark"] .mp-chips{ background:var(--bg); }
+
+/* ---- Registros / toma de datos: fondo blanco siempre ---- */
+html.docs-mode, html.docs-mode body, html.docs-mode #app, html.docs-mode #screens, html.docs-mode .screen{ background:#ffffff; }
+html.docs-mode #topbar{ background:rgba(255,255,255,0.92); }
+html.docs-mode .docs-card{ background:#ffffff; }
+html.docs-mode .docs-rec{ background:#ffffff; }
