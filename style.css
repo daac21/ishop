@@ -1282,3 +1282,18 @@ html.docs-mode, html.docs-mode body, html.docs-mode #app, html.docs-mode #screen
 html.docs-mode #topbar{ background:rgba(255,255,255,0.92); }
 html.docs-mode .docs-card{ background:#ffffff; }
 html.docs-mode .docs-rec{ background:#ffffff; }
+
+
+/* Trade In: formulario completo */
+#dSign, #dSignA{ display:block; width:100%; height:230px; touch-action:none; background:#fafafa; }
+.docs-sec{ display:flex; align-items:center; gap:12px; margin:26px 0 4px; }
+.docs-sec::before, .docs-sec::after{ content:""; flex:1; height:1px; background:rgba(0,0,0,0.14); }
+.docs-sec span{ font-size:19px; font-weight:700; letter-spacing:.3px; text-align:center; }
+.docs-help{ margin:8px 0 0; font-size:15px; color:#3a3a3c; }
+.docs-select{ appearance:auto; height:46px; }
+.docs-otro{ margin-top:8px; }
+.docs-otro[hidden]{ display:none; }
+.docs-check{ display:flex; gap:12px; align-items:flex-start; margin:14px 0; font-size:16px; line-height:1.35; }
+.docs-check input{ width:26px; height:26px; flex-shrink:0; margin-top:2px; accent-color:#0071e3; }
+.docs-check a{ color:inherit; text-decoration:underline; }
+.docs-field.docs-half select{ width:100%; }

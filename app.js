@@ -2292,7 +2292,13 @@ const DOCS_HOLD_MS = 3000;
 function docsNewDraft() {
   return {
     email: "", nombre: "", paterno: "", materno: "", telefono: "", serie: "",
-    firmaUrl: "",
+    firmaUrl: "", firmaAsesorUrl: "",
+    // Trade In (contrato completo)
+    estado: "", asesor: "", rfc: "", calle: "", cp: "", numExt: "", numInt: "", colonia: "",
+    localidad: "", referencia: "", municipio: "",
+    modelo: "", capacidad: "", imei: "", costo: "",
+    modeloN: "", capacidadN: "", serieN: "", imeiN: "",
+    idTipo: "INE", aceptaTyC: false, aceptaAviso: false,
     frente: null, reverso: null, ticket: null,
     names: { frente: "", reverso: "", ticket: "" },
     nombreEnFotos: false,   // true = el nombre se escribió en la pantalla de fotos (no se bloquea)
@@ -2301,7 +2307,7 @@ function docsNewDraft() {
 }
 let docsDraft = docsNewDraft();
 const docsFullName = (d) => [d.nombre, d.paterno, d.materno].filter(Boolean).join(" ");
-const docsHayDatos = (d) => !!(d.email || d.nombre || d.paterno || d.materno || d.telefono || d.serie || d.firmaUrl);
+const docsHayDatos = (d) => !!(d.email || d.nombre || d.paterno || d.materno || d.telefono || d.serie || d.firmaUrl || d.rfc || d.calle || d.modelo || d.costo);
 const docsFechaHoy = () => new Date().toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" });
 
 /* ---------- Base de datos del teléfono ---------- */
@@ -2399,6 +2405,7 @@ async function docsShare(rec) {
   if (rec.usuarioReverso) files.push(docsFile(rec.usuarioReverso, base, "documento_atras"));
   if (rec.ticket) files.push(docsFile(rec.ticket, base, "ticket"));
   if (rec.firma) files.push(docsFile(rec.firma, base, "firma"));
+  if (rec.firmaAsesor) files.push(docsFile(rec.firmaAsesor, base, "firma_asesor"));
   await docsShareFiles(files, base);
 }
 
@@ -2407,6 +2414,24 @@ const DOCS_CAMPOS = [
   ["nombre", "Nombre"], ["paterno", "Apellido paterno"], ["materno", "Apellido materno"],
   ["telefono", "Teléfono"], ["email", "Correo"], ["serie", "# Serie"],
 ];
+// Trade In: todos los datos que lleva el contrato completo
+const DOCS_CAMPOS_TI = [
+  ["nombre", "Nombre"], ["paterno", "Apellido paterno"], ["materno", "Apellido materno"],
+  ["telefono", "Teléfono"], ["email", "Correo"], ["estado", "Estado"],
+  ["rfc", "RFC"], ["calle", "Calle"], ["cp", "Código postal"], ["numExt", "No. exterior"], ["numInt", "No. interior"],
+  ["colonia", "Colonia"], ["localidad", "Localidad"], ["referencia", "Referencia"], ["municipio", "Municipio/Alcaldía"],
+  ["modelo", "Modelo (entrega)"], ["capacidad", "Capacidad (entrega)"], ["serie", "# Serie (entrega)"], ["imei", "IMEI (entrega)"], ["costo", "Costo"],
+  ["modeloN", "Modelo (nuevo)"], ["capacidadN", "Capacidad (nueva)"], ["serieN", "No. Serie (nuevo)"], ["imeiN", "IMEI (nuevo)"],
+  ["idTipo", "Identificación"],
+];
+const docsCampos = (prog) => prog === "Trade In" ? DOCS_CAMPOS_TI : DOCS_CAMPOS;
+const docsNb = (t) => String(t == null ? "" : t).replace(/\u00a0/g, " ");
+// "2500" -> "$2,500.00"
+function docsMoney(v) {
+  const n = parseFloat(String(v || "").replace(/[^0-9.]/g, ""));
+  if (!isFinite(n)) return "";
+  return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
 function docsDatosTexto(rec) {
   const d = rec.datos || {};
   const fecha = new Date(rec.fecha).toLocaleString("es-MX", { dateStyle: "long", timeStyle: "short" });
@@ -2414,7 +2439,7 @@ function docsDatosTexto(rec) {
   if (rec.programa) lines.push(`Programa: ${rec.programa}`);
   if (rec.empleado) lines.push(`Registrado por: ${rec.empleado}`);
   lines.push("");
-  DOCS_CAMPOS.forEach(([k, label]) => { if (d[k]) lines.push(`${label}: ${d[k]}`); });
+  docsCampos(rec.programa).forEach(([k, label]) => { if (d[k]) lines.push(`${label}: ${d[k]}`); });
   return lines.join("\n") + "\n";
 }
 async function docsShareDatos(rec) {
@@ -2526,10 +2551,13 @@ async function docsMakePdf(rec) {
     const px = align === "c" ? x - w / 2 : align === "r" ? x - w : x;
     page.drawText(t, { x: px, y: Hof(page) - top, size: sz, font: f, color: black });
   };
-  let sigBytes = null;
-  const sign = async (page, cx, top, boxW, boxH) => {
-    if (!rec.firma) return;
-    if (!sigBytes) sigBytes = await docsCropInk(rec.firma);
+  const sigCache = {};
+  const sign = async (page, cx, top, boxW, boxH, which) => {
+    const sk = which || "firma";
+    const blob = rec[sk];
+    if (!blob) return;
+    if (!sigCache[sk]) sigCache[sk] = await docsCropInk(blob);
+    const sigBytes = sigCache[sk];
     if (!sigBytes) return;
     const img = await pdf.embedPng(sigBytes);
     const sc = Math.min(boxW / img.width, boxH / img.height);
@@ -2601,23 +2629,84 @@ async function docsMakePdf(rec) {
 
   } else if (prog === "Trade In") {
     const [p1, p2, p3, p4, p5] = pages;
+    const costo = docsMoney(d.costo);
+    const white = rgb(1, 1, 1);
+    // texto en varias líneas dentro de un ancho
+    const wrapLines = (t, f, size, maxW) => {
+      const out = []; let line = "";
+      safe(t, f).split(/\s+/).forEach(w => {
+        const c = line ? line + " " + w : w;
+        if (f.widthOfTextAtSize(c, size) > maxW && line) { out.push(line); line = w; } else line = c;
+      });
+      if (line) out.push(line);
+      return out;
+    };
+    const calleNum = [d.calle, d.numExt ? "No. " + d.numExt : "", d.numInt ? "Int. " + d.numInt : ""].filter(Boolean).join(" ");
+    const domicilio = [calleNum, d.colonia ? "Col. " + d.colonia : "", d.localidad, d.municipio, d.estado, d.cp ? "C.P. " + d.cp : "", (calleNum || d.colonia) ? "México" : ""].filter(Boolean).join(", ");
+    const idTxt = d.idTipo === "Pasaporte" ? "PASAPORTE" : "INE";
+
+    // --- Página 1: cliente y equipo entregado
     put(p1, `México a ${docsFechaLarga(inicio)}`, 558.3, 122, font, 8.5, 200, "r");
     put(p1, nombreCompleto, 235, 270.1, font, 8.5, 320);
-    put(p1, "INE", 235, 287.1, font, 8.5, 320);
+    put(p1, idTxt, 235, 287.1, font, 8.5, 320);
+    wrapLines(domicilio, font, 7.5, 320).slice(0, 2).forEach((ln, i) => put(p1, ln, 235, 302 + i * 9.3, font, 7.5, 322));
+    put(p1, d.rfc, 235, 329.6, font, 8.5, 320);
     put(p1, d.email, 235, 346.6, font, 8.5, 320);
     put(p1, d.telefono, 235, 363.6, font, 8.5, 320);
-    put(p1, d.serie, 191.5, 466.4, bold, 8.5, 300);
+    put(p1, d.modelo, 191.5, 411.3, font, 8.5, 360);
+    put(p1, d.capacidad, 191.5, 438.9, font, 8.5, 360);
+    put(p1, d.serie, 191.5, 466.4, bold, 8.5, 360);
+    put(p1, d.imei, 191.5, 493.9, bold, 8.5, 360);
+
+    // --- Página 2: RFC, firmas y monto
+    put(p2, d.rfc, 53, 584.3, font, 8.5, 500);
     put(p2, nombreCompleto, 162, 700.4, font, 8.5, 190, "c");
     put(p2, empleado, 445.7, 700.4, font, 8.5, 120, "c");
     await sign(p2, 162, 622, 130, 66);
+    await sign(p2, 445.7, 622, 130, 66, "firmaAsesor");
+
+    // --- Página 3: equipo del comitente
     put(p3, `${nombreCompleto}, en mi carácter de legítimo propietario del Equipo que aquí se detalla (en lo sucesivo el “Comitente”),`, 53, 38, font, 8.5, 495);
-    put(p3, d.serie, 191.5, 162.6, bold, 8.5, 300);
+    put(p3, d.modelo, 191.5, 107.6, font, 8.5, 360);
+    put(p3, d.capacidad, 191.5, 135.1, font, 8.5, 360);
+    put(p3, d.serie, 191.5, 162.6, bold, 8.5, 360);
+    put(p3, d.imei, 191.5, 190.1, bold, 8.5, 360);
+
+    // --- Página 4: correo y equipo nuevo
     put(p4, d.email, 103.9, 216.1, font, 8.5, 440);
-    put(p5, nombreCompleto, 53, 328.3, bold, 8.5, 300);
-    put(p5, "México", 193.1, 464.4, font, 8.5, 140);
-    put(p5, d.email, 193.1, 481.3, font, 8.5, 300);
+    put(p4, d.modeloN, 191.5, 702.9, font, 8.5, 360);
+    put(p4, d.capacidadN, 191.5, 730.4, font, 8.5, 360);
+    put(p4, d.serieN, 191.5, 757.9, bold, 8.5, 360);
+
+    // --- Página 5: IMEI nuevo, cliente, domicilio fiscal y firmas
+    put(p5, d.imeiN, 191.5, 45.2, bold, 8.5, 360);
+    put(p5, nombreCompleto, 53, 328.3, bold, 8.5, 500);
+    put(p5, d.rfc, 53, 362.4, font, 8.5, 500);
+    put(p5, d.calle, 193.1, 396.4, font, 8.5, 152);
+    put(p5, d.numExt, 438.1, 396.4, font, 8.5, 120);
+    put(p5, d.numInt, 193.1, 413.4, font, 8.5, 152);
+    put(p5, d.colonia, 438.1, 413.4, font, 8.5, 120);
+    put(p5, d.localidad, 193.1, 430.4, font, 8.5, 152);
+    put(p5, d.referencia, 438.1, 430.4, font, 8.5, 120);
+    put(p5, d.municipio, 193.1, 447.4, font, 8.5, 152);
+    put(p5, d.estado, 438.1, 447.4, font, 8.5, 120);
+    put(p5, "México", 193.1, 464.4, font, 8.5, 152);
+    put(p5, d.cp, 438.1, 464.4, font, 8.5, 120);
+    put(p5, d.email, 193.1, 481.3, font, 8.5, 360);
     put(p5, nombreCompleto, 162, 524.4, font, 8.5, 190, "c");
     await sign(p5, 162, 532, 140, 86);
+    await sign(p5, 445.7, 534, 140, 82, "firmaAsesor");
+
+    // --- Monto: el contrato trae "$11,000.00" impreso; se tapa y se escribe el costo capturado
+    [[p2, 195.81, 235.91, 397.51, 406.51], [p4, 296.46, 336.56, 120.24, 129.24], [p4, 78.45, 118.55, 520.56, 529.56]].forEach(([pg, x0, x1, top, bot]) => {
+      const H = pg.getHeight();
+      pg.drawRectangle({ x: x0 - 0.8, y: H - bot - 2.2, width: (x1 - x0) + 1.6, height: (bot - top) + 3.4, color: white });
+      const t = safe(costo, bold); if (!t) return;
+      const sz = fit(t, bold, 9, x1 - x0);
+      const w = bold.widthOfTextAtSize(t, sz);
+      pg.drawText(t, { x: x0, y: H - bot + 2.2, size: sz, font: bold, color: black });
+      pg.drawLine({ start: { x: x0, y: H - bot + 0.6 }, end: { x: x0 + w, y: H - bot + 0.6 }, thickness: 0.6, color: black });
+    });
   }
   return new Blob([await pdf.save()], { type: "application/pdf" });
 }
@@ -2665,12 +2754,201 @@ function docsBindText(wrap, id, key, opts = {}) {
 }
 
 /* ---------- Pantalla 1: datos del cliente + firma ---------- */
-function buildDocs() {
-  const wrap = document.createElement("div");
-  wrap.className = "docs-page";
-  wrap.innerHTML = `
-    ${docsHeaderHtml()}
-    <div class="docs-card">
+const DOCS_ESTADOS = ["Aguascalientes", "Baja California", "Baja California Sur", "Campeche", "Chiapas", "Chihuahua", "Ciudad de México", "Coahuila", "Colima", "Durango", "Estado de México", "Guanajuato", "Guerrero", "Hidalgo", "Jalisco", "Michoacán", "Morelos", "Nayarit", "Nuevo León", "Oaxaca", "Puebla", "Querétaro", "Quintana Roo", "San Luis Potosí", "Sinaloa", "Sonora", "Tabasco", "Tamaulipas", "Tlaxcala", "Veracruz", "Yucatán", "Zacatecas"];
+const DOCS_TRASH_SVG = `<svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V5h4v2M8 7l1 12h6l1-12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const docsSignHtml = (cid, label, tid) => `
+  <div class="docs-sign">
+    <div class="docs-sign-head"><span>${label}</span>
+      <button type="button" class="docs-trash" id="${tid}" aria-label="Borrar firma">${DOCS_TRASH_SVG}</button></div>
+    <canvas id="${cid}"></canvas>
+  </div>`;
+
+// Lienzo de firma; guarda el PNG en docsDraft[key]
+function docsSignPad(wrap, cid, tid, key) {
+  const cv = wrap.querySelector("#" + cid);
+  const ctx = cv.getContext("2d");
+  let drawing = false, last = null;
+  function sizeCanvas() {
+    const r = Math.min(window.devicePixelRatio || 1, 2);
+    const w = cv.clientWidth, h = cv.clientHeight;
+    if (!w || !h) return;
+    cv.width = Math.round(w * r); cv.height = Math.round(h * r);
+    ctx.setTransform(r, 0, 0, r, 0, 0);
+    ctx.lineWidth = 2.6; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.strokeStyle = "#111";
+    if (docsDraft[key]) {
+      const im = new Image();
+      im.onload = () => ctx.drawImage(im, 0, 0, w, h);
+      im.src = docsDraft[key];
+    }
+  }
+  requestAnimationFrame(sizeCanvas);
+  const pos = (e) => { const b = cv.getBoundingClientRect(); return { x: e.clientX - b.left, y: e.clientY - b.top }; };
+  cv.addEventListener("pointerdown", (e) => {
+    drawing = true; last = pos(e);
+    cv.setPointerCapture(e.pointerId);
+    ctx.beginPath(); ctx.arc(last.x, last.y, 1.2, 0, Math.PI * 2); ctx.fillStyle = "#111"; ctx.fill();
+    e.preventDefault();
+  });
+  cv.addEventListener("pointermove", (e) => {
+    if (!drawing) return;
+    const p = pos(e);
+    ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+    last = p; e.preventDefault();
+  });
+  const end = () => { if (!drawing) return; drawing = false; docsDraft[key] = cv.toDataURL("image/png"); };
+  cv.addEventListener("pointerup", end);
+  cv.addEventListener("pointercancel", end);
+  wrap.querySelector("#" + tid).addEventListener("click", () => {
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height); ctx.restore();
+    docsDraft[key] = "";
+  });
+}
+
+// Modelo + capacidad enlazados. "Otro…" permite escribir a mano si el modelo no está en la lista.
+function docsModelosEntrega() {
+  return Object.keys(TRADEIN_DATA || {}).map(cat => ({ grupo: cat, items: Object.keys(TRADEIN_DATA[cat] || {}) }));
+}
+function docsCapsEntrega(model) {
+  const D = TRADEIN_DATA || {};
+  for (const cat of Object.keys(D)) { if (D[cat] && D[cat][model]) return Object.keys(D[cat][model]); }
+  return [];
+}
+const docsModelosNuevo = () => [{ grupo: "iPhone", items: Object.keys(PRECIOS_IPHONE || {}) }];
+const docsCapsNuevo = (model) => Object.keys((PRECIOS_IPHONE || {})[model] || {});
+
+function docsBindModelo(wrap, ids, keyM, keyC, listModelos, listCaps) {
+  const sm = wrap.querySelector("#" + ids.m), sc = wrap.querySelector("#" + ids.c);
+  const tm = wrap.querySelector("#" + ids.m + "X"), tc = wrap.querySelector("#" + ids.c + "X");
+  const d = docsDraft;
+  const opt = (v, t) => { const o = document.createElement("option"); o.value = v; o.textContent = t; return o; };
+  const OTRO = "__otro";
+
+  sm.innerHTML = "";
+  sm.appendChild(opt("", "Seleccione"));
+  listModelos().forEach(g => {
+    if (!g.items.length) return;
+    const og = document.createElement("optgroup"); og.label = g.grupo;
+    g.items.forEach(m => og.appendChild(opt(m, docsNb(m))));
+    sm.appendChild(og);
+  });
+  sm.appendChild(opt(OTRO, "Otro…"));
+
+  function fillCaps(model) {
+    sc.innerHTML = "";
+    sc.appendChild(opt("", "Seleccione"));
+    listCaps(model).forEach(c => sc.appendChild(opt(c, docsNb(c))));
+    sc.appendChild(opt(OTRO, "Otro…"));
+  }
+  function show(el, on) { el.hidden = !on; }
+
+  // restaurar al volver a esta pantalla
+  const cur = d[keyM], curC = d[keyC];
+  const hit = Array.from(sm.options).find(o => o.value && o.value !== OTRO && docsNb(o.value) === cur);
+  if (hit) { sm.value = hit.value; fillCaps(hit.value); }
+  else if (cur) { sm.value = OTRO; tm.value = cur; fillCaps(""); }
+  else fillCaps("");
+  show(tm, sm.value === OTRO);
+  const hitC = Array.from(sc.options).find(o => o.value && o.value !== OTRO && docsNb(o.value) === curC);
+  if (hitC) sc.value = hitC.value;
+  else if (curC) { sc.value = OTRO; tc.value = curC; }
+  show(tc, sc.value === OTRO);
+
+  sm.addEventListener("change", () => {
+    const v = sm.value;
+    if (v === OTRO) { show(tm, true); d[keyM] = tm.value; fillCaps(""); sc.value = OTRO; show(tc, true); d[keyC] = tc.value; return; }
+    show(tm, false); d[keyM] = docsNb(v);
+    fillCaps(v); d[keyC] = ""; show(tc, false);
+  });
+  sc.addEventListener("change", () => {
+    if (sc.value === OTRO) { show(tc, true); d[keyC] = tc.value; }
+    else { show(tc, false); d[keyC] = docsNb(sc.value); }
+  });
+  tm.addEventListener("input", () => { d[keyM] = tm.value; });
+  tc.addEventListener("input", () => { d[keyC] = tc.value; });
+}
+
+function docsTiHtml() {
+  const fld = (id, label, attrs = "", cls = "") => `<div class="docs-field ${cls}"><label for="${id}">${label} :</label>
+        <input id="${id}" class="docs-input" type="text" autocomplete="off" ${attrs}></div>`;
+  const modelo = (id, idc, label, labelC) => `
+      <div class="docs-row2">
+        <div class="docs-field"><label for="${id}">${label} :</label>
+          <select id="${id}" class="docs-input docs-select"></select>
+          <input id="${id}X" class="docs-input docs-otro" type="text" autocomplete="off" placeholder="Escribe el modelo" hidden></div>
+        <div class="docs-field"><label for="${idc}">${labelC} :</label>
+          <select id="${idc}" class="docs-input docs-select"></select>
+          <input id="${idc}X" class="docs-input docs-otro" type="text" autocomplete="off" placeholder="Escribe la capacidad" hidden></div>
+      </div>`;
+  const UP = 'autocapitalize="characters" autocorrect="off" spellcheck="false"';
+  return `
+      <h3>Datos del cliente</h3>
+      <div class="docs-sec"><span>Consentimientos</span></div>
+      <label class="docs-check"><input type="checkbox" id="dTyC"><span>He leído y Acepto los términos y condiciones del programa Trade In (Contrato unificado)</span></label>
+      <label class="docs-check"><input type="checkbox" id="dAviso"><span>He leído y Acepto el <a href="https://www.ishopmixup.com/aviso-de-privacidad" target="_blank" rel="noopener">Aviso de Privacidad</a>, consiento y autorizo expresamente que los datos personales que proporcione sean tratados conforme a los términos y condiciones del mismo.</span></label>
+      <div class="docs-field"><label for="dEmail">Email :</label>
+        <input id="dEmail" class="docs-input" type="email" inputmode="email" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false"></div>
+      ${fld("dNombre", "Nombre", 'autocapitalize="characters"')}
+      <div class="docs-row2">
+        ${fld("dPaterno", "Apellido Paterno", 'autocapitalize="characters"')}
+        ${fld("dMaterno", "Apellido Materno", 'autocapitalize="characters"')}
+      </div>
+      <div class="docs-field"><label for="dTel">Teléfono :</label>
+        <input id="dTel" class="docs-input" type="tel" inputmode="tel" autocomplete="off"></div>
+      <div class="docs-field docs-half"><label for="dEstado">Estado :</label>
+        <select id="dEstado" class="docs-input docs-select"><option value="">Seleccione</option>${DOCS_ESTADOS.map(e => `<option>${e}</option>`).join("")}</select></div>
+      ${fld("dAsesor", "Asesor", 'autocapitalize="characters"')}
+
+      <div class="docs-sec"><span>🏠 Domicilio fiscal</span></div>
+      ${fld("dRfc", "RFC", UP)}
+      <div class="docs-row2">
+        ${fld("dCalle", "Calle", 'autocapitalize="characters"')}
+        <div class="docs-field"><label for="dCp">Código postal :</label>
+          <input id="dCp" class="docs-input" type="text" inputmode="numeric" maxlength="5" autocomplete="off"></div>
+      </div>
+      <div class="docs-row2">
+        ${fld("dExt", "No. Exterior", 'autocapitalize="characters"')}
+        ${fld("dInt", "No. Interior", 'autocapitalize="characters"')}
+      </div>
+      ${fld("dColonia", "Colonia", 'autocapitalize="characters"')}
+      ${fld("dLocalidad", "Localidad", 'autocapitalize="characters"')}
+      ${fld("dReferencia", "Referencia", 'autocapitalize="characters"')}
+      ${fld("dMunicipio", "Municipio/Alcaldía", 'autocapitalize="characters"')}
+
+      <div class="docs-sec"><span>Datos del equipo a entregar</span></div>
+      <p class="docs-help">Equipo usado que el cliente <b>entrega</b> en cesión de derechos.</p>
+      ${modelo("dModelo", "dCap", "Modelo", "Capacidad")}
+      <div class="docs-row2">
+        ${fld("dSerie", "# Serie", UP)}
+        ${fld("dImei", "IMEI", UP + ' inputmode="numeric"')}
+      </div>
+      <div class="docs-field docs-half"><label for="dCosto">Costo :</label>
+        <input id="dCosto" class="docs-input" type="text" inputmode="decimal" autocomplete="off" placeholder="$0.00"></div>
+
+      <div class="docs-sec"><span>Datos del equipo nuevo</span></div>
+      <p class="docs-help">Equipo nuevo que el cliente <b>adquiere y se lleva</b>. Opcional: el equipo a entregar no es un iPhone.</p>
+      ${modelo("dModeloN", "dCapN", "Modelo (nuevo)", "Capacidad (nueva)")}
+      <div class="docs-row2">
+        ${fld("dSerieN", "No. Serie (nuevo)", UP)}
+        ${fld("dImeiN", "IMEI (nuevo)", UP + ' inputmode="numeric"')}
+      </div>
+
+      <div class="docs-sec"><span>Identificación oficial</span></div>
+      <div class="docs-field"><label>Tipo de identificación :</label>
+        <div class="docs-seg" id="dIdSeg" data-side="frente">
+          <span class="docs-seg-knob"></span>
+          <button type="button" data-side="frente">INE</button>
+          <button type="button" data-side="reverso">Pasaporte</button>
+        </div></div>
+      <div class="docs-row2 docs-info">
+        <div><div class="docs-lbl">Fecha :</div><div class="docs-val" id="dFecha"></div></div>
+        <div><div class="docs-lbl">Sucursal de iShop :</div><div class="docs-val" id="dSuc"></div></div>
+      </div>
+      ${docsSignHtml("dSign", "Captura tu firma (Cliente)", "dClear")}
+      ${docsSignHtml("dSignA", "Captura tu firma (Asesor)", "dClearA")}`;
+}
+
+function docsBaseHtml() {
+  return `
       <h3>Datos del cliente</h3>
       <div class="docs-field"><label for="dEmail">Email :</label>
         <input id="dEmail" class="docs-input" type="email" inputmode="email" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false"></div>
@@ -2690,18 +2968,24 @@ function buildDocs() {
         <div><div class="docs-lbl">Fecha :</div><div class="docs-val" id="dFecha"></div></div>
         <div><div class="docs-lbl">Sucursal de iShop :</div><div class="docs-val" id="dSuc"></div></div>
       </div>
-      <div class="docs-sign">
-        <div class="docs-sign-head"><span>Captura tu firma (Cliente)</span>
-          <button type="button" class="docs-trash" id="dClear" aria-label="Borrar firma"><svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V5h4v2M8 7l1 12h6l1-12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
-        <canvas id="dSign"></canvas>
-      </div>
-    </div>
+      ${docsSignHtml("dSign", "Captura tu firma (Cliente)", "dClear")}`;
+}
+
+function buildDocs() {
+  const ti = docsDraft.programa === "Trade In";
+  const wrap = document.createElement("div");
+  wrap.className = "docs-page";
+  wrap.innerHTML = `
+    ${docsHeaderHtml()}
+    <div class="docs-card">${ti ? docsTiHtml() : docsBaseHtml()}</div>
     <button type="button" class="docs-accept" id="dNext"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Aceptar</span></button>
+    <p class="docs-msg" id="dMsg" role="status"></p>
     <button type="button" class="docs-link" id="dSkip">Omitir datos · solo fotos</button>
     <button type="button" class="docs-link" id="dVer">Ver registros</button>
   `;
   docsInitHeader(wrap);
   const $ = (s) => wrap.querySelector(s);
+  const d = docsDraft;
   docsBindText(wrap, "dEmail", "email");
   docsBindText(wrap, "dNombre", "nombre", { upper: true });
   docsBindText(wrap, "dPaterno", "paterno", { upper: true });
@@ -2710,48 +2994,56 @@ function buildDocs() {
   docsBindText(wrap, "dSerie", "serie", { upper: true });
   $("#dFecha").textContent = docsFechaHoy();
   $("#dSuc").textContent = DOCS_SUCURSAL;
+  docsSignPad(wrap, "dSign", "dClear", "firmaUrl");
 
-  // Firma
-  const cv = $("#dSign");
-  const ctx = cv.getContext("2d");
-  let drawing = false, last = null;
-  function sizeCanvas() {
-    const r = Math.min(window.devicePixelRatio || 1, 2);
-    const w = cv.clientWidth, h = cv.clientHeight;
-    if (!w || !h) return;
-    cv.width = Math.round(w * r); cv.height = Math.round(h * r);
-    ctx.setTransform(r, 0, 0, r, 0, 0);
-    ctx.lineWidth = 2.6; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.strokeStyle = "#111";
-    if (docsDraft.firmaUrl) {
-      const im = new Image();
-      im.onload = () => ctx.drawImage(im, 0, 0, w, h);
-      im.src = docsDraft.firmaUrl;
-    }
+  if (ti) {
+    if (!d.asesor) d.asesor = (ishopAjustes().nombre || "").toUpperCase();
+    [["dAsesor", "asesor", true], ["dRfc", "rfc", true], ["dCalle", "calle", true], ["dCp", "cp"], ["dExt", "numExt", true],
+     ["dInt", "numInt", true], ["dColonia", "colonia", true], ["dLocalidad", "localidad", true], ["dReferencia", "referencia", true],
+     ["dMunicipio", "municipio", true], ["dImei", "imei", true], ["dSerieN", "serieN", true], ["dImeiN", "imeiN", true]
+    ].forEach(([id, key, upper]) => docsBindText(wrap, id, key, { upper: !!upper }));
+
+    // Costo: libre; al salir del campo se da formato de moneda
+    const costo = docsBindText(wrap, "dCosto", "costo");
+    costo.addEventListener("blur", () => { const m = docsMoney(costo.value); if (m) { costo.value = m; d.costo = m; } });
+
+    // Estado
+    const est = $("#dEstado"); est.value = d.estado || "";
+    est.addEventListener("change", () => { d.estado = est.value; });
+
+    // Consentimientos
+    const tyc = $("#dTyC"), avi = $("#dAviso");
+    tyc.checked = !!d.aceptaTyC; avi.checked = !!d.aceptaAviso;
+    tyc.addEventListener("change", () => { d.aceptaTyC = tyc.checked; });
+    avi.addEventListener("change", () => { d.aceptaAviso = avi.checked; });
+
+    // Modelo / capacidad
+    dataReady.then(() => {
+      docsBindModelo(wrap, { m: "dModelo", c: "dCap" }, "modelo", "capacidad", docsModelosEntrega, docsCapsEntrega);
+      docsBindModelo(wrap, { m: "dModeloN", c: "dCapN" }, "modeloN", "capacidadN", docsModelosNuevo, docsCapsNuevo);
+    });
+
+    // Tipo de identificación
+    const seg = $("#dIdSeg");
+    const setId = (v) => { d.idTipo = v; seg.dataset.side = v === "Pasaporte" ? "reverso" : "frente"; };
+    setId(d.idTipo || "INE");
+    seg.addEventListener("click", (e) => {
+      const b = e.target.closest("button[data-side]"); if (!b) return;
+      setId(b.dataset.side === "reverso" ? "Pasaporte" : "INE");
+    });
+
+    docsSignPad(wrap, "dSignA", "dClearA", "firmaAsesorUrl");
   }
-  requestAnimationFrame(sizeCanvas);
-  const pos = (e) => { const b = cv.getBoundingClientRect(); return { x: e.clientX - b.left, y: e.clientY - b.top }; };
-  cv.addEventListener("pointerdown", (e) => {
-    drawing = true; last = pos(e);
-    cv.setPointerCapture(e.pointerId);
-    ctx.beginPath(); ctx.arc(last.x, last.y, 1.2, 0, Math.PI * 2); ctx.fillStyle = "#111"; ctx.fill();
-    e.preventDefault();
-  });
-  cv.addEventListener("pointermove", (e) => {
-    if (!drawing) return;
-    const p = pos(e);
-    ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke();
-    last = p; e.preventDefault();
-  });
-  const end = () => { if (!drawing) return; drawing = false; docsDraft.firmaUrl = cv.toDataURL("image/png"); };
-  cv.addEventListener("pointerup", end);
-  cv.addEventListener("pointercancel", end);
-  $("#dClear").addEventListener("click", () => {
-    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height); ctx.restore();
-    docsDraft.firmaUrl = "";
-  });
 
   const next = () => navigate({ screen: "docsFotos", title: "Documentos" });
-  $("#dNext").addEventListener("click", next);
+  $("#dNext").addEventListener("click", () => {
+    if (ti && (!d.aceptaTyC || !d.aceptaAviso)) {
+      $("#dMsg").textContent = "Marca los dos consentimientos para continuar.";
+      $("#dTyC").scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    next();
+  });
   $("#dSkip").addEventListener("click", next);
   $("#dVer").addEventListener("click", () => navigate({ screen: "docsOk", title: "Registros", hero: false }));
   return wrap;
@@ -2908,7 +3200,8 @@ function buildDocsConfirm() {
   const hayDatos = docsHayDatos(d);
   if (d.programa) addRow("Programa", d.programa);
   if (hayDatos) {
-    DOCS_CAMPOS.forEach(([k, label]) => { if (d[k]) addRow(label, d[k]); });
+    docsCampos(d.programa).forEach(([k, label]) => { if (d[k]) addRow(label, k === "costo" ? (docsMoney(d[k]) || d[k]) : d[k]); });
+    if (d.programa === "Trade In") addRow("Asesor", d.asesor || ishopAjustes().nombre || "—");
     addRow("Fecha", docsFechaHoy());
     addRow("Sucursal", DOCS_SUCURSAL);
   } else {
@@ -2927,12 +3220,22 @@ function buildDocsConfirm() {
     if (!b) return; const u = URL.createObjectURL(b); tUrls.push(u); addThumb(l, u);
   });
   if (d.firmaUrl) addThumb("Firma", d.firmaUrl);
+  if (d.firmaAsesorUrl) addThumb("Firma asesor", d.firmaAsesorUrl);
 
   const faltan = [];
   if (!d.frente) faltan.push("foto del frente");
   if (!d.reverso) faltan.push("foto de atrás");
   if (!d.ticket) faltan.push("ticket");
   if (hayDatos && !d.firmaUrl) faltan.push("firma");
+  if (d.programa === "Trade In") {
+    const req = [["email", "correo"], ["nombre", "nombre"], ["paterno", "apellido paterno"], ["telefono", "teléfono"], ["estado", "estado"],
+      ["rfc", "RFC"], ["calle", "calle"], ["cp", "código postal"], ["numExt", "no. exterior"], ["colonia", "colonia"],
+      ["localidad", "localidad"], ["municipio", "municipio/alcaldía"], ["modelo", "modelo a entregar"], ["capacidad", "capacidad a entregar"],
+      ["serie", "# serie"], ["imei", "IMEI"], ["costo", "costo"]];
+    req.forEach(([k, l]) => { if (!String(d[k] || "").trim()) faltan.push(l); });
+    if (!(d.asesor || "").trim() && !ishopAjustes().nombre) faltan.push("asesor");
+    if (!d.firmaAsesorUrl) faltan.push("firma del asesor");
+  }
   if (!d.programa) faltan.push("tipo de registro");
   if (faltan.length) {
     const w = wrap.querySelector("#cfWarn");
@@ -2945,17 +3248,19 @@ function buildDocsConfirm() {
     okBtn.disabled = true;
     try {
       const firma = d.firmaUrl ? await docsDataUrlToWhitePng(d.firmaUrl) : null;
+      const firmaAsesor = d.firmaAsesorUrl ? await docsDataUrlToWhitePng(d.firmaAsesorUrl) : null;
+      const datosRec = {};
+      docsCampos(d.programa).forEach(([k]) => { datosRec[k] = String(d[k] == null ? "" : d[k]).trim(); });
+      if (d.programa === "Trade In") datosRec.costo = docsMoney(d.costo) || datosRec.costo;
       const rec = {
         id: Date.now() + "-" + Math.random().toString(36).slice(2, 7),
         nombre: docsFullName(d) || "Sin nombre",
         programa: d.programa,
-        empleado: ishopAjustes().nombre,
+        empleado: (d.programa === "Trade In" && d.asesor.trim()) ? d.asesor.trim() : ishopAjustes().nombre,
         fecha: new Date().toISOString(),
-        datos: hayDatos ? {
-          email: d.email.trim(), nombre: d.nombre.trim(), paterno: d.paterno.trim(), materno: d.materno.trim(),
-          telefono: d.telefono.trim(), serie: d.serie.trim(), sucursal: DOCS_SUCURSAL, fechaTexto: docsFechaHoy(),
-        } : null,
+        datos: hayDatos ? Object.assign(datosRec, { sucursal: DOCS_SUCURSAL, fechaTexto: docsFechaHoy() }) : null,
         firma,
+        firmaAsesor,
         usuarioFrente: d.frente,
         usuarioReverso: d.reverso,
         ticket: d.ticket,
@@ -3046,7 +3351,7 @@ function buildDocsOk(entry) {
       if (d) {
         const box = document.createElement("div");
         box.className = "docs-rec-data";
-        DOCS_CAMPOS.forEach(([k, label]) => {
+        docsCampos(rec.programa).forEach(([k, label]) => {
           if (!d[k]) return;
           const row = document.createElement("div");
           row.className = "docs-copy-row";
@@ -3065,7 +3370,7 @@ function buildDocsOk(entry) {
 
       const thumbs = document.createElement("div");
       thumbs.className = "docs-rec-thumbs";
-      [["Frente", rec.usuarioFrente || rec.usuario], ["Atrás", rec.usuarioReverso], ["Ticket", rec.ticket], ["Firma", rec.firma]].forEach(([label, blob]) => {
+      [["Frente", rec.usuarioFrente || rec.usuario], ["Atrás", rec.usuarioReverso], ["Ticket", rec.ticket], ["Firma", rec.firma], ["Firma asesor", rec.firmaAsesor]].forEach(([label, blob]) => {
         if (!blob) return;
         const fig = document.createElement("figure");
         const u = URL.createObjectURL(blob);
