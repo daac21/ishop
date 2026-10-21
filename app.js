@@ -66,14 +66,14 @@ const ISHOP_ICONS = (() => {
 
 // ---- Definición del menú principal ----
 const MENU = [
-  { id: "tradein",   label: "Trade In",       c1: "#5b8def", c2: "#4a4fe0" },
-  { id: "switchup",  label: "Switch Up",      c1: "#ffb35c", c2: "#f2706a" },
-  { id: "applecare", label: "AppleCare+",     c1: "#6fcf97", c2: "#3b9b86" },
-  { id: "forlife",   label: "For Life + AC",  c1: "#8a6df0", c2: "#5a43c9" },
-  { id: "getac",     label: "GET + AC",       c1: "#f2709c", c2: "#d6457a" },
-  { id: "cubre",     label: "¿Qué cubre?",    c1: "#78c8d8", c2: "#4aa3bd" },
-  { id: "scanner",   label: "Escáner",        c1: "#7b8497", c2: "#3d4455" },
-  { id: "cajas",     label: "Código cajas",   c1: "#e0b27a", c2: "#b9783a" },
+  { id: "tradein",   label: "Trade In",       c1: "#1c3590", c2: "#2f58d6" },
+  { id: "switchup",  label: "Switch Up",      c1: "#7d4a1c", c2: "#c47f35" },
+  { id: "applecare", label: "AppleCare+",     c1: "#1b5f43", c2: "#2f9266" },
+  { id: "forlife",   label: "For Life + AC",  c1: "#43288f", c2: "#6a45d8" },
+  { id: "getac",     label: "GET + AC",       c1: "#7e2a4f", c2: "#c14577" },
+  { id: "cubre",     label: "¿Qué cubre?",    c1: "#155a68", c2: "#2a8fa3" },
+  { id: "scanner",   label: "Escáner",        c1: "#262d3c", c2: "#4a566f" },
+  { id: "cajas",     label: "Código cajas",   c1: "#5e4420", c2: "#a9803a" },
 ];
 
 // ---- iShop Arcade (oculto: se abre manteniendo presionado el nombre "iShop Tools") ----
@@ -156,6 +156,98 @@ const AC_CATEGORY_META = {
   "Apple TV":  { icon: "📺", color: "#1d1d1f" },
   "AirPods":   { icon: "🎧", color: "#8e8e93" },
 };
+
+/* =====================================================================
+   Tema "joya": íconos de línea, colores y piezas compartidas por todos los menús.
+   Nada de esto lee datos: solo es presentación. Los textos y precios salen de los JSON.
+   ===================================================================== */
+const DS_SVG = (inner, sw = 1.8) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
+const DS_ICONS = {
+  phone:   DS_SVG('<rect x="7" y="2.5" width="10" height="19" rx="2.6"/><path d="M10.5 18.6h3"/>'),
+  tablet:  DS_SVG('<rect x="4.5" y="2.5" width="15" height="19" rx="2.6"/><path d="M10.6 18.4h2.8"/>'),
+  watch:   DS_SVG('<rect x="7" y="6.5" width="10" height="11" rx="3"/><path d="M9 6.5l.7-3.5h4.6l.7 3.5M9 17.5l.7 3.5h4.6l.7-3.5"/>'),
+  mac:     DS_SVG('<rect x="4.5" y="5" width="15" height="10.5" rx="1.6"/><path d="M2.5 19h19"/>'),
+  homepod: DS_SVG('<rect x="6" y="4" width="12" height="16" rx="6"/><path d="M9 8.2h6"/>'),
+  tv:      DS_SVG('<rect x="3" y="6" width="18" height="11" rx="2"/><path d="M8 20h8"/>'),
+  airpods: DS_SVG('<path d="M4 14a8 8 0 0 1 16 0"/><rect x="3" y="13.5" width="4" height="7" rx="2"/><rect x="17" y="13.5" width="4" height="7" rx="2"/>'),
+  box:     DS_SVG('<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/>'),
+  shield:  DS_SVG('<path d="M12 3l7 3v5.2c0 4.6-3 7.6-7 9.8-4-2.2-7-5.2-7-9.8V6z"/><path d="M9 12l2.2 2.2L15.2 10"/>'),
+  check:   DS_SVG('<path d="M5 12.5l4.5 4.5L19 7.5"/>', 2.6),
+  x:       DS_SVG('<path d="M6 6l12 12M18 6L6 18"/>', 2.6),
+  bolt:    DS_SVG('<path d="M13 3L5 13.5h6L10 21l8-10.5h-6z"/>'),
+  wrench:  DS_SVG('<path d="M14.5 6.2a4 4 0 0 0 4.9 4.9L9 21.5 3 15.5 13.6 5a4 4 0 0 0 .9 1.2z"/>'),
+  battery: DS_SVG('<rect x="6" y="5" width="12" height="16" rx="2.6"/><path d="M10 2.5h4M12 10v5M9.5 12.5h5"/>'),
+  headset: DS_SVG('<path d="M4.5 14v-2a7.5 7.5 0 0 1 15 0v2"/><rect x="3.5" y="13" width="4" height="6.5" rx="2"/><rect x="16.5" y="13" width="4" height="6.5" rx="2"/>'),
+  burst:   DS_SVG('<path d="M12 3l1.8 4.7 4.6-2.1-2 4.7 5 .9-4.6 2.5 3 4-5-1-1 4.9-2.8-4.1-3.7 3.2.5-4.9-5-.3 4.2-3.2-3-4 4.9 1.5z"/>'),
+  pencil:  DS_SVG('<path d="M4 20l1-4L16.5 4.5a2.1 2.1 0 0 1 3 3L8 19z"/>'),
+  calendar:DS_SVG('<rect x="4" y="5" width="16" height="15" rx="3"/><path d="M4 10h16M8 3v4M16 3v4"/>', 2),
+  coin:    DS_SVG('<path d="M12 2v20M17 6.5H9.8a2.8 2.8 0 0 0 0 5.6h4.4a2.8 2.8 0 0 1 0 5.6H6.5"/>', 2),
+  warn:    DS_SVG('<path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17v.2"/>', 2),
+  doc:     DS_SVG('<path d="M7 3h10v18l-5-3-5 3z"/>', 2),
+  steps:   DS_SVG('<path d="M5 6.5h14M5 12h14M5 17.5h9"/>', 2),
+  grid:    DS_SVG('<rect x="4" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.6"/>'),
+  list:    DS_SVG('<path d="M9 6.5h11M9 12h11M9 17.5h11"/><circle cx="4.7" cy="6.5" r=".6"/><circle cx="4.7" cy="12" r=".6"/><circle cx="4.7" cy="17.5" r=".6"/>'),
+};
+const DS_JEWELS = ["blue", "violet", "green", "rose", "amber", "teal", "slate", "navy"];
+function dsIconFor(name) {
+  const t = String(name || "").toLowerCase();
+  if (/iphone/.test(t)) return DS_ICONS.phone;
+  if (/ipad/.test(t)) return DS_ICONS.tablet;
+  if (/watch/.test(t)) return DS_ICONS.watch;
+  if (/mac/.test(t)) return DS_ICONS.mac;
+  if (/homepod/.test(t)) return DS_ICONS.homepod;
+  if (/apple tv|\btv\b/.test(t)) return DS_ICONS.tv;
+  if (/airpods|audífon|audifon|beats/.test(t)) return DS_ICONS.airpods;
+  return DS_ICONS.box;
+}
+function dsJewelFor(name, i) {
+  const t = String(name || "").toLowerCase();
+  if (/iphone/.test(t)) return "blue";
+  if (/ipad/.test(t)) return "violet";
+  if (/watch/.test(t)) return "green";
+  if (/mac/.test(t)) return "slate";
+  if (/homepod/.test(t)) return "amber";
+  if (/apple tv|\btv\b/.test(t)) return "navy";
+  if (/airpods|audífon|audifon|beats/.test(t)) return "teal";
+  return DS_JEWELS[(i || 0) % DS_JEWELS.length];
+}
+// Fila de menú con ícono de color (AppleCare+, ¿Qué cubre?, Código cajas…)
+function dsRow({ icon, jw, label, sub, onClick }) {
+  const b = document.createElement("button");
+  b.className = "ds-row";
+  b.innerHTML = `<span class="ds-chip jw-${jw}">${icon}</span><span class="ds-row-text"><b></b>${sub ? "<small></small>" : ""}</span><span class="chev"></span>`;
+  b.querySelector("b").textContent = label;
+  if (sub) b.querySelector("small").textContent = sub;
+  b.addEventListener("click", onClick);
+  return b;
+}
+// Ícono y color de cada beneficio de AppleCare+ según las palabras del texto
+function benefitChip(text) {
+  const t = String(text).toLowerCase();
+  if (t.includes("batería")) return { icon: DS_ICONS.battery, jw: "green" };
+  if (t.includes("robo") || t.includes("extrav")) return { icon: DS_ICONS.shield, jw: "blue" };
+  if (t.includes("soporte")) return { icon: DS_ICONS.headset, jw: "violet" };
+  if (t.includes("pencil") || t.includes("keyboard")) return { icon: DS_ICONS.pencil, jw: "teal" };
+  if (t.includes("original")) return { icon: DS_ICONS.wrench, jw: "amber" };
+  if (t.includes("accidental")) return { icon: DS_ICONS.burst, jw: "rose" };
+  return { icon: DS_ICONS.check, jw: "slate" };
+}
+function dsKeyIcon(label) {
+  const t = String(label).toLowerCase();
+  if (/pantalla/.test(t)) return DS_ICONS.phone;
+  if (/robo|extrav/.test(t)) return DS_ICONS.shield;
+  if (/bater/.test(t)) return DS_ICONS.battery;
+  if (/otros|da[ñn]o/.test(t)) return DS_ICONS.burst;
+  return DS_ICONS.wrench;
+}
+// Marca de agua al pie de cada pantalla
+function dsWatermark() {
+  const w = document.createElement("div");
+  w.className = "ds-wm";
+  w.setAttribute("aria-hidden", "true");
+  w.innerHTML = "<i></i><span>daac</span><i></i>";
+  return w;
+}
 
 let TRADEIN_DATA = null;
 let TRADEIN_VISUAL = null;
@@ -362,6 +454,10 @@ function render(isForward) {
 
   const node = buildScreen(entry);
   node.classList.add("screen");
+  if (!/^(scanner|arcade|minesweeper|tetris|snake|dino|repair)$/.test(entry.screen)) {
+    node.classList.add("has-wm");
+    node.appendChild(dsWatermark());
+  }
   if (isForward) node.classList.add("enter");
   screensEl.innerHTML = "";
   screensEl.appendChild(node);
@@ -518,24 +614,22 @@ const REGISTROS_TIPOS = [
 function buildRegistros() {
   const wrap = document.createElement("div");
   wrap.className = "reg-wrap";
-  wrap.innerHTML = `<div class="reg-heading"><h2>Registros</h2><p>Elige el tipo de registro.</p></div>`;
+  wrap.innerHTML = `<div class="reg-heading"><h2>Registros</h2><p class="ds-sub">Elige el tipo de registro.</p></div>`;
   const list = document.createElement("div");
   list.className = "reg-list";
+  const JW = { "For Life": "violet", "Get": "navy", "Switch Up": "amber", "Trade In": "blue", "Cancelación For Life": "slate" };
   REGISTROS_TIPOS.forEach(t => {
-    const row = document.createElement("button");
-    row.className = "reg-row";
-    row.innerHTML = `
-      <span class="reg-icon" style="--r1:${t.c1};--r2:${t.c2}">${ISHOP_ICONS[t.icon]}</span>
-      <span class="reg-name">${t.label}</span>
-      <span class="reg-chev"></span>`;
-    row.addEventListener("click", () => {
-      if (t.pendiente) {
-        navigate({ screen: "tool", id: "cancelacion", title: t.label });
-        return;
-      }
-      docsDraft = docsNewDraft();
-      docsDraft.programa = t.programa;
-      navigate({ screen: "docs", title: t.label });
+    const row = dsRow({
+      icon: ISHOP_ICONS[t.icon] || DS_ICONS.doc, jw: JW[t.programa] || "slate", label: t.label,
+      onClick: () => {
+        if (t.pendiente) {
+          navigate({ screen: "tool", id: "cancelacion", title: t.label });
+          return;
+        }
+        docsDraft = docsNewDraft();
+        docsDraft.programa = t.programa;
+        navigate({ screen: "docs", title: t.label });
+      },
     });
     list.appendChild(row);
   });
@@ -611,11 +705,8 @@ function buildCoverageList() {
 
   const heading = document.createElement("div");
   heading.className = "section-heading";
-  heading.innerHTML = `<h2>¿Qué cubre?</h2>`;
+  heading.innerHTML = `<h2>¿Qué cubre?</h2><p class="ds-sub">Elige el equipo para ver su cobertura.</p>`;
   wrap.appendChild(heading);
-
-  const grid = document.createElement("div");
-  grid.className = "coverage-tile-grid";
 
   const categories = COBERTURA_DATA ? Object.keys(COBERTURA_DATA) : [];
   if (categories.length === 0) {
@@ -623,23 +714,21 @@ function buildCoverageList() {
     return wrap;
   }
 
+  const list = document.createElement("div");
   categories.forEach((cat, i) => {
-    const tile = document.createElement("button");
-    tile.className = "coverage-tile";
-    tile.style.setProperty("--tile-color", COVERAGE_TILE_COLORS[i % COVERAGE_TILE_COLORS.length]);
-    tile.innerHTML = `<span class="coverage-tile-icon">${COVERAGE_ICONS[cat] || "🛠️"}</span><span>${cat}</span>`;
-    tile.addEventListener("click", () => {
-      const variants = Object.keys(COBERTURA_DATA[cat]);
-      if (variants.length === 1) {
-        navigate({ screen: "coverageDetail", category: cat, variant: variants[0], title: cat });
-      } else {
-        navigate({ screen: "coverageVariant", category: cat, title: cat });
-      }
-    });
-    grid.appendChild(tile);
+    list.appendChild(dsRow({
+      icon: dsIconFor(cat), jw: dsJewelFor(cat, i), label: cat,
+      onClick: () => {
+        const variants = Object.keys(COBERTURA_DATA[cat]);
+        if (variants.length === 1) {
+          navigate({ screen: "coverageDetail", category: cat, variant: variants[0], title: cat });
+        } else {
+          navigate({ screen: "coverageDetail", category: cat, variant: variants[0], title: cat });
+        }
+      },
+    }));
   });
-
-  wrap.appendChild(grid);
+  wrap.appendChild(list);
   return wrap;
 }
 
@@ -669,75 +758,120 @@ function buildCoverageDetail(category, variant, preModel) {
   const wrap = document.createElement("div");
   const data = COBERTURA_DATA?.[category]?.[variant];
   const isRobo = /robo/i.test(variant);
+  const years = coverageYears(category, variant);
 
-  const hero = document.createElement("div");
-  hero.className = "coverage-hero" + (isRobo ? " robo" : "");
-  hero.innerHTML = `
-    <span class="coverage-hero-icon">${COVERAGE_ICONS[category] || "🛠️"}</span>
-    <span class="coverage-hero-cat">${category}</span>
-    <strong>${variant}</strong>
-    <span class="coverage-years">🗓️ ${coverageYears(category, variant)} años de cobertura</span>
-  `;
-  wrap.appendChild(hero);
+  const head = document.createElement("div");
+  head.className = "section-heading";
+  head.innerHTML = `<h2>¿Qué cubre?</h2><p class="ds-sub"></p>`;
+  head.querySelector("p").textContent = `${category} · protección con ${variant}`;
+  wrap.appendChild(head);
+
+  // Pestañas entre las coberturas del mismo equipo (AppleCare+ / Robo y Pérdida…)
+  const variants = Object.keys(COBERTURA_DATA?.[category] || {});
+  if (variants.length > 1) {
+    const tabs = document.createElement("div");
+    tabs.className = "ds-tabs";
+    variants.forEach(v => {
+      const tb = document.createElement("button");
+      tb.type = "button";
+      tb.className = "ds-tab" + (v === variant ? " on" : "");
+      tb.textContent = v;
+      tb.addEventListener("click", () => {
+        if (v === variant) return;
+        const e = currentEntry();
+        e.variant = v;
+        e.title = category;
+        render(false);
+      });
+      tabs.appendChild(tb);
+    });
+    wrap.appendChild(tabs);
+  }
 
   if (!data) {
     wrap.appendChild(buildPlaceholder("Sin datos", "🛠️", "Aún no hay información cargada para esta cobertura."));
     return wrap;
   }
 
-  function section(title, icon, innerNode) {
-    const sec = document.createElement("div");
-    sec.className = "cov-section";
-    const h = document.createElement("h3");
-    h.innerHTML = `<span>${icon}</span> ${title}`;
-    sec.appendChild(h);
-    sec.appendChild(innerNode);
-    wrap.appendChild(sec);
-  }
+  // Resumen: se arma solo con lo que haya en el JSON
+  const nums = (data.cuotas || []).map(c => parseFloat(String(c.precio).replace(/[^0-9.]/g, ""))).filter(n => isFinite(n));
+  const kp = [{ jw: "blue", big: `${years} años`, small: "de cobertura" }];
+  if (nums.length) kp.push({ jw: "green", big: `Desde ${money(Math.min(...nums))}`, small: "por evento" });
+  if (data.bateria) kp.push({ jw: "violet", big: "Batería", small: "incluida" });
+  if (data.cubre?.length) kp.push({ jw: "teal", big: String(data.cubre.length), small: "coberturas" });
+  const kpis = document.createElement("div");
+  kpis.className = "ds-kpis";
+  kp.slice(0, 3).forEach(k => {
+    const d = document.createElement("div");
+    d.className = "ds-kpi jw-" + k.jw;
+    d.innerHTML = `<strong></strong><small></small>`;
+    d.querySelector("strong").textContent = k.big;
+    d.querySelector("small").textContent = k.small;
+    kpis.appendChild(d);
+  });
+  wrap.appendChild(kpis);
 
-  function chipList(items, kind) {
+  function card(icon, title, body, cls) {
+    const c = document.createElement("div");
+    c.className = "ds-card" + (cls ? " " + cls : "");
+    const h = document.createElement("h4");
+    h.innerHTML = `${icon}<span></span>`;
+    h.querySelector("span").textContent = title;
+    c.appendChild(h);
+    c.appendChild(body);
+    wrap.appendChild(c);
+    return c;
+  }
+  function checks(items, kind) {
     const box = document.createElement("div");
-    box.className = "chip-list";
     items.forEach(text => {
-      const chip = document.createElement("span");
-      chip.className = kind === "good" ? "chip-good" : "chip-bad";
-      chip.textContent = (kind === "good" ? "✓ " : "✕ ") + text;
-      box.appendChild(chip);
+      const row = document.createElement("div");
+      row.className = "ds-li " + (kind === "good" ? "ok" : "no");
+      row.innerHTML = `<i>${kind === "good" ? DS_ICONS.check : DS_ICONS.x}</i><span></span>`;
+      row.querySelector("span").textContent = text;
+      box.appendChild(row);
     });
     return box;
   }
+  function chips(items) {
+    const box = document.createElement("div");
+    box.className = "ds-chips";
+    items.forEach(text => { const c = document.createElement("span"); c.textContent = text; box.appendChild(c); });
+    return box;
+  }
 
-  if (data.cubre?.length) section("Qué cubre", "✅", chipList(data.cubre, "good"));
-  if (data.no_cubre?.length) section("Qué no cubre", "❌", chipList(data.no_cubre, "bad"));
+  if (data.cubre?.length) card(DS_ICONS.check, "Sí cubre", checks(data.cubre, "good"), "ds-card-ok");
 
   if (data.cuotas?.length) {
     const box = document.createElement("div");
-    box.className = "fee-list";
+    box.className = "ds-fees";
     data.cuotas.forEach(c => {
-      const row = document.createElement("div");
-      row.className = "fee-row";
-      row.innerHTML = `<span>${c.label}</span><strong>${c.precio}</strong>`;
-      box.appendChild(row);
+      const d = document.createElement("div");
+      d.innerHTML = `<small></small><strong></strong>`;
+      d.querySelector("small").textContent = c.label;
+      d.querySelector("strong").textContent = c.precio;
+      box.appendChild(d);
     });
-    section("Cuotas de servicio", "💰", box);
+    card(DS_ICONS.coin, "Cuota por evento", box);
   }
 
-  if (data.si_aplica?.length) section("Casos que normalmente sí aplican", "📍", chipList(data.si_aplica, "good"));
-  if (data.rechazados?.length) section("Casos que pueden ser rechazados", "🚫", chipList(data.rechazados, "bad"));
+  if (data.si_aplica?.length) card(DS_ICONS.warn, "Casos que normalmente sí aplican", chips(data.si_aplica));
+  if (data.no_cubre?.length) card(DS_ICONS.x, "No cubre", checks(data.no_cubre, "bad"), "ds-card-no");
+  if (data.rechazados?.length) card(DS_ICONS.x, "Casos que pueden ser rechazados", chips(data.rechazados), "ds-card-no");
 
   if (data.bateria) {
     const box = document.createElement("div");
-    box.className = "battery-box";
-    box.innerHTML = `<span>${data.bateria.condicion}</span><strong>${data.bateria.resultado}</strong>`;
-    section("Batería", "🔋", box);
+    box.className = "ds-batt";
+    box.innerHTML = `<span class="ds-chip jw-green">${DS_ICONS.battery}</span><div><b></b><small></small></div>`;
+    box.querySelector("b").textContent = data.bateria.condicion || "Batería";
+    box.querySelector("small").textContent = data.bateria.resultado || "";
+    const c = document.createElement("div");
+    c.className = "ds-card ds-card-ok";
+    c.appendChild(box);
+    wrap.appendChild(c);
   }
 
-  if (data.info?.length) {
-    const ul = document.createElement("ul");
-    ul.className = "info-checklist";
-    data.info.forEach(t => { const li = document.createElement("li"); li.textContent = "✓ " + t; ul.appendChild(li); });
-    section("Información importante", "🔄", ul);
-  }
+  if (data.info?.length) card(DS_ICONS.shield, "Información importante", checks(data.info, "good"));
 
   // Costo del plan: dropdown de modelo (precio real, ya no "desde") y, solo
   // para iPhone, un segundo dropdown para elegir AppleCare+ normal o Robo y
@@ -811,14 +945,14 @@ function buildCoverageDetail(category, variant, preModel) {
     msiSelect.addEventListener("change", renderAll);
     renderAll();
 
-    section("Costo de AppleCare+", "💳", box);
+    card(DS_ICONS.coin, "Costo de AppleCare+", box);
   }
 
   if (data.reclamo?.length) {
     const ol = document.createElement("ol");
     ol.className = "claim-steps";
     data.reclamo.forEach(t => { const li = document.createElement("li"); li.textContent = t; ol.appendChild(li); });
-    section("Cómo reclamar", "📋", ol);
+    card(DS_ICONS.steps, "Cómo reclamar", ol);
   }
 
   return wrap;
@@ -1017,7 +1151,7 @@ function buildCajasCategories() {
   const wrap = document.createElement("div");
   const heading = document.createElement("div");
   heading.className = "section-heading";
-  heading.innerHTML = `<h2>📦 Código cajas</h2><p>Elige el equipo para generar su código de AppleCare+.</p>`;
+  heading.innerHTML = `<h2>Código cajas</h2><p class="ds-sub">Elige el equipo para generar su código de AppleCare+.</p>`;
   wrap.appendChild(heading);
 
   const cats = CODIGOS_CAJAS ? Object.keys(CODIGOS_CAJAS) : [];
@@ -1027,17 +1161,11 @@ function buildCajasCategories() {
   }
 
   const grid = document.createElement("div");
-  grid.className = "coverage-tile-grid";
   cats.forEach((cat, i) => {
-    const meta = CAJAS_CATEGORY_META[cat] || { icon: "📦" };
-    const tile = document.createElement("button");
-    tile.className = "coverage-tile";
-    tile.style.setProperty("--tile-color", COVERAGE_TILE_COLORS[i % COVERAGE_TILE_COLORS.length]);
-    tile.innerHTML = `<span class="coverage-tile-icon">${meta.icon}</span><span>${cat}</span>`;
-    tile.addEventListener("click", () => {
-      navigate({ screen: "cajasModels", category: cat, title: cat });
-    });
-    grid.appendChild(tile);
+    grid.appendChild(dsRow({
+      icon: dsIconFor(cat), jw: dsJewelFor(cat, i), label: cat,
+      onClick: () => navigate({ screen: "cajasModels", category: cat, title: cat }),
+    }));
   });
   wrap.appendChild(grid);
   return wrap;
@@ -1236,44 +1364,45 @@ function buildTradeNode(path) {
   heading.innerHTML = `<h2>${path.length === 0 ? "Selecciona un tipo" : label}</h2>`;
   wrap.appendChild(heading);
 
-  // El menú raíz ("Selecciona un tipo") se ve como tarjetas con imagen. El
-  // aspecto (imagen/colores) sale de TRADEIN_VISUAL (datos/tradein_categorias.json),
-  // un archivo separado de tradein.json: así, cuando se reemplaza tradein.json
-  // con precios nuevos, este menú no se ve afectado y sigue mostrándose igual.
-  // Las claves (qué categorías existen y a dónde navegan) siguen saliendo de
-  // tradein.json; si una clave nueva no tiene entrada visual, cae a un botón simple.
+  // El menú raíz ("Selecciona un tipo") se ve en cuadrícula o en lista (el botón de arriba a la
+  // derecha cambia la vista y se recuerda en este teléfono). Las claves, y a dónde navegan,
+  // salen de tradein.json: si agregas una categoría nueva, aparece sola con ícono genérico.
   if (path.length === 0) {
-    const grid = document.createElement("div");
-    grid.className = "tradein-grid";
-    Object.keys(node).forEach(key => {
-      const visual = buscarVisual(key);
-      if (visual) {
-        const card = document.createElement("button");
-        card.className = "tradein-card";
-        card.style.setProperty("--tc1", visual.color1 || "#eef1f4");
-        card.style.setProperty("--tc2", visual.color2 || "#d5dbe1");
-        card.innerHTML = `
-          <img class="tradein-card-img" src="${visual.imagen}" alt="${key}">
-          <span class="tradein-card-row">
-            <span class="tradein-card-label">${key}</span>
-            <span class="chev"></span>
-          </span>
-        `;
-        card.addEventListener("click", () => {
-          navigate({ screen: "tradeNode", path: [...path, key], title: key });
-        });
-        grid.appendChild(card);
-      } else {
-        const btn = document.createElement("button");
-        btn.className = "sub-btn";
-        btn.innerHTML = `<span>${key}</span><span class="chev"></span>`;
-        btn.addEventListener("click", () => {
-          navigate({ screen: "tradeNode", path: [...path, key], title: key });
-        });
-        grid.appendChild(btn);
-      }
+    wrap.removeChild(heading);
+    const KEY = "ishop_vista_tradein";
+    let vista = "cuadricula";
+    try { if (localStorage.getItem(KEY) === "lista") vista = "lista"; } catch (e) {}
+    const head = document.createElement("div");
+    head.className = "ds-head";
+    head.innerHTML = `<div><h2>Selecciona un tipo</h2><p>Elige el dispositivo que deseas consultar.</p></div>
+      <div class="view-toggle">
+        <button type="button" class="view-toggle-btn" data-v="cuadricula" aria-label="Cuadrícula">${DS_ICONS.grid}</button>
+        <button type="button" class="view-toggle-btn" data-v="lista" aria-label="Lista">${DS_ICONS.list}</button>
+      </div>`;
+    wrap.appendChild(head);
+    const box = document.createElement("div");
+    wrap.appendChild(box);
+    const paint = () => {
+      head.querySelectorAll(".view-toggle-btn").forEach(btn => btn.classList.toggle("active", btn.dataset.v === vista));
+      box.className = vista === "lista" ? "ds-stack" : "ds-grid";
+      box.innerHTML = "";
+      Object.keys(node).forEach((key, i) => {
+        const t = document.createElement("button");
+        t.className = "ds-tile jw-" + dsJewelFor(key, i);
+        t.innerHTML = `<span class="ds-tile-chev"></span><span class="ds-tile-icon">${dsIconFor(key)}</span><span class="ds-tile-label"></span>`;
+        t.querySelector(".ds-tile-label").textContent = key;
+        t.addEventListener("click", () => navigate({ screen: "tradeNode", path: [...path, key], title: key }));
+        box.appendChild(t);
+      });
+    };
+    head.addEventListener("click", (e) => {
+      const btn = e.target.closest(".view-toggle-btn");
+      if (!btn) return;
+      vista = btn.dataset.v;
+      try { localStorage.setItem(KEY, vista); } catch (e2) {}
+      paint();
     });
-    wrap.appendChild(grid);
+    paint();
     return wrap;
   }
 
@@ -1723,17 +1852,11 @@ function buildAcCategories() {
   }
 
   const list = document.createElement("div");
-  list.className = "tool-list";
-  cats.forEach(cat => {
-    const meta = AC_CATEGORY_META[cat] || { icon: "🛡️", color: "#0071e3" };
-    const btn = document.createElement("button");
-    btn.className = "tool-btn";
-    btn.style.setProperty("--tool-color", meta.color);
-    btn.innerHTML = `<span class="tool-icon">${meta.icon}</span><span class="tool-label">${cat}</span><span class="chev"></span>`;
-    btn.addEventListener("click", () => {
-      navigate({ screen: "acModels", category: cat, title: cat });
-    });
-    list.appendChild(btn);
+  cats.forEach((cat, i) => {
+    list.appendChild(dsRow({
+      icon: dsIconFor(cat), jw: dsJewelFor(cat, i), label: cat,
+      onClick: () => navigate({ screen: "acModels", category: cat, title: cat }),
+    }));
   });
   wrap.appendChild(list);
   return wrap;
@@ -1813,34 +1936,35 @@ function buildAcDetail(category, model, variant) {
   const roboPrice = info["Robo y Extravío"];
   const hasRobo = roboPrice !== undefined && roboPrice !== null;
   const years = coverageYears(category, model + " " + variant);
-  const meta = AC_CATEGORY_META[category] || { color: "#0071e3" };
+  const diff = (hasRobo && typeof info.precio === "number" && typeof roboPrice === "number") ? roboPrice - info.precio : null;
 
   const hero = document.createElement("div");
-  hero.className = "ac-hero";
-  hero.style.setProperty("--tool-color", meta.color);
+  hero.className = "ds-hero";
   hero.innerHTML = `
-    <span class="ac-hero-icon">🛡️</span>
-    <h2>${model}</h2>
-    <p class="ac-hero-sub">${variant}</p>
-    <span class="coverage-years">🗓️ ${years} años de cobertura</span>
+    <span class="ds-hero-chip">${DS_ICONS.shield}</span>
+    <h2></h2>
+    <p class="ds-hero-sub"></p>
+    <span class="ds-pill">${DS_ICONS.calendar}<span>${years} años de cobertura</span></span>
     ${hasRobo ? `
-      <div class="ac-price-row">
-        <div class="ac-price-box">
+      <div class="ds-plans">
+        <div class="ds-plan">
           <span>AppleCare+</span>
           <strong>${money(info.precio)}</strong>
         </div>
-        <div class="ac-price-box robo">
-          <span class="ac-ribbon">Protección total</span>
-          <span>Robo y Extravío</span>
+        <div class="ds-plan alt">
+          <span>Con Robo y Extravío</span>
           <strong>${money(roboPrice)}</strong>
         </div>
       </div>
-    ` : `<div class="ac-price">${money(info.precio)}</div>`}
+      ${diff && diff > 0 ? `<p class="ds-plan-note">Agrega protección contra robo y extravío por ${money(diff)} más.</p>` : ""}
+    ` : `<div class="ds-price">${money(info.precio)}</div>`}
   `;
+  hero.querySelector("h2").textContent = model;
+  hero.querySelector(".ds-hero-sub").textContent = variant;
   wrap.appendChild(hero);
 
   // Gesto secreto: mantener presionado el precio de AppleCare+ (el normal) abre Reparaciones.
-  const repTrigger = hero.querySelector(".ac-price-box:not(.robo)") || hero.querySelector(".ac-price");
+  const repTrigger = hero.querySelector(".ds-plan:not(.alt)") || hero.querySelector(".ds-price");
   if (repTrigger && repairPartsFor(category, info).length) {
     repTrigger.classList.add("rep-trigger");
     setupRepairTrigger(repTrigger, () => {
@@ -1848,37 +1972,44 @@ function buildAcDetail(category, model, variant) {
     });
   }
 
+  function card(icon, title, cls) {
+    const c = document.createElement("div");
+    c.className = "ds-card" + (cls ? " " + cls : "");
+    const h = document.createElement("h4");
+    h.innerHTML = `${icon}<span></span>`;
+    h.querySelector("span").textContent = title;
+    c.appendChild(h);
+    wrap.appendChild(c);
+    return c;
+  }
+  function kvRows(c, obj) {
+    Object.entries(obj).forEach(([k, v]) => {
+      const row = document.createElement("div");
+      row.className = "ds-kv";
+      row.innerHTML = `<span>${dsKeyIcon(k)}<em></em></span><strong>${money(v)}</strong>`;
+      row.querySelector("em").textContent = k;
+      c.appendChild(row);
+    });
+  }
+
   if (Array.isArray(info.cubre) && info.cubre.length) {
-    const benefits = document.createElement("div");
-    benefits.className = "ac-benefits";
-    benefits.innerHTML = `
-      <h4>✨ Todo lo que incluye</h4>
-      <div class="ac-benefit-grid">
-        ${info.cubre.map(c => `
-          <div class="ac-benefit-item">
-            <span class="ac-benefit-icon">${benefitIcon(c)}</span>
-            <span>${c}</span>
-          </div>
-        `).join("")}
-      </div>
-    `;
-    wrap.appendChild(benefits);
+    const c = card(DS_ICONS.shield, "Todo lo que incluye");
+    info.cubre.forEach(t => {
+      const b = benefitChip(t);
+      const row = document.createElement("div");
+      row.className = "ds-incl";
+      row.innerHTML = `<span class="ds-chip sm jw-${b.jw}">${b.icon}</span><span></span>`;
+      row.lastChild.textContent = t;
+      c.appendChild(row);
+    });
   }
 
   if (info.deducibles && Object.keys(info.deducibles).length) {
-    const deduc = document.createElement("div");
-    deduc.className = "plan-result";
-    deduc.innerHTML = `<h4 style="margin:0 0 2px;font-size:12px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.05em;">Deducibles</h4>`
-      + Object.entries(info.deducibles).map(([k, v]) => `<div class="plan-phase"><span>${k}</span><strong>${money(v)}</strong></div>`).join("");
-    wrap.appendChild(deduc);
+    kvRows(card(DS_ICONS.doc, "Deducibles por evento", "ds-card-rose"), info.deducibles);
   }
 
   if (info.sinAppleCare && Object.keys(info.sinAppleCare).length) {
-    const sinAc = document.createElement("div");
-    sinAc.className = "plan-result";
-    sinAc.innerHTML = `<h4 style="margin:0 0 2px;font-size:12px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.05em;">Reparación sin AppleCare+</h4>`
-      + Object.entries(info.sinAppleCare).map(([k, v]) => `<div class="plan-phase"><span>${k}</span><strong>${money(v)}</strong></div>`).join("");
-    wrap.appendChild(sinAc);
+    kvRows(card(DS_ICONS.wrench, "Reparación sin AppleCare+", "ds-card-teal"), info.sinAppleCare);
   }
 
   // Acceso a "¿Qué cubre?" de este mismo equipo (no duplica datos: abre la
@@ -1886,14 +2017,13 @@ function buildAcDetail(category, model, variant) {
   const covCat = coverageCategoryForAc(category, model);
   if (covCat) {
     const covVariant = Object.keys(COBERTURA_DATA[covCat])[0];
-    const covBtn = document.createElement("button");
-    covBtn.className = "sub-btn";
-    covBtn.style.marginTop = "14px";
-    covBtn.innerHTML = `<span>🛠️ Ver qué cubre</span><span class="chev"></span>`;
-    covBtn.addEventListener("click", () => {
-      navigate({ screen: "coverageDetail", category: covCat, variant: covVariant, preModel: model, title: covCat });
-    });
-    wrap.appendChild(covBtn);
+    const holder = document.createElement("div");
+    holder.style.marginTop = "12px";
+    holder.appendChild(dsRow({
+      icon: DS_ICONS.shield, jw: "teal", label: "Ver qué cubre", sub: "Cobertura, cuotas y casos que aplican",
+      onClick: () => navigate({ screen: "coverageDetail", category: covCat, variant: covVariant, preModel: model, title: covCat }),
+    }));
+    wrap.appendChild(holder);
   }
 
   return wrap;
