@@ -2614,8 +2614,9 @@ async function docsMakePdf(rec) {
 
   } else if (prog === "Cancelación For Life") {
     const p = pages[0];
-    const hora = inicio.getHours();
-    const txt = `En mi carácter de tarjetahabiente de Citibanamex y en razón de que a través del programa iPhone For Life adquirí el iPhone con número de serie ${d.serie || "______________"}, haciendo uso del derecho de upgrade que el programa me confiere y que el citado teléfono cumple con todos los requisitos de elegibilidad, “bajo protesta de decir verdad” y siendo las ${hora} horas del día ${docsFechaLarga(inicio)}, hago devolución del citado equipo a Promotora Musical, S.A de C.V (APR), quien a partir de este momento recibe la propiedad y la posesión física y jurídica del citado iPhone, mismo que se entrega sin información del tarjetahabiente.`;
+    const ahora = new Date();   // momento exacto en que se genera el contrato
+    const hora = String(ahora.getHours()).padStart(2, "0") + ":" + String(ahora.getMinutes()).padStart(2, "0");
+    const txt = `En mi carácter de tarjetahabiente de Citibanamex y en razón de que a través del programa iPhone For Life adquirí el iPhone con número de serie ${d.serie || "______________"}, haciendo uso del derecho de upgrade que el programa me confiere y que el citado teléfono cumple con todos los requisitos de elegibilidad, “bajo protesta de decir verdad” y siendo las ${hora} horas del día ${docsFechaLarga(ahora)}, hago devolución del citado equipo a Promotora Musical, S.A de C.V (APR), quien a partir de este momento recibe la propiedad y la posesión física y jurídica del citado iPhone, mismo que se entrega sin información del tarjetahabiente.`;
     const words = safe(txt, font).split(/\s+/);
     const SZ = 11, MAXW = 440, LH = 15.9;
     let line = "", y = 308.5;
@@ -2997,11 +2998,16 @@ function buildDocs() {
   docsSignPad(wrap, "dSign", "dClear", "firmaUrl");
 
   if (ti) {
-    if (!d.asesor) d.asesor = (ishopAjustes().nombre || "").toUpperCase();
+    const nomAsesor = (ishopAjustes().nombre || "").trim().toUpperCase();
+    if (nomAsesor) d.asesor = nomAsesor;
+    else if (!d.asesor) d.asesor = "";
     [["dAsesor", "asesor", true], ["dRfc", "rfc", true], ["dCalle", "calle", true], ["dCp", "cp"], ["dExt", "numExt", true],
      ["dInt", "numInt", true], ["dColonia", "colonia", true], ["dLocalidad", "localidad", true], ["dReferencia", "referencia", true],
      ["dMunicipio", "municipio", true], ["dImei", "imei", true], ["dSerieN", "serieN", true], ["dImeiN", "imeiN", true]
     ].forEach(([id, key, upper]) => docsBindText(wrap, id, key, { upper: !!upper }));
+
+    const asEl = $("#dAsesor");
+    if (nomAsesor) { asEl.readOnly = true; asEl.classList.add("locked"); }
 
     // Costo: libre; al salir del campo se da formato de moneda
     const costo = docsBindText(wrap, "dCosto", "costo");
@@ -3227,13 +3233,13 @@ function buildDocsConfirm() {
   if (!d.reverso) faltan.push("foto de atrás");
   if (!d.ticket) faltan.push("ticket");
   if (hayDatos && !d.firmaUrl) faltan.push("firma");
+  if ((d.programa === "Trade In" || d.programa === "Switch Up") && !ishopAjustes().nombre && !(d.asesor || "").trim()) faltan.push("tu nombre de asesor (ponlo en Ajustes)");
   if (d.programa === "Trade In") {
     const req = [["email", "correo"], ["nombre", "nombre"], ["paterno", "apellido paterno"], ["telefono", "teléfono"], ["estado", "estado"],
       ["rfc", "RFC"], ["calle", "calle"], ["cp", "código postal"], ["numExt", "no. exterior"], ["colonia", "colonia"],
       ["localidad", "localidad"], ["municipio", "municipio/alcaldía"], ["modelo", "modelo a entregar"], ["capacidad", "capacidad a entregar"],
       ["serie", "# serie"], ["imei", "IMEI"], ["costo", "costo"]];
     req.forEach(([k, l]) => { if (!String(d[k] || "").trim()) faltan.push(l); });
-    if (!(d.asesor || "").trim() && !ishopAjustes().nombre) faltan.push("asesor");
     if (!d.firmaAsesorUrl) faltan.push("firma del asesor");
   }
   if (!d.programa) faltan.push("tipo de registro");
