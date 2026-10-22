@@ -22,6 +22,9 @@ const BODEGA_SEED = {
   "195950621419":11,"195950621297":1,"195951405650":40,"195951405612":40
 };
 
+/* DATOS DE PRUEBA (erróneos a propósito): escanea la foto del 21-10-2026 y el reporte debe corregirlos */
+const BODEGA_PRUEBA = {"195949035180":1,"195950643015":70,"195950643213":1,"195950643138":120,"195950643336":2,"195950643091":43,"195950643299":1,"195950643176":27,"195950643374":1,"195950643053":39,"195950643251":1,"195950626438":3,"195950626513":5,"195950626759":1,"195950626353":14,"195950638288":26,"195950638325":15,"195950638240":32,"195951030197":20,"195951030272":5,"195951030234":7,"195951415505":37,"195951415529":150,"195951415611":1,"195951415536":64,"195951415550":10,"195951409948":10,"195951409863":12,"195951409887":55,"195951409924":29,"195951409979":5,"195951410012":2,"195951409955":1,"195951409870":8,"195950621419":11,"195951405650":25,"195951405612":40,"195949821257":6};
+
 /* ---------- Catálogo ---------- */
 function bodegaExtra() { try { return JSON.parse(localStorage.getItem(BODEGA_EXTRA_KEY)) || {}; } catch (e) { return {}; } }
 function bodegaCatalogo() {
@@ -67,6 +70,9 @@ function bodegaResolver(raw, cat) {
     for (let i = 0; i < 13; i++) probar(r.slice(0, i) + r.slice(i + 1));
   } else if (r.length === 11) {
     for (let i = 0; i <= 11; i++) for (let n = 0; n < 10; n++) probar(r.slice(0, i) + n + r.slice(i));
+  }
+  if (hallados.size === 0 && r.length === 12) {
+    keys.forEach(k => { let d = 0; for (let i = 0; i < 12 && d < 3; i++) if (k[i] !== r[i]) d++; if (d <= 2) hallados.add(k); });
   }
   if (hallados.size === 1) return { code: [...hallados][0], estado: "corregido" };
   if (r.length === 12 && bodegaUpcOk(r)) return { code: r, estado: "nuevo" };
@@ -138,6 +144,44 @@ function bodegaTextoReporte(rep, fecha) {
   return out.join("\n");
 }
 
+/* Lista de {raw,qty} → existencias */
+function bodegaConstruir(filas, cat) {
+  const stock = {}, dudosos = [], nuevos = [];
+  filas.forEach(r => {
+    const res = bodegaResolver(r.raw, cat);
+    if (res.estado === "ilegible" || res.estado === "ambiguo") { dudosos.push({ raw: r.raw, qty: r.qty }); return; }
+    if (res.estado === "nuevo" && !nuevos.includes(res.code)) nuevos.push(res.code);
+    stock[res.code] = (stock[res.code] || 0) + r.qty;
+  });
+  return { stock, dudosos, nuevos, leidos: Object.keys(stock).length };
+}
+
+/* Texto (escaneado con el teclado del iPhone o pegado): un renglón por línea */
+function bodegaFilasDeTexto(texto) {
+  const filas = [];
+  String(texto || "").split(/\r?\n/).forEach(l => {
+    // solo se corrigen letras (O, l, I) dentro de "palabras" que son números
+    const toks = l.trim().split(/\s+/).map(t => (/^[\dOolI|.,]+$/.test(t) && /\d/.test(t)) ? t.replace(/[Oo]/g, "0").replace(/[Il|]/g, "1") : t);
+    let raw = "", empezo = false;
+    for (const t of toks) {
+      if (/^\d+$/.test(t) && (empezo || t.length >= 3)) { raw += t; empezo = true; if (raw.length >= 12) break; }
+      else if (empezo) break;
+    }
+    const nums = [...toks.join(" ").matchAll(/\d[\d,]*[.,]\d{2}(?!\d)/g)];
+    if (raw.length < 10 || !nums.length) return;
+    const q = nums[nums.length - 1][0];
+    const val = parseFloat(q.replace(/,(?=\d{3}\b)/g, "").replace(",", "."));
+    if (isFinite(val)) filas.push({ raw: raw.slice(0, 13), qty: Math.round(val) });
+  });
+  return filas;
+}
+function bodegaLeerTexto(texto) {
+  const r = bodegaConstruir(bodegaFilasDeTexto(texto), bodegaCatalogo());
+  const m = String(texto).match(/(\d{2})[-/](\d{2})[-/](20\d{2})/);
+  r.fecha = m ? `${m[1]}-${m[2]}-${m[3]}` : "";
+  return r;
+}
+
 /* ---------- Imagen: limpiar y escalar ---------- */
 function bodegaCargarImagen(file) {
   return new Promise((res, rej) => {
@@ -147,7 +191,7 @@ function bodegaCargarImagen(file) {
     img.src = url;
   });
 }
-function bodegaPreparar(img) {
+function bodegaPreparar(img, simple) {
   const MAX = 2400, esc = Math.min(1, MAX / Math.max(img.naturalWidth, img.naturalHeight));
   const w = Math.round(img.naturalWidth * esc), h = Math.round(img.naturalHeight * esc);
   const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
@@ -155,6 +199,7 @@ function bodegaPreparar(img) {
   ctx.drawImage(img, 0, 0, w, h);
   const im = ctx.getImageData(0, 0, w, h), px = im.data, g = new Float32Array(w * h);
   for (let i = 0; i < w * h; i++) g[i] = px[i*4] * 0.299 + px[i*4+1] * 0.587 + px[i*4+2] * 0.114;
+  if (simple) { for (let i = 0; i < w * h; i++) { const v = Math.max(0, Math.min(255, (g[i] - 60) * 1.4)); px[i*4] = px[i*4+1] = px[i*4+2] = v; } ctx.putImageData(im, 0, 0); return cv; }
   // fondo = desenfoque grande (imagen integral); salida = gris / fondo → corrige luz despareja
   const W = w + 1, S = new Float64Array(W * (h + 1));
   for (let y = 0; y < h; y++) { let fila = 0; for (let x = 0; x < w; x++) { fila += g[y*w+x]; S[(y+1)*W+x+1] = S[y*W+x+1] + fila; } }
@@ -197,86 +242,132 @@ async function bodegaWorker(onProg) {
   return w;
 }
 
-/* Foto → { stock, fecha, dudosos, nuevos, leidos } */
+/* Foto → { stock, fecha, dudosos, nuevos, leidos }. Prueba varios intentos y se queda con el mejor */
 async function bodegaEscanear(file, onEstado, onProg) {
   onEstado("Preparando la foto…");
-  const cv = bodegaPreparar(await bodegaCargarImagen(file));
+  const img = await bodegaCargarImagen(file);
   onEstado("Cargando lector de texto…");
   let worker;
   try { worker = await bodegaWorker(onProg); }
-  catch (e) { throw new Error("No pude cargar el lector de texto. Revisa tu internet o agrega libs/tesseract/."); }
-  onEstado("Escaneando renglón por renglón…");
-  const { data } = await worker.recognize(cv, {}, { blocks: true });
-  const words = data.words || (data.blocks || []).flatMap(b => (b.paragraphs || []).flatMap(p => (p.lines || []).flatMap(l => l.words || [])));
+  catch (e) { throw new Error("No pude cargar el lector de texto (necesita internet la primera vez)."); }
   const cat = bodegaCatalogo();
-  const stock = {}, dudosos = [], nuevos = [];
-  bodegaRenglones(words, cv.width).forEach(tokens => {
-    const r = bodegaLeerRenglon(tokens, cv.width);
-    if (!r) return;
-    const res = bodegaResolver(r.raw, cat);
-    if (res.estado === "ilegible" || res.estado === "ambiguo") { dudosos.push({ raw: r.raw, qty: r.qty }); return; }
-    if (res.estado === "nuevo") nuevos.push(res.code);
-    stock[res.code] = (stock[res.code] || 0) + r.qty;
-  });
-  return { stock, fecha: bodegaFecha(words), dudosos, nuevos, leidos: Object.keys(stock).length };
+  const intentos = [
+    { simple: false, psm: "6", wl: true },
+    { simple: true,  psm: "6", wl: true },
+    { simple: false, psm: "4", wl: true },
+    { simple: true,  psm: "4", wl: false },
+  ];
+  let mejor = null;
+  for (let i = 0; i < intentos.length; i++) {
+    const it = intentos[i];
+    onEstado(i === 0 ? "Escaneando renglón por renglón…" : `Reintentando con otro ajuste (${i + 1}/${intentos.length})…`);
+    const cv = bodegaPreparar(img, it.simple);
+    await worker.setParameters({ tessedit_char_whitelist: it.wl ? "0123456789.,-/ " : "", tessedit_pageseg_mode: it.psm, preserve_interword_spaces: "1" });
+    const { data } = await worker.recognize(cv, {}, { blocks: true });
+    const words = data.words || (data.blocks || []).flatMap(b => (b.paragraphs || []).flatMap(p => (p.lines || []).flatMap(l => l.words || [])));
+    const filas = [];
+    bodegaRenglones(words, cv.width).forEach(tk => { const r = bodegaLeerRenglon(tk, cv.width); if (r) filas.push(r); });
+    let r1 = bodegaConstruir(filas, cat);
+    const r2 = bodegaConstruir(bodegaFilasDeTexto(data.text || ""), cat);
+    if (r2.leidos > r1.leidos) r1 = r2;
+    r1.fecha = bodegaFecha(words) || (String(data.text || "").match(/\d{2}-\d{2}-20\d{2}/) || [""])[0];
+    if (!mejor || r1.leidos > mejor.leidos) mejor = r1;
+    if (mejor.leidos >= 25 && mejor.dudosos.length <= 2) break;
+  }
+  return mejor;
 }
 
 /* ---------- Pantalla ---------- */
+function bodegaEstilos() {
+  if (document.getElementById("bodEstilos")) return;
+  const st = document.createElement("style"); st.id = "bodEstilos";
+  st.textContent = `
+  .bod-card{ background:#fff; border-radius:16px; padding:16px; margin:12px 0; box-shadow:0 1px 3px rgba(0,0,0,.06); }
+  html[data-mode="dark"] .bod-card{ background:#1c1c1e; }
+  .bod-card h3{ margin:0 0 4px; font-size:18px; }
+  .bod-card p{ margin:0 0 12px; font-size:14.5px; color:var(--text-secondary); line-height:1.4; }
+  .bod-big{ display:block; width:100%; padding:16px; font-size:17px; border-radius:14px; border:0; background:var(--accent); color:#fff; font-weight:600; text-align:center; cursor:pointer; margin-bottom:10px; box-sizing:border-box; }
+  .bod-big.sec{ background:#e8e8ed; color:var(--text); }
+  html[data-mode="dark"] .bod-big.sec{ background:#3a3a3c; }
+  .bod-txt{ width:100%; box-sizing:border-box; min-height:130px; border-radius:12px; border:1px solid rgba(120,120,128,.35); padding:10px; font:14px ui-monospace,Menlo,monospace; background:transparent; color:var(--text); }
+  .bod-small{ display:flex; gap:16px; justify-content:center; margin:18px 0; flex-wrap:wrap; }
+  .bod-small button{ background:none; border:0; color:var(--accent); font-size:14.5px; padding:6px; }
+  .bod-small button.rojo{ color:#ff3b30; }
+  .bod-ok{ background:#34c759 !important; }`;
+  document.head.appendChild(st);
+}
+
 function buildBodega() {
+  bodegaEstilos();
   const wrap = document.createElement("div");
   wrap.className = "bod-wrap";
   const cat = () => bodegaCatalogo();
   let estado = bodegaLoad();
-  let pendiente = null;   // { esc, rep } esperando "Aplicar"
-
+  let pendiente = null;
   const ordenModelo = m => { const i = BODEGA_ORDEN.indexOf(m); return i < 0 ? 99 : i; };
 
   function pintar() {
-    const c = cat();
+    const c = cat(), n = Object.keys(estado.stock).length;
     const total = Object.values(estado.stock).reduce((a, b) => a + b, 0);
     wrap.innerHTML = `
-      <div class="reg-heading"><h2>Bodega</h2>
-        <p class="ds-sub">${Object.keys(estado.stock).length
-          ? `${total} piezas · ${Object.keys(estado.stock).length} códigos${estado.fecha ? " · " + estado.fecha : ""}`
-          : "Aún no hay existencias. Toma la primera foto del listado."}</p></div>
-      <div class="bod-actions">
-        <label class="docs-btn bod-btn">📷 Foto de existencias<input type="file" accept="image/*" capture="environment" id="bodFoto" hidden></label>
-        <label class="docs-btn sec bod-btn">🖼️ Elegir de la galería<input type="file" accept="image/*" id="bodGaleria" hidden></label>
-      </div>
-      <div id="bodEstado" class="bod-estado" hidden></div>
-      <div id="bodPreview"></div>`;
+      <div class="reg-heading"><h2>Bodega <small style="font-size:13px;font-weight:500;color:var(--text-secondary)">v3</small></h2>
+        <p class="ds-sub">${n ? `${total} piezas en ${n} códigos${estado.fecha ? " · lista del " + estado.fecha : ""}` : "Todavía no hay existencias guardadas."}</p></div>
 
-    const modelos = {};
-    Object.keys(estado.stock).forEach(code => {
-      const e = c[code] || { modelo: "Código nuevo", color: "", capacidad: "" };
-      (modelos[e.modelo] = modelos[e.modelo] || []).push({ code, e, qty: estado.stock[code] });
-    });
-    const lista = document.createElement("div"); lista.className = "bod-list";
-    Object.keys(modelos).sort((a, b) => ordenModelo(a) - ordenModelo(b) || a.localeCompare(b)).forEach(m => {
-      const items = modelos[m].sort((a, b) => parseInt(a.e.capacidad) - parseInt(b.e.capacidad) || a.e.color.localeCompare(b.e.color));
-      const det = document.createElement("details"); det.className = "bod-model";
-      det.innerHTML = `<summary><span>${m}</span><b>${items.reduce((s, i) => s + i.qty, 0)}</b></summary>` +
-        items.map(i => `<div class="bod-row"><div><strong>${[i.e.color, bodegaCap(i.e.capacidad)].filter(Boolean).join(" · ") || "Sin nombre"}</strong><small>UPC ${i.code}</small></div><b>${i.qty}</b></div>`).join("");
-      lista.appendChild(det);
-    });
-    wrap.appendChild(lista);
+      <div class="bod-card">
+        <h3>Actualizar existencias</h3>
+        <p>Escanea o sube el listado del día. La app lo lee y te dice qué cambió.</p>
+        <label class="bod-big">📄 Escanear / subir foto del listado
+          <input type="file" accept="image/*" id="bodFoto" hidden></label>
+        <button class="bod-big sec" id="bodVerTexto">📝 Pegar o escanear texto</button>
+        <div id="bodTextoBox" hidden>
+          <p>Toca el cuadro, mantén presionado y elige <b>“Escanear texto”</b> (icono de cámara) y apunta al papel. Luego toca “Leer texto”.</p>
+          <textarea class="bod-txt" id="bodTexto" placeholder="Aquí aparece el texto…"></textarea>
+          <button class="bod-big" id="bodLeerTexto" style="margin-top:10px">Leer texto</button>
+        </div>
+        <div id="bodEstado" class="bod-estado" hidden></div>
+        <div id="bodPreview"></div>
+      </div>`;
 
+    if (n) {
+      const modelos = {};
+      Object.keys(estado.stock).forEach(code => {
+        const e = c[code] || { modelo: "Código nuevo", color: "", capacidad: "" };
+        (modelos[e.modelo] = modelos[e.modelo] || []).push({ code, e, qty: estado.stock[code] });
+      });
+      const box = document.createElement("div"); box.className = "bod-card";
+      box.innerHTML = `<h3>Existencias por modelo</h3><p>Toca un modelo para ver colores, capacidades y UPC.</p>`;
+      Object.keys(modelos).sort((a, b) => ordenModelo(a) - ordenModelo(b) || a.localeCompare(b)).forEach(m => {
+        const items = modelos[m].sort((a, b) => parseInt(a.e.capacidad) - parseInt(b.e.capacidad) || a.e.color.localeCompare(b.e.color));
+        const det = document.createElement("details"); det.className = "bod-model";
+        det.innerHTML = `<summary><span>${m}</span><b>${items.reduce((s, i) => s + i.qty, 0)}</b></summary>` +
+          items.map(i => `<div class="bod-row"><div><strong>${[i.e.color, bodegaCap(i.e.capacidad)].filter(Boolean).join(" · ") || "Sin nombre"}</strong><small>UPC ${i.code}</small></div><b>${i.qty}</b></div>`).join("");
+        box.appendChild(det);
+      });
+      wrap.appendChild(box);
+    }
     if (estado.ultimoReporte) {
-      const u = document.createElement("div"); u.className = "bod-reporte";
-      u.innerHTML = `<h3>Último reporte</h3><pre>${estado.ultimoReporte.replace(/</g, "&lt;")}</pre>`;
+      const u = document.createElement("div"); u.className = "bod-card";
+      u.innerHTML = `<h3>Último reporte</h3><pre style="white-space:pre-wrap;font:inherit;font-size:15px;margin:0">${estado.ultimoReporte.replace(/</g, "&lt;")}</pre>`;
       wrap.appendChild(u);
     }
-    const pie = document.createElement("div"); pie.className = "bod-actions";
-    pie.innerHTML = `<button class="docs-btn sec bod-btn" id="bodSeed">Cargar ejemplo (foto 21-10-2026)</button>
-                     <button class="docs-btn danger bod-btn" id="bodBorrar">Borrar bodega</button>`;
+    const pie = document.createElement("div"); pie.className = "bod-small";
+    pie.innerHTML = `<button id="bodPrueba">Cargar datos de prueba</button><button id="bodSeed">Cargar lista del 21-10</button><button class="rojo" id="bodBorrar">Borrar todo</button>`;
     wrap.appendChild(pie);
 
     wrap.querySelector("#bodFoto").addEventListener("change", e => procesar(e.target.files[0]));
-    wrap.querySelector("#bodGaleria").addEventListener("change", e => procesar(e.target.files[0]));
-    wrap.querySelector("#bodSeed").addEventListener("click", () => {
-      if (Object.keys(estado.stock).length && !confirm("Esto reemplaza las existencias actuales por las del ejemplo. ¿Seguir?")) return;
-      estado = { stock: { ...BODEGA_SEED }, fecha: "21-10-2026", ultimoReporte: null }; bodegaSave(estado); pintar();
+    wrap.querySelector("#bodVerTexto").addEventListener("click", () => { const b = wrap.querySelector("#bodTextoBox"); b.hidden = !b.hidden; if (!b.hidden) wrap.querySelector("#bodTexto").focus(); });
+    wrap.querySelector("#bodLeerTexto").addEventListener("click", () => {
+      const t = wrap.querySelector("#bodTexto").value, est = wrap.querySelector("#bodEstado"), prev = wrap.querySelector("#bodPreview");
+      const esc = bodegaLeerTexto(t); est.hidden = false; prev.innerHTML = "";
+      if (!esc.leidos) { est.textContent = "No encontré renglones con código y existencia en ese texto."; return; }
+      pendiente = { esc }; est.textContent = `Leí ${esc.leidos} códigos.`; mostrarReporte(prev, cat());
     });
+    const poner = (stock, fecha, msg) => {
+      if (Object.keys(estado.stock).length && !confirm(msg)) return;
+      estado = { stock: { ...stock }, fecha, ultimoReporte: null }; bodegaSave(estado); pintar();
+    };
+    wrap.querySelector("#bodPrueba").addEventListener("click", () => poner(BODEGA_PRUEBA, "datos de prueba", "Esto reemplaza tus existencias por datos de prueba (con errores a propósito). ¿Seguir?"));
+    wrap.querySelector("#bodSeed").addEventListener("click", () => poner(BODEGA_SEED, "21-10-2026", "Esto reemplaza tus existencias por la lista del 21-10-2026. ¿Seguir?"));
     wrap.querySelector("#bodBorrar").addEventListener("click", () => {
       if (!confirm("¿Borrar todas las existencias de bodega de este teléfono?")) return;
       estado = { stock: {}, fecha: "", ultimoReporte: null }; bodegaSave(estado); pintar();
@@ -294,29 +385,27 @@ function buildBodega() {
       const esc = await bodegaEscanear(file, t => { est.textContent = t; },
         p => { barra.style.width = Math.round(p * 100) + "%"; linea.style.top = Math.round(p * 100) + "%"; });
       barra.style.width = "100%"; linea.style.display = "none";
-      if (!esc.leidos) { est.textContent = "No pude leer renglones. Prueba con la foto más recta y con buena luz."; return; }
-      const c = cat();
-      const rep = Object.keys(estado.stock).length ? bodegaComparar(estado.stock, esc.stock, c) : null;
-      pendiente = { esc, rep };
-      est.textContent = `Leí ${esc.leidos} códigos${esc.dudosos.length ? ` · ${esc.dudosos.length} renglón(es) dudoso(s)` : ""}. Revisa y aplica.`;
-      mostrarReporte(prev, c);
-    } catch (e) {
-      est.textContent = "Error: " + (e.message || e);
-    }
+      if (!esc.leidos) { est.textContent = "No logré leer renglones de esa foto. Prueba con “Pegar o escanear texto”, que es más tolerante."; return; }
+      pendiente = { esc };
+      est.textContent = `Leí ${esc.leidos} códigos${esc.dudosos.length ? ` · ${esc.dudosos.length} dudoso(s)` : ""}.`;
+      mostrarReporte(prev, cat(), true);
+    } catch (e) { est.textContent = "Error: " + (e.message || e); }
   }
 
-  function mostrarReporte(prev, c) {
-    const { esc, rep } = pendiente, fecha = esc.fecha;
+  function mostrarReporte(prev, c, conservar) {
+    const { esc } = pendiente, fecha = esc.fecha;
+    const rep = Object.keys(estado.stock).length ? bodegaComparar(estado.stock, esc.stock, c) : null;
     const tot = Object.values(esc.stock).reduce((a, b) => a + b, 0);
-    const texto = rep ? bodegaTextoReporte(rep, fecha)
-      : `Primera captura${fecha ? " · " + fecha : ""}\n${esc.leidos} códigos · ${tot} piezas`;
+    const texto = rep ? bodegaTextoReporte(rep, fecha) : `Primera captura${fecha ? " · " + fecha : ""}\n${esc.leidos} códigos · ${tot} piezas`;
     let extra = "";
-    if (esc.dudosos.length) extra += `<p class="bod-aviso">⚠️ No pude confirmar estos renglones y los dejé fuera: ${esc.dudosos.map(d => `${d.raw} (${d.qty})`).join(", ")}. Si es importante, retoma la foto.</p>`;
-    if (esc.nuevos.length) extra += `<div class="bod-nuevos"><p class="bod-aviso">🆕 Códigos que no están en el catálogo:</p>${esc.nuevos.map(n => `<button class="docs-btn sec bod-nombrar" data-c="${n}">${n} — Nombrar</button>`).join("")}</div>`;
-    prev.insertAdjacentHTML("beforeend", `<div class="bod-reporte"><h3>Cambios detectados</h3><pre>${texto.replace(/</g, "&lt;")}</pre>${extra}
-      <div class="bod-actions"><button class="docs-btn bod-btn" id="bodAplicar">Aplicar cambios</button>
-      <button class="docs-btn sec bod-btn" id="bodCopiar">Copiar reporte</button>
-      <button class="docs-btn sec bod-btn" id="bodCancelar">Descartar</button></div></div>`);
+    if (esc.dudosos.length) extra += `<p class="bod-aviso">⚠️ No pude confirmar estos renglones y los dejé fuera: ${esc.dudosos.map(d => `${d.raw} (${d.qty})`).join(", ")}.</p>`;
+    if (esc.nuevos.length) extra += `<p class="bod-aviso">🆕 Códigos fuera del catálogo:</p>${esc.nuevos.map(n => `<button class="bod-big sec bod-nombrar" data-c="${n}">${n} — Poner nombre</button>`).join("")}`;
+    const html = `<div class="bod-reporte"><h3>Cambios detectados</h3><pre>${texto.replace(/</g, "&lt;")}</pre>${extra}
+      <button class="bod-big bod-ok" id="bodAplicar">✓ Aplicar cambios</button>
+      <button class="bod-big sec" id="bodCopiar">Copiar reporte</button>
+      <button class="bod-big sec" id="bodCancelar">Descartar</button></div>`;
+    if (!conservar) prev.innerHTML = "";
+    prev.insertAdjacentHTML("beforeend", html);
     prev.querySelectorAll(".bod-nombrar").forEach(b => b.addEventListener("click", () => {
       const code = b.dataset.c, n = prompt("Nombre (ej. iPhone 18 Pro Max Naranja 512GB):", "");
       if (!n) return;
@@ -336,4 +425,4 @@ function buildBodega() {
   return wrap;
 }
 
-if (typeof module !== "undefined") module.exports = { bodegaResolver, bodegaRenglones, bodegaLeerRenglon, bodegaComparar, bodegaTextoReporte, bodegaUpcOk, bodegaFecha };
+if (typeof module !== "undefined") module.exports = { bodegaFilasDeTexto, bodegaLeerTexto, bodegaResolver, bodegaRenglones, bodegaLeerRenglon, bodegaComparar, bodegaTextoReporte, bodegaUpcOk, bodegaFecha };
