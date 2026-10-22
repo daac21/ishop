@@ -35,6 +35,21 @@ function bodegaCatalogo() {
   Object.keys(ex).forEach(k => { cat[k] = ex[k]; });
   return cat;
 }
+/* Catálogo del escáner: iPhone, iPad, Mac, Watch… (todo menos las "Caja AppleCare+") + códigos que tú nombraste */
+function bodegaCatalogoEscaneo() {
+  const cat = {};
+  const esc = (typeof ESCANER_DATA !== "undefined" && ESCANER_DATA) || {};
+  Object.keys(esc).forEach(k => { const v = esc[k]; if (v && !/^caja\b/i.test(v.modelo || "")) cat[k] = { modelo: v.modelo || "", color: v.color || "", capacidad: v.capacidad || "" }; });
+  const ex = bodegaExtra();
+  Object.keys(ex).forEach(k => { cat[k] = ex[k]; });
+  return cat;
+}
+/* Sección de un código (iPhone, iPad, Mac…) según su nombre */
+function bodegaSeccionDe(code) {
+  const cat = bodegaCatalogoEscaneo(), e = cat[code];
+  if (!e) return "Otros";
+  return typeof exSeccion === "function" ? exSeccion(e.modelo) : (/^iPhone/i.test(e.modelo || "") ? "iPhone" : "Otros");
+}
 function bodegaCap(c) { c = String(c || ""); return /^\d+$/.test(c) ? c + "GB" : c; }
 function bodegaNombre(cat, code) {
   const e = cat[code];
@@ -57,13 +72,17 @@ function bodegaUpcOk(c) {
   return (10 - (s % 10)) % 10 === d[11];
 }
 
-/* Corrige errores del lector comparando contra el catálogo. Devuelve {code, estado} */
+/* Dígitos que el lector suele confundir entre sí (5↔6↔8↔3, 1↔7, 0↔8↔6…) */
+const BODEGA_CONF = { "0": "896", "1": "7", "2": "7", "3": "58", "4": "1", "5": "6389", "6": "5809", "7": "12", "8": "0693", "9": "84" };
+
+/* Corrige errores del lector comparando contra el catálogo y el dígito verificador. Devuelve {code, estado} */
 function bodegaResolver(raw, cat) {
   const r = String(raw || "").replace(/\D/g, "");
   if (cat[r]) return { code: r, estado: "ok" };
   const keys = Object.keys(cat);
   const hallados = new Set();
   const probar = (c) => { if (cat[c]) hallados.add(c); };
+  const valido = r.length === 12 && bodegaUpcOk(r);
   if (r.length === 12) {
     keys.forEach(k => { let d = 0; for (let i = 0; i < 12 && d < 2; i++) if (k[i] !== r[i]) d++; if (d <= 1) hallados.add(k); });
   } else if (r.length === 13) {
@@ -71,12 +90,18 @@ function bodegaResolver(raw, cat) {
   } else if (r.length === 11) {
     for (let i = 0; i <= 11; i++) for (let n = 0; n < 10; n++) probar(r.slice(0, i) + n + r.slice(i));
   }
-  if (hallados.size === 0 && r.length === 12) {
+  // un UPC con dígito verificador correcto que no está en el catálogo es un código nuevo (no se "corrige" a otro)
+  if (hallados.size === 0 && r.length === 12 && !valido) {
     keys.forEach(k => { let d = 0; for (let i = 0; i < 12 && d < 3; i++) if (k[i] !== r[i]) d++; if (d <= 2) hallados.add(k); });
   }
   if (hallados.size === 1) return { code: [...hallados][0], estado: "corregido" };
-  if (r.length === 12 && bodegaUpcOk(r)) return { code: r, estado: "nuevo" };
+  if (valido) return { code: r, estado: "nuevo" };
   if (hallados.size > 1) return { code: r, estado: "ambiguo" };
+  // código nuevo con un dígito mal leído: se prueban solo las confusiones típicas y debe salir un único UPC válido
+  const cand = new Set();
+  if (r.length === 12) { for (let i = 0; i < 12; i++) for (const d of (BODEGA_CONF[r[i]] || "")) { const c = r.slice(0, i) + d + r.slice(i + 1); if (bodegaUpcOk(c)) cand.add(c); } }
+  else if (r.length === 13) { for (let i = 0; i < 13; i++) { const c = r.slice(0, i) + r.slice(i + 1); if (bodegaUpcOk(c)) cand.add(c); } }
+  if (cand.size === 1) return { code: [...cand][0], estado: "nuevo" };
   return { code: r, estado: "ilegible" };
 }
 
@@ -144,16 +169,18 @@ function bodegaTextoReporte(rep, fecha) {
   return out.join("\n");
 }
 
-/* Lista de {raw,qty} → existencias */
+/* Lista de {raw,qty} → existencias. Marca para revisar las cantidades poco seguras y los códigos repetidos */
 function bodegaConstruir(filas, cat) {
-  const stock = {}, dudosos = [], nuevos = [];
+  const stock = {}, dudosos = [], nuevos = [], info = {};
   filas.forEach(r => {
     const res = bodegaResolver(r.raw, cat);
     if (res.estado === "ilegible" || res.estado === "ambiguo") { dudosos.push({ raw: r.raw, qty: r.qty }); return; }
     if (res.estado === "nuevo" && !nuevos.includes(res.code)) nuevos.push(res.code);
+    const repetido = res.code in stock;
     stock[res.code] = (stock[res.code] || 0) + r.qty;
+    if (r.dudoso || repetido) info[res.code] = { code: res.code, qty: stock[res.code], alt: r.alt == null ? null : r.alt, repetido };
   });
-  return { stock, dudosos, nuevos, leidos: Object.keys(stock).length };
+  return { stock, dudosos, nuevos, leidos: Object.keys(stock).length, revisar: Object.values(info) };
 }
 
 /* Texto (escaneado con el teclado del iPhone o pegado): un renglón por línea */
@@ -176,13 +203,13 @@ function bodegaFilasDeTexto(texto) {
   return filas;
 }
 function bodegaLeerTexto(texto) {
-  const r = bodegaConstruir(bodegaFilasDeTexto(texto), bodegaCatalogo());
+  const r = bodegaConstruir(bodegaFilasDeTexto(texto), bodegaCatalogoEscaneo());
   const m = String(texto).match(/(\d{2})[-/](\d{2})[-/](20\d{2})/);
   r.fecha = m ? `${m[1]}-${m[2]}-${m[3]}` : "";
   return r;
 }
 
-/* ---------- Imagen: limpiar y escalar ---------- */
+/* ---------- Imagen: base en gris (si es pantalla oscura se invierte) ---------- */
 function bodegaCargarImagen(file) {
   return new Promise((res, rej) => {
     const url = URL.createObjectURL(file), img = new Image();
@@ -191,16 +218,28 @@ function bodegaCargarImagen(file) {
     img.src = url;
   });
 }
-function bodegaPreparar(img, simple) {
-  const MAX = 2400, esc = Math.min(1, MAX / Math.max(img.naturalWidth, img.naturalHeight));
-  const w = Math.round(img.naturalWidth * esc), h = Math.round(img.naturalHeight * esc);
+function bodegaBase(img) {
+  const W0 = img.naturalWidth, H0 = img.naturalHeight;
+  const esc = W0 > 1700 ? 1700 / W0 : W0 < 1200 ? Math.min(2, 1200 / W0) : 1;
+  const w = Math.round(W0 * esc), h = Math.round(H0 * esc);
   const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
   const ctx = cv.getContext("2d", { willReadFrequently: true });
-  ctx.drawImage(img, 0, 0, w, h);
+  ctx.imageSmoothingQuality = "high"; ctx.drawImage(img, 0, 0, w, h);
+  const im = ctx.getImageData(0, 0, w, h), px = im.data, g = new Uint8ClampedArray(w * h);
+  let suma = 0;
+  for (let i = 0; i < w * h; i++) { const v = px[i*4] * 0.299 + px[i*4+1] * 0.587 + px[i*4+2] * 0.114; g[i] = v; suma += v; }
+  const oscura = suma / (w * h) < 128;   // letras claras sobre fondo oscuro (pantalla) → se invierte
+  for (let i = 0; i < w * h; i++) { const v = oscura ? 255 - g[i] : g[i]; px[i*4] = px[i*4+1] = px[i*4+2] = v; px[i*4+3] = 255; }
+  ctx.putImageData(im, 0, 0);
+  return { cv, w, h, oscura };
+}
+/* Luz despareja: gris / fondo (desenfoque grande) + contraste */
+function bodegaNormalizar(base) {
+  const { w, h } = base, cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+  const ctx = cv.getContext("2d", { willReadFrequently: true });
+  ctx.drawImage(base.cv, 0, 0);
   const im = ctx.getImageData(0, 0, w, h), px = im.data, g = new Float32Array(w * h);
-  for (let i = 0; i < w * h; i++) g[i] = px[i*4] * 0.299 + px[i*4+1] * 0.587 + px[i*4+2] * 0.114;
-  if (simple) { for (let i = 0; i < w * h; i++) { const v = Math.max(0, Math.min(255, (g[i] - 60) * 1.4)); px[i*4] = px[i*4+1] = px[i*4+2] = v; } ctx.putImageData(im, 0, 0); return cv; }
-  // fondo = desenfoque grande (imagen integral); salida = gris / fondo → corrige luz despareja
+  for (let i = 0; i < w * h; i++) g[i] = px[i*4];
   const W = w + 1, S = new Float64Array(W * (h + 1));
   for (let y = 0; y < h; y++) { let fila = 0; for (let x = 0; x < w; x++) { fila += g[y*w+x]; S[(y+1)*W+x+1] = S[y*W+x+1] + fila; } }
   const R = Math.max(12, Math.round(Math.min(w, h) / 40));
@@ -210,11 +249,57 @@ function bodegaPreparar(img, simple) {
       const x0 = Math.max(0, x - R), x1 = Math.min(w, x + R + 1);
       const bg = (S[y1*W+x1] - S[y0*W+x1] - S[y1*W+x0] + S[y0*W+x0]) / ((x1 - x0) * (y1 - y0));
       let v = (g[y*w+x] / Math.max(bg, 1)) * 255;
-      v = Math.max(0, Math.min(255, (v - 110) * 1.9 + 110));   // más contraste
-      const o = (y*w+x) * 4; px[o] = px[o+1] = px[o+2] = v; px[o+3] = 255;
+      v = Math.max(0, Math.min(255, (v - 110) * 1.9 + 110));
+      const o = (y*w+x) * 4; px[o] = px[o+1] = px[o+2] = v;
     }
   }
   ctx.putImageData(im, 0, 0);
+  return { cv, w, h };
+}
+
+/* Variantes de limpieza para un recorte pequeño (1 = contraste, 2 = blanco/negro, 3 = blanco/negro local) */
+function bodegaVariante(im, v) {
+  const w = im.width, h = im.height, px = im.data, n = w * h, g = new Float32Array(n);
+  for (let i = 0; i < n; i++) g[i] = px[i*4];
+  const box = (src, r) => {
+    const W = w + 1, S = new Float64Array(W * (h + 1)), out = new Float32Array(n);
+    for (let y = 0; y < h; y++) { let f = 0; for (let x = 0; x < w; x++) { f += src[y*w+x]; S[(y+1)*W+x+1] = S[y*W+x+1] + f; } }
+    for (let y = 0; y < h; y++) { const y0 = Math.max(0, y - r), y1 = Math.min(h, y + r + 1);
+      for (let x = 0; x < w; x++) { const x0 = Math.max(0, x - r), x1 = Math.min(w, x + r + 1);
+        out[y*w+x] = (S[y1*W+x1] - S[y0*W+x1] - S[y1*W+x0] + S[y0*W+x0]) / ((x1 - x0) * (y1 - y0)); } }
+    return out;
+  };
+  let out = new Float32Array(n);
+  if (v === 1) {
+    const hist = new Uint32Array(256); for (let i = 0; i < n; i++) hist[g[i] | 0]++;
+    let a = 0, lo = 0, hi = 255; while (lo < 255 && (a += hist[lo]) < n * 0.02) lo++;
+    a = 0; while (hi > 0 && (a += hist[hi]) < n * 0.02) hi--;
+    const k = 255 / Math.max(1, hi - lo); for (let i = 0; i < n; i++) out[i] = Math.max(0, Math.min(255, (g[i] - lo) * k));
+  } else if (v === 2) {
+    const b = box(g, 1), hist = new Uint32Array(256); for (let i = 0; i < n; i++) hist[b[i] | 0]++;
+    let sum = 0; for (let t = 0; t < 256; t++) sum += t * hist[t];
+    let sB = 0, wB = 0, mx = -1, th = 128;
+    for (let t = 0; t < 256; t++) { wB += hist[t]; if (!wB) continue; const wF = n - wB; if (!wF) break; sB += t * hist[t];
+      const mB = sB / wB, mF = (sum - sB) / wF, bt = wB * wF * (mB - mF) * (mB - mF); if (bt > mx) { mx = bt; th = t; } }
+    for (let i = 0; i < n; i++) out[i] = b[i] > th ? 255 : 0;
+  } else {
+    const b = box(g, 1), m = box(b, Math.max(8, Math.round(h / 3)));
+    for (let i = 0; i < n; i++) out[i] = b[i] > m[i] - 12 ? 255 : 0;
+  }
+  for (let i = 0; i < n; i++) { px[i*4] = px[i*4+1] = px[i*4+2] = out[i]; }
+}
+/* Recorta una zona (x,y,w,h de la base), la agranda a H px de alto y la rodea de margen blanco */
+function bodegaRecorte(base, b, H, variante, padx, pady) {
+  const px = Math.round(b.h * padx), py = Math.round(b.h * pady);
+  const x0 = Math.max(0, Math.floor(b.x - px)), y0 = Math.max(0, Math.floor(b.y - py));
+  const x1 = Math.min(base.w, Math.ceil(b.x + b.w + px)), y1 = Math.min(base.h, Math.ceil(b.y + b.h + py));
+  const sw = Math.max(1, x1 - x0), sh = Math.max(1, y1 - y0), sc = H / sh;
+  const w = Math.max(8, Math.round(sw * sc)), h = Math.round(H), M = 16;
+  const cv = document.createElement("canvas"); cv.width = w + 2 * M; cv.height = h + 2 * M;
+  const ctx = cv.getContext("2d", { willReadFrequently: true });
+  ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.imageSmoothingQuality = "high"; ctx.drawImage(base.cv, x0, y0, sw, sh, M, M, w, h);
+  if (variante) { const im = ctx.getImageData(0, 0, cv.width, cv.height); bodegaVariante(im, variante); ctx.putImageData(im, 0, 0); }
   return cv;
 }
 
@@ -229,52 +314,181 @@ async function bodegaWorker(onProg) {
     catch (e) { await bodegaCargarScript("https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"); window.__tessLocal = false; }
   }
   if (!bodegaWorkerP) {
-    const opt = { logger: m => { if (m.status === "recognizing text") onProg && onProg(m.progress); } };
+    const opt = { logger: m => { const w = bodegaWorkerP && bodegaWorkerP.__w; if (m.status === "recognizing text" && w && w.__prog) w.__prog(m.progress); } };
     if (window.__tessLocal) { opt.workerPath = "libs/tesseract/worker.min.js"; opt.corePath = "libs/tesseract/"; opt.langPath = "libs/tesseract/lang"; }
-    bodegaWorkerP = Tesseract.createWorker("eng", 1, opt).then(async w => {
-      await w.setParameters({ tessedit_char_whitelist: "0123456789.,-/", tessedit_pageseg_mode: "6", preserve_interword_spaces: "1" });
-      return w;
-    });
+    bodegaWorkerP = Tesseract.createWorker("eng", 1, opt).then(async w => { bodegaWorkerP.__w = w; return w; });
     bodegaWorkerP.catch(() => { bodegaWorkerP = null; });
   }
   const w = await bodegaWorkerP;
   w.__prog = onProg;
   return w;
 }
+function bodegaPalabras(data) {
+  return data.words || (data.blocks || []).flatMap(b => (b.paragraphs || []).flatMap(p => (p.lines || []).flatMap(l => l.words || [])));
+}
 
-/* Foto → { stock, fecha, dudosos, nuevos, leidos }. Prueba varios intentos y se queda con el mejor */
+/* ---------- Palabras → renglones { cod:{x,y,w,h}, qty:{...}|null, raw } ---------- */
+const BODEGA_QTY_RE = /^\d{1,5}[.,]\d{1,2}$/;
+function bodegaFilasDePalabras(words) {
+  const ws = words.filter(w => w.bbox && String(w.text || "").trim())
+    .map(w => ({ t: String(w.text).trim(), x0: w.bbox.x0, y0: w.bbox.y0, x1: w.bbox.x1, y1: w.bbox.y1, cy: (w.bbox.y0 + w.bbox.y1) / 2, h: w.bbox.y1 - w.bbox.y0 }))
+    .sort((a, b) => a.cy - b.cy);
+  if (!ws.length) return [];
+  const hs = ws.map(w => w.h).sort((a, b) => a - b), tol = Math.max(6, hs[Math.floor(hs.length / 2)] * 0.6);
+  const rows = [];
+  ws.forEach(w => {
+    const last = rows[rows.length - 1];
+    if (last && Math.abs(w.cy - last.cy) <= tol) { last.w.push(w); last.cy = (last.cy * (last.w.length - 1) + w.cy) / last.w.length; }
+    else rows.push({ cy: w.cy, w: [w] });
+  });
+  const out = [];
+  rows.forEach(r => {
+    const toks = r.w.sort((a, b) => a.x0 - b.x0), cod = []; let qty = null, digs = 0;
+    for (const t of toks) {
+      const nd = t.t.replace(/\D/g, "").length;
+      if (BODEGA_QTY_RE.test(t.t)) { if (cod.length) { qty = t; break; } continue; }
+      if (nd >= 14 && /[.,]/.test(t.t)) {   // código y cantidad pegados en una sola palabra
+        const L = t.t.length, xm = t.x0 + (t.x1 - t.x0) * (12 / L);
+        cod.push({ ...t, t: t.t.replace(/\D/g, "").slice(0, 12), x1: xm }); digs += 12;
+        qty = { ...t, t: t.t.slice(12), x0: xm + 1 }; break;
+      }
+      if (nd >= 3 && !/[.,]\d/.test(t.t)) { cod.push(t); digs += nd; if (digs > 14) break; }
+      else if (cod.length) break;
+    }
+    if (digs < 9) return;
+    const x0 = Math.min(...cod.map(t => t.x0)), x1 = Math.max(...cod.map(t => t.x1)), y0 = Math.min(...cod.map(t => t.y0)), y1 = Math.max(...cod.map(t => t.y1));
+    out.push({
+      cod: { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }, raw: cod.map(t => t.t.replace(/\D/g, "")).join("").slice(0, 13),
+      qty: qty ? { x: qty.x0, y: qty.y0, w: qty.x1 - qty.x0, h: qty.y1 - qty.y0 } : null,
+    });
+  });
+  return out;
+}
+/* Une lo que encontró cada intento (mismo renglón = mismo alto) */
+function bodegaUnirFilas(listas) {
+  const out = [];
+  listas.forEach(l => l.forEach(f => {
+    const cy = f.cod.y + f.cod.h / 2, ya = out.find(o => Math.abs(o.cod.y + o.cod.h / 2 - cy) < o.cod.h * 0.55);
+    if (!ya) out.push(f); else if (!ya.qty && f.qty) ya.qty = f.qty;
+  }));
+  return out.sort((a, b) => a.cod.y - b.cod.y);
+}
+const bodegaMediana = a => { const s = a.slice().sort((x, y) => x - y); return s.length ? s[Math.floor(s.length / 2)] : 0; };
+/* Renglones que el lector se saltó: si hay un hueco de 2× o más entre renglones, se prueba ahí */
+function bodegaHuecos(filas) {
+  if (filas.length < 4) return [];
+  const cy = filas.map(f => f.cod.y + f.cod.h / 2), dif = []; for (let i = 1; i < cy.length; i++) dif.push(cy[i] - cy[i-1]);
+  const med = bodegaMediana(dif), extra = [];
+  for (let i = 0; i < dif.length; i++) {
+    const n = Math.round(dif[i] / med) - 1;
+    if (dif[i] / med < 1.6 || n < 1 || n > 6) continue;
+    const a = filas[i], b = filas[i+1];
+    for (let j = 1; j <= n; j++) {
+      const t = j / (n + 1), lerp = (p, q) => p + (q - p) * t;
+      extra.push({ cod: { x: lerp(a.cod.x, b.cod.x), y: lerp(a.cod.y, b.cod.y), w: lerp(a.cod.w, b.cod.w), h: lerp(a.cod.h, b.cod.h) }, raw: "", qty: null, sonda: true });
+    }
+  }
+  return extra;
+}
+/* A los renglones sin cantidad ubicada se les calcula dónde debe estar (como en los demás) */
+function bodegaUbicarCantidades(filas) {
+  const con = filas.filter(f => f.qty);
+  if (con.length < 3) return;
+  const dx = bodegaMediana(con.map(f => f.qty.x - (f.cod.x + f.cod.w))), dy = bodegaMediana(con.map(f => f.qty.y - f.cod.y)), w = bodegaMediana(con.map(f => f.qty.w));
+  filas.forEach(f => { if (!f.qty) { f.qty = { x: f.cod.x + f.cod.w + dx, y: f.cod.y + dy, w, h: f.cod.h }; f.qtyEstimada = true; } });
+}
+
+/* ---------- Lectura renglón por renglón (código validado con el catálogo / dígito verificador) ---------- */
+async function bodegaLeerCodigo(worker, base, fila, cat) {
+  const votos = new Map(); let mejor = "", pMejor = 0, lecturas = 0;
+  const voto = (raw, peso) => {
+    raw = String(raw || "").replace(/\D/g, "").slice(0, 13); if (raw.length < 9) return;
+    const r = bodegaResolver(raw, cat), clave = (r.estado === "ilegible" || r.estado === "ambiguo") ? raw : r.code;
+    const p = r.estado === "ok" || r.estado === "corregido" ? 3 : r.estado === "nuevo" ? 2 : 0.5;
+    votos.set(clave, (votos.get(clave) || 0) + p * peso);
+    if (votos.get(clave) > pMejor) { pMejor = votos.get(clave); mejor = clave; }
+  };
+  voto(fila.raw, 1);
+  for (const v of [0, 1, 2, 3]) {
+    const cv = bodegaRecorte(base, fila.cod, 48, v, 0.25, 0.2);
+    const { data } = await worker.recognize(cv);
+    lecturas++; voto(String(data.text || "").split(/\s+/).join(""), 1);
+    if (lecturas >= 2 && pMejor >= 5.5) break;   // dos lecturas buenas coinciden
+  }
+  return mejor;
+}
+/* Cantidad: varias lecturas y se queda con la que más se repite */
+async function bodegaLeerCantidad(worker, base, fila) {
+  const v = new Map(); let total = 0;
+  const suma = (n, p) => { v.set(n, (v.get(n) || 0) + p); total += p; };
+  const plan = [[44, 0], [64, 0], [44, 2], [64, 3], [64, 2], [44, 3]];
+  for (let i = 0; i < plan.length; i++) {
+    const cv = bodegaRecorte(base, fila.qty, plan[i][0], plan[i][1], 0.4, 0.3);
+    const { data } = await worker.recognize(cv);
+    const t = String(data.text || "").replace(/\s+/g, "");
+    let m = t.match(/^(\d{1,4})[.,]\d{2}$/);
+    if (m) suma(+m[1], 1);
+    else if ((m = t.match(/^(\d{1,4})[.,]\d?$/))) suma(+m[1], 0.5);
+    else if ((m = t.match(/^(\d{1,3})00$/))) suma(+m[1], 0.5);   // el punto no se vio: "800" = 8.00
+    if (i >= 2 && total >= 3) { const top = Math.max(...v.values()); if (top === total) break; }
+  }
+  if (!total) return { qty: null, share: 0, alt: null };
+  const orden = [...v.entries()].sort((a, b) => b[1] - a[1]);
+  return { qty: orden[0][0], share: orden[0][1] / total, alt: orden[1] ? orden[1][0] : null };
+}
+
+/* Foto → { stock, fecha, dudosos, nuevos, leidos, revisar } */
 async function bodegaEscanear(file, onEstado, onProg) {
   onEstado("Preparando la foto…");
-  const img = await bodegaCargarImagen(file);
+  const img = await bodegaCargarImagen(file), base = bodegaBase(img);
   onEstado("Cargando lector de texto…");
   let worker;
   try { worker = await bodegaWorker(onProg); }
   catch (e) { throw new Error("No pude cargar el lector de texto (necesita internet la primera vez)."); }
-  const cat = bodegaCatalogo();
-  const intentos = [
-    { simple: false, psm: "6", wl: true },
-    { simple: true,  psm: "6", wl: true },
-    { simple: false, psm: "4", wl: true },
-    { simple: true,  psm: "4", wl: false },
-  ];
-  let mejor = null;
+  const cat = bodegaCatalogoEscaneo();
+
+  // 1) vista general: ubica dónde está cada renglón
+  const listas = []; let fecha = "";
+  const intentos = [{ norm: false, psm: "6" }, { norm: false, psm: "4" }, { norm: true, psm: "6" }, { norm: true, psm: "4" }];
   for (let i = 0; i < intentos.length; i++) {
+    if (i >= 2 && bodegaUnirFilas(listas).length >= 3) break;
     const it = intentos[i];
-    onEstado(i === 0 ? "Escaneando renglón por renglón…" : `Reintentando con otro ajuste (${i + 1}/${intentos.length})…`);
-    const cv = bodegaPreparar(img, it.simple);
-    await worker.setParameters({ tessedit_char_whitelist: it.wl ? "0123456789.,-/ " : "", tessedit_pageseg_mode: it.psm, preserve_interword_spaces: "1" });
+    onEstado(i === 0 ? "Buscando los renglones…" : "Buscando con otro ajuste…");
+    const cv = it.norm ? bodegaNormalizar(base).cv : base.cv;
+    await worker.setParameters({ tessedit_char_whitelist: "0123456789.,-/ ", tessedit_pageseg_mode: it.psm, preserve_interword_spaces: "1" });
     const { data } = await worker.recognize(cv, {}, { blocks: true });
-    const words = data.words || (data.blocks || []).flatMap(b => (b.paragraphs || []).flatMap(p => (p.lines || []).flatMap(l => l.words || [])));
-    const filas = [];
-    bodegaRenglones(words, cv.width).forEach(tk => { const r = bodegaLeerRenglon(tk, cv.width); if (r) filas.push(r); });
-    let r1 = bodegaConstruir(filas, cat);
-    const r2 = bodegaConstruir(bodegaFilasDeTexto(data.text || ""), cat);
-    if (r2.leidos > r1.leidos) r1 = r2;
-    r1.fecha = bodegaFecha(words) || (String(data.text || "").match(/\d{2}-\d{2}-20\d{2}/) || [""])[0];
-    if (!mejor || r1.leidos > mejor.leidos) mejor = r1;
-    if (mejor.leidos >= 25 && mejor.dudosos.length <= 2) break;
+    const words = bodegaPalabras(data);
+    listas.push(bodegaFilasDePalabras(words));
+    fecha = fecha || bodegaFecha(words) || (String(data.text || "").match(/\d{2}-\d{2}-20\d{2}/) || [""])[0];
   }
-  return mejor;
+  let filas = bodegaUnirFilas(listas);
+  if (!filas.length) return { stock: {}, fecha, dudosos: [], nuevos: [], leidos: 0, revisar: [] };
+  filas = filas.concat(bodegaHuecos(filas)).sort((a, b) => a.cod.y - b.cod.y);
+  bodegaUbicarCantidades(filas);
+
+  // 2) cada renglón por separado, agrandado y limpio
+  worker.__prog = null;
+  await worker.setParameters({ tessedit_char_whitelist: "0123456789", tessedit_pageseg_mode: "7", preserve_interword_spaces: "0" });
+  const codigos = [];
+  for (let i = 0; i < filas.length; i++) {
+    onEstado(`Leyendo códigos… ${i + 1}/${filas.length}`); onProg && onProg((i + 1) / filas.length / 2);
+    codigos.push(await bodegaLeerCodigo(worker, base, filas[i], cat));
+  }
+  await worker.setParameters({ tessedit_char_whitelist: "0123456789.,", tessedit_pageseg_mode: "7" });
+  const lista = [], vistos = new Set();
+  for (let i = 0; i < filas.length; i++) {
+    const res = bodegaResolver(codigos[i], cat);
+    if (filas[i].sonda && !(res.estado === "ok" || res.estado === "corregido" || res.estado === "nuevo")) continue;   // la sonda no encontró nada
+    if (filas[i].sonda && vistos.has(res.code)) continue;
+    onEstado(`Leyendo cantidades… ${i + 1}/${filas.length}`); onProg && onProg(0.5 + (i + 1) / filas.length / 2);
+    const q = await bodegaLeerCantidad(worker, base, filas[i]);
+    if (q.qty == null) { if (res.estado === "ilegible" || res.estado === "ambiguo") { lista.push({ raw: codigos[i], qty: 0 }); } else lista.push({ raw: codigos[i], qty: 0, dudoso: true, share: 0 }); continue; }
+    vistos.add(res.code);
+    lista.push({ raw: codigos[i], qty: q.qty, share: q.share, alt: q.alt, dudoso: q.share < 0.8 || filas[i].qtyEstimada });
+  }
+  const r = bodegaConstruir(lista, cat);
+  r.fecha = fecha;
+  return r;
 }
 
 /* =====================================================================
@@ -325,12 +539,14 @@ function bodegaCatalogoTodo(stock) {
   return out;
 }
 
-/* Al aplicar un escaneo: lo que ya estaba capturado a mano de otros productos (iPad, Mac…) se conserva */
-function bodegaMezclar(prev, escaneado) {
-  const out = { ...escaneado }, esc = (typeof ESCANER_DATA !== "undefined" && ESCANER_DATA) || {};
+/* Al aplicar un escaneo, cada sección que aparece en la foto (iPhone, iPad, Mac…) se reemplaza con lo leído;
+   las secciones que NO aparecen se conservan. Con modo "parcial" (la foto es solo una parte de la lista)
+   no se pone en 0 nada de lo que no apareció. */
+function bodegaMezclar(prev, escaneado, modo) {
+  const out = { ...escaneado }, vistas = new Set(Object.keys(escaneado).map(bodegaSeccionDe));
   Object.keys(prev || {}).forEach(c => {
     if (c in out) return;
-    if (esc[c] && !/^iPhone/i.test(esc[c].modelo || "")) out[c] = prev[c];
+    if (modo === "parcial" || !vistas.has(bodegaSeccionDe(c))) out[c] = prev[c];
   });
   return out;
 }
@@ -590,6 +806,13 @@ function bodegaFilaInfo(i) {
   return `<i class="bx-dot" style="background:${bodegaColor(i.color)}"></i><div class="bx-mi"><b>${bodegaEsc(i.color || "Sin color")}</b>${cap ? `<span class="cap">${bodegaEsc(cap)}</span>` : ""}<small>UPC ${bodegaEsc(i.code)}</small></div>`;
 }
 
+/* "iPad (18 códigos), iPhone (40 códigos)" de lo que trae un escaneo */
+function bodegaSeccionesTxt(stock) {
+  const n = {}; Object.keys(stock).forEach(c => { const sec = bodegaSeccionDe(c); n[sec] = (n[sec] || 0) + 1; });
+  const t = Object.keys(n).map(k => `${k} (${n[k]} código${n[k] === 1 ? "" : "s"})`).join(", ");
+  return t || "nada";
+}
+
 /* ---------- Pantalla principal de Bodega ---------- */
 function buildBodega() {
   bodegaEstilos();
@@ -688,7 +911,7 @@ function buildBodega() {
       barra.style.width = "100%"; linea.style.display = "none";
       if (!esc.leidos) { est.textContent = "No logré leer renglones de esa foto. Prueba con “Pegar o escanear texto”, que es más tolerante."; return; }
       pendiente = { esc, origen: "foto" };
-      est.textContent = `Leí ${esc.leidos} códigos${esc.dudosos.length ? ` · ${esc.dudosos.length} dudoso(s)` : ""}.`;
+      est.textContent = `Leí ${esc.leidos} códigos${esc.dudosos.length ? ` · ${esc.dudosos.length} dudoso(s)` : ""}${(esc.revisar || []).length ? ` · ${esc.revisar.length} cantidad(es) por revisar` : ""}.`;
       mostrarReporte(prev, cat(), true);
     } catch (e) { est.textContent = "Error: " + (e.message || e); }
   }
@@ -696,7 +919,7 @@ function buildBodega() {
   /* Vista previa de lo que cambió ANTES de guardar */
   function mostrarReporte(prev, c, conservar) {
     const { esc, origen } = pendiente, fecha = esc.fecha;
-    const nuevoStock = bodegaMezclar(estado.stock, esc.stock);
+    const nuevoStock = bodegaMezclar(estado.stock, esc.stock, pendiente.parcial ? "parcial" : "secciones");
     const hayPrev = Object.keys(estado.stock).length > 0;
     const items = bodegaItems(estado.stock, nuevoStock, c);
     const res = bodegaResumen(items);
@@ -705,16 +928,29 @@ function buildBodega() {
     const texto = rep ? bodegaTextoReporte(rep, fecha) : `Primera captura${fecha ? " · " + fecha : ""}\n${esc.leidos} códigos · ${tot} piezas`;
     let extra = "";
     if (esc.dudosos.length) extra += `<p class="bod-aviso">⚠️ No pude confirmar estos renglones y los dejé fuera: ${esc.dudosos.map(d => `${bodegaEsc(d.raw)} (${d.qty})`).join(", ")}.</p>`;
+    const rev = (esc.revisar || []).filter(x => !(esc.confirmadas || {})[x.code]);
+    if (rev.length) extra += `<p class="bod-aviso">🔎 Revisa estas cantidades (no estoy seguro de que estén bien). Toca para corregir:</p>${rev.map(x => `<button class="bx-btn bod-revisar" data-c="${x.code}"><span>${bodegaEsc(bodegaNombre(c, x.code))} — leí ${esc.stock[x.code]}${x.alt != null && x.alt !== esc.stock[x.code] ? " (¿" + x.alt + "?)" : ""}${x.repetido ? " · salió repetido" : ""}</span></button>`).join("")}`;
     if (esc.nuevos.length) extra += `<p class="bod-aviso">🆕 Códigos fuera del catálogo:</p>${esc.nuevos.map(n => `<button class="bx-btn bod-nombrar" data-c="${n}"><span>${n} — Poner nombre</span></button>`).join("")}`;
     const old = prev.querySelector(".bod-reporte"); if (old) old.remove();
     if (!conservar) prev.innerHTML = "";
     prev.insertAdjacentHTML("beforeend", `<div class="bod-reporte bx-prev">
       <h3>Cambios detectados</h3>
       <p class="bx-sub" style="margin-bottom:6px">${fecha ? "Lista del " + bodegaEsc(fecha) + " · " : ""}${esc.leidos} códigos leídos · ${res.cambios ? res.cambios + " con cambio" : "sin cambios"}. Revísalos antes de guardar.</p>
+      ${hayPrev ? `<label class="bod-aviso" style="display:flex;gap:10px;align-items:flex-start;cursor:pointer"><input type="checkbox" id="bodParcial" ${pendiente.parcial ? "checked" : ""} style="margin-top:3px;width:20px;height:20px"><span><b>La foto es solo una parte de la lista</b><br><small>Actualizo: ${bodegaSeccionesTxt(esc.stock)}. ${pendiente.parcial ? "Lo que no aparece en la foto se queda como estaba." : "Lo que no aparece de esas secciones pasa a 0."}</small></span></label>` : ""}
       ${bodegaDetalleHtml(items, c)}${extra}
       <button class="bx-btn ok" id="bodAplicar">✓ Aplicar cambios</button>
       <button class="bx-btn mid" id="bodCopiar">Copiar reporte</button>
       <button class="bx-btn mid" id="bodCancelar">Descartar</button></div>`);
+    const chkP = prev.querySelector("#bodParcial");
+    if (chkP) chkP.addEventListener("change", () => { pendiente.parcial = chkP.checked; mostrarReporte(prev, cat(), true); });
+    prev.querySelectorAll(".bod-revisar").forEach(b => b.addEventListener("click", () => {
+      const code = b.dataset.c, v = prompt("Cantidad correcta de " + bodegaNombre(c, code) + ":", String(esc.stock[code]));
+      if (v === null) return;
+      const n = parseInt(String(v).replace(/\D/g, ""), 10);
+      if (!isFinite(n)) return;
+      esc.stock[code] = n; (esc.confirmadas = esc.confirmadas || {})[code] = true;
+      mostrarReporte(prev, cat(), true);
+    }));
     prev.querySelectorAll(".bod-nombrar").forEach(b => b.addEventListener("click", () => {
       const code = b.dataset.c, n = prompt("Nombre (ej. iPhone 18 Pro Max Naranja 512GB):", "");
       if (!n) return;
@@ -895,4 +1131,4 @@ function buildBodegaDetalle(ts) {
   return wrap;
 }
 
-if (typeof module !== "undefined") module.exports = { bodegaFilasDeTexto, bodegaLeerTexto, bodegaResolver, bodegaRenglones, bodegaLeerRenglon, bodegaComparar, bodegaTextoReporte, bodegaUpcOk, bodegaFecha };
+if (typeof module !== "undefined") module.exports = { bodegaFilasDeTexto, bodegaLeerTexto, bodegaResolver, bodegaRenglones, bodegaLeerRenglon, bodegaFilasDePalabras, bodegaComparar, bodegaTextoReporte, bodegaUpcOk, bodegaFecha, bodegaMezclar };
