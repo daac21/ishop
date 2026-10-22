@@ -393,8 +393,12 @@ function bodegaHuecos(filas) {
 /* A los renglones sin cantidad ubicada se les calcula dónde debe estar (como en los demás) */
 function bodegaUbicarCantidades(filas) {
   const con = filas.filter(f => f.qty);
-  if (con.length < 3) return;
-  const dx = bodegaMediana(con.map(f => f.qty.x - (f.cod.x + f.cod.w))), dy = bodegaMediana(con.map(f => f.qty.y - f.cod.y)), w = bodegaMediana(con.map(f => f.qty.w));
+  let dx, dy, w;
+  if (con.length >= 3) {
+    dx = bodegaMediana(con.map(f => f.qty.x - (f.cod.x + f.cod.w))); dy = bodegaMediana(con.map(f => f.qty.y - f.cod.y)); w = bodegaMediana(con.map(f => f.qty.w));
+  } else {   // casi no se vieron cantidades: se estima por la forma típica del listado (cantidad a la derecha del código)
+    const cw = bodegaMediana(filas.map(f => f.cod.w)); dx = cw * 0.45; dy = 0; w = cw * 0.55;
+  }
   filas.forEach(f => { if (!f.qty) { f.qty = { x: f.cod.x + f.cod.w + dx, y: f.cod.y + dy, w, h: f.cod.h }; f.qtyEstimada = true; } });
 }
 
@@ -420,6 +424,7 @@ async function bodegaLeerCodigo(worker, base, fila, cat) {
 /* Cantidad: varias lecturas y se queda con la que más se repite */
 async function bodegaLeerCantidad(worker, base, fila) {
   const v = new Map(); let total = 0;
+  if (!fila.qty) return { qty: null, share: 0, alt: null };
   const suma = (n, p) => { v.set(n, (v.get(n) || 0) + p); total += p; };
   const plan = [[44, 0], [64, 0], [44, 2], [64, 3], [64, 2], [44, 3]];
   for (let i = 0; i < plan.length; i++) {
@@ -913,7 +918,7 @@ function buildBodega() {
       pendiente = { esc, origen: "foto" };
       est.textContent = `Leí ${esc.leidos} códigos${esc.dudosos.length ? ` · ${esc.dudosos.length} dudoso(s)` : ""}${(esc.revisar || []).length ? ` · ${esc.revisar.length} cantidad(es) por revisar` : ""}.`;
       mostrarReporte(prev, cat(), true);
-    } catch (e) { est.textContent = "Error: " + (e.message || e); }
+    } catch (e) { linea.style.display = "none"; est.textContent = "No pude leer esa foto (" + (e.message || e) + "). Prueba con otra foto o con “Pegar o escanear texto”."; }
   }
 
   /* Vista previa de lo que cambió ANTES de guardar */
