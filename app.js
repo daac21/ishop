@@ -176,6 +176,8 @@ const DS_ICONS = {
   x:       DS_SVG('<path d="M6 6l12 12M18 6L6 18"/>', 2.6),
   bolt:    DS_SVG('<path d="M13 3L5 13.5h6L10 21l8-10.5h-6z"/>'),
   wrench:  DS_SVG('<path d="M14.5 6.2a4 4 0 0 0 4.9 4.9L9 21.5 3 15.5 13.6 5a4 4 0 0 0 .9 1.2z"/>'),
+  storage: DS_SVG('<rect x="3" y="7.5" width="18" height="9" rx="2.2"/><path d="M7 10.5v3M10.3 10.5v3M13.6 10.5v3M16.9 10.5v3" stroke-width="1.6"/>'),
+  batpho:  DS_SVG('<rect x="7" y="2.5" width="10" height="19" rx="2.6"/><path d="M12.8 7.8l-2.4 4h2.8l-1.6 3.6"/>'),
   battery: DS_SVG('<rect x="6" y="5" width="12" height="16" rx="2.6"/><path d="M10 2.5h4M12 10v5M9.5 12.5h5"/>'),
   headset: DS_SVG('<path d="M4.5 14v-2a7.5 7.5 0 0 1 15 0v2"/><rect x="3.5" y="13" width="4" height="6.5" rx="2"/><rect x="16.5" y="13" width="4" height="6.5" rx="2"/>'),
   burst:   DS_SVG('<path d="M12 3l1.8 4.7 4.6-2.1-2 4.7 5 .9-4.6 2.5 3 4-5-1-1 4.9-2.8-4.1-3.7 3.2.5-4.9-5-.3 4.2-3.2-3-4 4.9 1.5z"/>'),
@@ -1262,11 +1264,18 @@ function buildCajasDetail(category, modelo) {
 }
 
 const PRICE_ROWS = [
-  { key: "ÓPTIMO",   label: "Óptimo",   color: "#34c759" },
-  { key: "BATERÍA",  label: "Batería",  color: "#ff9500" },
-  { key: "PANTALLA", label: "Pantalla", color: "#0071e3" },
-  { key: "B Y P",    label: "B y P",    color: "#af52de" },
+  { key: "ÓPTIMO",   label: "Óptimo",   color: "#34c759", sub: "Equipo en perfecto estado", jw: "green",  icon: "check" },
+  { key: "BATERÍA",  label: "Batería",  color: "#ff9500", sub: "Servicio de batería",       jw: "orange", icon: "battery" },
+  { key: "PANTALLA", label: "Pantalla", color: "#0071e3", sub: "Pantalla dañada",           jw: "sky",    icon: "phone" },
+  { key: "B Y P",    label: "B y P",    color: "#af52de", sub: "Batería y pantalla",        jw: "purple", icon: "batpho" },
 ];
+
+// Lee un valor de un nodo de precios ignorando espacios raros (nbsp) en las claves y valores.
+function leafVal(node, key) {
+  const t = normalizarClave(key);
+  const k = Object.keys(node || {}).find(x => normalizarClave(x) === t);
+  return k === undefined ? "N/A" : normalizarClave(node[k]);
+}
 
 function getNodeAtPath(path) {
   let node = TRADEIN_DATA;
@@ -1308,40 +1317,93 @@ function buildTradeNode(path) {
   }
 
   if (isPriceLeaf(node)) {
+    // Pantalla "Estado del equipo": nombre del modelo arriba (con la capacidad chiquita) y los precios.
     const isIphone = path[0] === "iPhone";
-    const heading = document.createElement("div");
-    heading.className = "section-heading";
-    heading.innerHTML = `<h2>${path[path.length - 1]}</h2>`;
-    wrap.appendChild(heading);
+    const head = document.createElement("div");
+    head.className = "ds-head ti-head";
+    head.innerHTML = `<div><h2></h2><p></p></div>`;
+    head.querySelector("h2").textContent = modeloNombre(path[path.length - 2] || path[0]);
+    head.querySelector("p").textContent = modeloNombre(path[path.length - 1]);
+    wrap.appendChild(head);
 
-    const list = document.createElement("div");
-    list.className = "sub-list";
-
-    PRICE_ROWS.forEach(row => {
-      const raw = node[row.key] ?? "N/A";
-      const numeric = parsePesoValue(raw);
-      const item = document.createElement(isIphone && numeric !== null ? "button" : "div");
-      item.className = "sub-btn";
-      item.innerHTML = `
-        <span style="display:flex;align-items:center;gap:10px;">
-          <span style="width:9px;height:9px;border-radius:50%;background:${row.color};display:inline-block;"></span>
-          ${row.label}
-        </span>
-        <span style="font-weight:650;">${raw}</span>
-      `;
-      if (isIphone && numeric !== null) {
-        item.addEventListener("click", () => {
-          navigate({
-            screen: "quoteSelectNew",
-            path: [],
-            tradeIn: { model: path[1], capacity: path[2], value: numeric, condition: row.label },
-            title: "Equipo nuevo",
-          });
-        });
-      }
-      list.appendChild(item);
+    const goQuote = (row, numeric) => navigate({
+      screen: "quoteSelectNew",
+      path: [],
+      tradeIn: { model: path[1], capacity: path[2], value: numeric, condition: row.label },
+      title: "Equipo nuevo",
     });
-    wrap.appendChild(list);
+    const chevSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>';
+
+    const rowOpt = PRICE_ROWS[0];
+    const rawOpt = leafVal(node, rowOpt.key);
+    const numOpt = parsePesoValue(rawOpt);
+    const hero = document.createElement(isIphone && numOpt !== null ? "button" : "div");
+    hero.className = "ti-hero";
+    hero.innerHTML = `<div class="ti-hero-tag">${DS_ICONS.check}<span>ÓPTIMO</span></div>
+      <div class="ti-hero-price"></div><div class="ti-hero-sub"></div>
+      ${isIphone && numOpt !== null ? `<span class="ti-hero-go">${chevSvg}</span>` : ""}`;
+    hero.querySelector(".ti-hero-price").textContent = rawOpt;
+    hero.querySelector(".ti-hero-sub").textContent = rowOpt.sub;
+    if (isIphone && numOpt !== null) hero.addEventListener("click", () => goQuote(rowOpt, numOpt));
+    wrap.appendChild(hero);
+
+    const lab = document.createElement("div");
+    lab.className = "ti-label";
+    lab.textContent = "CON DETALLES";
+    wrap.appendChild(lab);
+
+    PRICE_ROWS.slice(1).forEach(row => {
+      const raw = leafVal(node, row.key);
+      const numeric = parsePesoValue(raw);
+      const ok = numeric !== null;
+      const clickable = isIphone && ok;
+      const item = document.createElement(clickable ? "button" : "div");
+      item.className = "ti-row" + (ok ? "" : " off");
+      item.innerHTML = `<span class="ds-chip jw-${row.jw}">${DS_ICONS[row.icon]}</span>
+        <span class="ds-row-text"><b></b><small></small></span>
+        <span class="ti-row-val"></span>${clickable ? '<span class="chev"></span>' : ""}`;
+      item.querySelector("b").textContent = row.label;
+      item.querySelector("small").textContent = row.sub;
+      item.querySelector(".ti-row-val").textContent = ok ? raw : "No aplica";
+      if (clickable) item.addEventListener("click", () => goQuote(row, numeric));
+      wrap.appendChild(item);
+    });
+    return wrap;
+  }
+
+  // Elegir capacidad (los hijos son nodos de precios): tarjetas con barra de almacenamiento.
+  if (path.length >= 2 && Object.values(node).length && Object.values(node).every(isPriceLeaf)) {
+    const keys = Object.keys(node);
+    const head = document.createElement("div");
+    head.className = "ds-head ti-head";
+    head.innerHTML = `<div><h2></h2><p>Elige la capacidad que entrega el cliente</p></div>`;
+    head.querySelector("h2").textContent = modeloNombre(path[path.length - 1]);
+    wrap.appendChild(head);
+
+    const JW = ["blue", "violet", "amber", "rose", "teal", "green"];
+    keys.forEach((key, i) => {
+      const leaf = node[key];
+      const nums = PRICE_ROWS.map(r => parsePesoValue(leafVal(leaf, r.key))).filter(n => n !== null);
+      const top = nums.length ? Math.max(...nums) : null;
+      const name = modeloNombre(key);
+      const m = name.match(/^(\d+(?:\.\d+)?)\s*(GB|TB)$/i);
+      const pct = keys.length > 1 ? Math.round(35 + 65 * i / (keys.length - 1)) : 100;
+      const b = document.createElement("button");
+      b.className = "ti-cap jw-" + JW[i % JW.length];
+      b.innerHTML = `<span class="ds-chip">${DS_ICONS.storage}</span>
+        <span class="ti-cap-main">
+          <span class="ti-cap-size"><b></b><i></i></span>
+          <small>Almacenamiento</small>
+          <span class="ti-bar"><span style="width:${pct}%"></span></span>
+        </span>
+        <span class="ti-cap-price"><small>Hasta</small><b></b></span>
+        <span class="chev"></span>`;
+      b.querySelector(".ti-cap-size b").textContent = m ? m[1] : name;
+      b.querySelector(".ti-cap-size i").textContent = m ? m[2].toUpperCase() : "";
+      b.querySelector(".ti-cap-price b").textContent = top !== null ? money(top) : "—";
+      b.addEventListener("click", () => navigate({ screen: "tradeNode", path: [...path, key], title: "Estado del equipo" }));
+      wrap.appendChild(b);
+    });
     return wrap;
   }
 
@@ -1502,7 +1564,7 @@ function tradeGuardarReciente(cat, key) {
 
 function buildTradeModelPicker(path, node, wrap) {
   buildModelPicker(path[0], Object.keys(node), wrap, (key) => {
-    navigate({ screen: "tradeNode", path: [...path, key], title: modeloNombre(key) });
+    navigate({ screen: "tradeNode", path: [...path, key], title: "Trade In · " + modeloNombre(key) });
   }, { recents: true });
 }
 
