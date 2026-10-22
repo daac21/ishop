@@ -1,0 +1,433 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name=claude:viewport-fit-sides content=cover><style>:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-right:env(safe-area-inset-right,0px);padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}</style><style>.md-table{overflow-x:auto}@media print{.md-table{overflow-x:visible}}</style><style>:root{color-scheme:light dark;--md-bg:#fff;--md-text:rgba(0,0,0,.8);--md-muted:rgba(0,0,0,.6);--md-fill:rgba(0,0,0,.04);--md-fill-strong:rgba(0,0,0,.06);--md-rule:rgba(0,0,0,.1);--md-rule-strong:rgba(0,0,0,.16);--md-link:hsl(210 100% 45%)}@media (prefers-color-scheme:dark){:root:where(:not([data-theme="light"])){--md-bg:#0d0d0d;--md-text:rgba(255,255,255,.85);--md-muted:rgba(255,255,255,.6);--md-fill:rgba(255,255,255,.06);--md-fill-strong:rgba(255,255,255,.09);--md-rule:rgba(255,255,255,.14);--md-rule-strong:rgba(255,255,255,.22);--md-link:hsl(210 100% 72%)}}:root[data-theme="dark"]{color-scheme:dark;--md-bg:#0d0d0d;--md-text:rgba(255,255,255,.85);--md-muted:rgba(255,255,255,.6);--md-fill:rgba(255,255,255,.06);--md-fill-strong:rgba(255,255,255,.09);--md-rule:rgba(255,255,255,.14);--md-rule-strong:rgba(255,255,255,.22);--md-link:hsl(210 100% 72%)}:root[data-theme="light"]{color-scheme:light}@media print{:root,:root[data-theme="dark"]{color-scheme:light;--md-bg:#fff;--md-text:rgba(0,0,0,.8);--md-muted:rgba(0,0,0,.6);--md-fill:rgba(0,0,0,.04);--md-fill-strong:rgba(0,0,0,.06);--md-rule:rgba(0,0,0,.1);--md-rule-strong:rgba(0,0,0,.16);--md-link:hsl(210 100% 45%)}}body{background:var(--md-bg);color:var(--md-text);max-width:720px;margin:0 auto;padding:32px;display:flex;flex-direction:column;gap:10px;font:14px/1.55 -apple-system,BlinkMacSystemFont,'SF Pro','Segoe UI',sans-serif;overflow-wrap:break-word}body>:first-child{margin-top:0}h1,h2,h3,h4,h5,h6{margin:6px 0 0;line-height:1.25;font-weight:600;text-wrap:balance}h1{font-size:1.35em}h2{font-size:1.15em;color:var(--md-muted)}h3,h4,h5,h6{font-size:1em}p,ul,ol,blockquote,table,pre,hr{margin:0}strong{font-weight:600}a{color:var(--md-link);text-decoration:none}a:hover{text-decoration:underline}ul,ol{display:flex;flex-direction:column;gap:6px;padding-left:22px}ul{list-style:disc}ol{list-style:decimal}:is(li,td,th)>*+:is(p,ul,ol,blockquote){margin-top:6px}blockquote{display:flex;flex-direction:column;gap:10px;border-left:2px solid var(--md-rule);padding-left:10px;color:var(--md-muted)}:not(pre)>code{background:var(--md-fill);padding:1px 3px;border-radius:4px;font:.92em 'SF Mono',ui-monospace,Menlo,Consolas,monospace}a>code{background:none;color:inherit}pre{background:var(--md-fill);padding:10px 12px;border-radius:6px;overflow-x:auto;font:12px/1.5 'SF Mono',ui-monospace,Menlo,Consolas,monospace;margin-block:4px}pre code{background:none;padding:0;font:inherit}table{width:100%;border-collapse:separate;border-spacing:2px;font:inherit}th,td{padding:6px 8px;border-radius:3px;text-align:left;vertical-align:top}th{background:var(--md-fill-strong);font-weight:600}td{background:var(--md-fill)}:is(th,td) :not(pre)>code{background:transparent}hr{border:0;border-top:1px solid var(--md-rule-strong);margin-block:10px}img{max-width:100%;height:auto;border-radius:4px}</style>
+</head><body>
+<pre><code class="language-javascript">/* =====================================================================
+   BODEGA (oculto) — inventario por foto
+   Se abre manteniendo presionado el botón &#34;Registros&#34; ~1 segundo.
+   Flujo: foto del listado → escaneo renglón por renglón (lector de texto) →
+   compara contra las existencias guardadas → reporte de cambios → Aplicar.
+   Todo se guarda en ESTE teléfono (localStorage). No toca otros módulos.
+   Catálogo: usa datos/escaner.json (UPC → modelo/color/capacidad) + códigos nuevos
+   que tú nombres aquí. Lector de texto: libs/tesseract/ (si no está, lo baja de internet).
+   ===================================================================== */
+const BODEGA_KEY = &#34;ishop_bodega_v1&#34;;
+const BODEGA_EXTRA_KEY = &#34;ishop_bodega_extra_v1&#34;;
+const BODEGA_ORDEN = [&#34;iPhone Duo&#34;,&#34;iPhone 18 Pro Max&#34;,&#34;iPhone 18 Pro&#34;,&#34;iPhone 17 Pro Max&#34;,&#34;iPhone 17 Pro&#34;,&#34;iPhone Air&#34;,&#34;iPhone 17&#34;,&#34;iPhone 17e&#34;,&#34;iPhone 16 Plus&#34;,&#34;iPhone 16&#34;,&#34;iPhone 16e&#34;,&#34;iPhone 15&#34;];
+
+/* Existencias de ejemplo = foto del 21-10-2026 (para probar sin tomar foto) */
+const BODEGA_SEED = {
+  &#34;195949035180&#34;:1,&#34;195950643015&#34;:79,&#34;195950643213&#34;:1,&#34;195950643138&#34;:112,&#34;195950643336&#34;:2,&#34;195950643091&#34;:43,
+  &#34;195950643299&#34;:1,&#34;195950643176&#34;:27,&#34;195950643374&#34;:1,&#34;195950643053&#34;:39,&#34;195950643251&#34;:1,&#34;195950626438&#34;:3,
+  &#34;195950626513&#34;:5,&#34;195950626759&#34;:1,&#34;195950626353&#34;:18,&#34;195950638288&#34;:26,&#34;195950638325&#34;:15,&#34;195950638240&#34;:32,
+  &#34;195951030197&#34;:16,&#34;195951030272&#34;:5,&#34;195951030234&#34;:7,&#34;195951415581&#34;:1,&#34;195951415505&#34;:37,&#34;195951415529&#34;:135,
+  &#34;195951415611&#34;:1,&#34;195951415536&#34;:64,&#34;195951415550&#34;:10,&#34;195951409948&#34;:10,&#34;195951409863&#34;:7,&#34;195951409887&#34;:60,
+  &#34;195951409924&#34;:29,&#34;195951409979&#34;:5,&#34;195951410012&#34;:2,&#34;195951409955&#34;:1,&#34;195951409870&#34;:8,&#34;195951409993&#34;:1,
+  &#34;195950621419&#34;:11,&#34;195950621297&#34;:1,&#34;195951405650&#34;:40,&#34;195951405612&#34;:40
+};
+
+/* DATOS DE PRUEBA (erróneos a propósito): escanea la foto del 21-10-2026 y el reporte debe corregirlos */
+const BODEGA_PRUEBA = {&#34;195949035180&#34;:1,&#34;195950643015&#34;:70,&#34;195950643213&#34;:1,&#34;195950643138&#34;:120,&#34;195950643336&#34;:2,&#34;195950643091&#34;:43,&#34;195950643299&#34;:1,&#34;195950643176&#34;:27,&#34;195950643374&#34;:1,&#34;195950643053&#34;:39,&#34;195950643251&#34;:1,&#34;195950626438&#34;:3,&#34;195950626513&#34;:5,&#34;195950626759&#34;:1,&#34;195950626353&#34;:14,&#34;195950638288&#34;:26,&#34;195950638325&#34;:15,&#34;195950638240&#34;:32,&#34;195951030197&#34;:20,&#34;195951030272&#34;:5,&#34;195951030234&#34;:7,&#34;195951415505&#34;:37,&#34;195951415529&#34;:150,&#34;195951415611&#34;:1,&#34;195951415536&#34;:64,&#34;195951415550&#34;:10,&#34;195951409948&#34;:10,&#34;195951409863&#34;:12,&#34;195951409887&#34;:55,&#34;195951409924&#34;:29,&#34;195951409979&#34;:5,&#34;195951410012&#34;:2,&#34;195951409955&#34;:1,&#34;195951409870&#34;:8,&#34;195950621419&#34;:11,&#34;195951405650&#34;:25,&#34;195951405612&#34;:40,&#34;195949821257&#34;:6};
+
+/* ---------- Catálogo ---------- */
+function bodegaExtra() { try { return JSON.parse(localStorage.getItem(BODEGA_EXTRA_KEY)) || {}; } catch (e) { return {}; } }
+function bodegaCatalogo() {
+  const cat = {};
+  const esc = (typeof ESCANER_DATA !== &#34;undefined&#34; &amp;&amp; ESCANER_DATA) || {};
+  Object.keys(esc).forEach(k =&gt; { if (/^iPhone/i.test(esc[k].modelo || &#34;&#34;)) cat[k] = { modelo: esc[k].modelo, color: esc[k].color || &#34;&#34;, capacidad: esc[k].capacidad || &#34;&#34; }; });
+  const ex = bodegaExtra();
+  Object.keys(ex).forEach(k =&gt; { cat[k] = ex[k]; });
+  return cat;
+}
+function bodegaCap(c) { c = String(c || &#34;&#34;); return /^\d+$/.test(c) ? c + &#34;GB&#34; : c; }
+function bodegaNombre(cat, code) {
+  const e = cat[code];
+  if (!e) return &#34;UPC &#34; + code;
+  return [e.modelo, e.color, bodegaCap(e.capacidad)].filter(Boolean).join(&#34; &#34;);
+}
+
+/* ---------- Guardado ---------- */
+function bodegaLoad() {
+  try { const d = JSON.parse(localStorage.getItem(BODEGA_KEY)); if (d &amp;&amp; d.stock) return d; } catch (e) {}
+  return { stock: {}, fecha: &#34;&#34;, ultimoReporte: null };
+}
+function bodegaSave(d) { try { localStorage.setItem(BODEGA_KEY, JSON.stringify(d)); } catch (e) {} }
+
+/* ---------- UPC-A: dígito verificador ---------- */
+function bodegaUpcOk(c) {
+  if (!/^\d{12}$/.test(c)) return false;
+  const d = c.split(&#34;&#34;).map(Number);
+  const s = (d[0]+d[2]+d[4]+d[6]+d[8]+d[10]) * 3 + (d[1]+d[3]+d[5]+d[7]+d[9]);
+  return (10 - (s % 10)) % 10 === d[11];
+}
+
+/* Corrige errores del lector comparando contra el catálogo. Devuelve {code, estado} */
+function bodegaResolver(raw, cat) {
+  const r = String(raw || &#34;&#34;).replace(/\D/g, &#34;&#34;);
+  if (cat[r]) return { code: r, estado: &#34;ok&#34; };
+  const keys = Object.keys(cat);
+  const hallados = new Set();
+  const probar = (c) =&gt; { if (cat[c]) hallados.add(c); };
+  if (r.length === 12) {
+    keys.forEach(k =&gt; { let d = 0; for (let i = 0; i &lt; 12 &amp;&amp; d &lt; 2; i++) if (k[i] !== r[i]) d++; if (d &lt;= 1) hallados.add(k); });
+  } else if (r.length === 13) {
+    for (let i = 0; i &lt; 13; i++) probar(r.slice(0, i) + r.slice(i + 1));
+  } else if (r.length === 11) {
+    for (let i = 0; i &lt;= 11; i++) for (let n = 0; n &lt; 10; n++) probar(r.slice(0, i) + n + r.slice(i));
+  }
+  if (hallados.size === 0 &amp;&amp; r.length === 12) {
+    keys.forEach(k =&gt; { let d = 0; for (let i = 0; i &lt; 12 &amp;&amp; d &lt; 3; i++) if (k[i] !== r[i]) d++; if (d &lt;= 2) hallados.add(k); });
+  }
+  if (hallados.size === 1) return { code: [...hallados][0], estado: &#34;corregido&#34; };
+  if (r.length === 12 &amp;&amp; bodegaUpcOk(r)) return { code: r, estado: &#34;nuevo&#34; };
+  if (hallados.size &gt; 1) return { code: r, estado: &#34;ambiguo&#34; };
+  return { code: r, estado: &#34;ilegible&#34; };
+}
+
+/* ---------- Palabras del lector → renglones ---------- */
+function bodegaRenglones(words, anchoImg) {
+  const ws = words.filter(w =&gt; w.bbox &amp;&amp; String(w.text || &#34;&#34;).trim())
+    .map(w =&gt; ({ t: String(w.text).trim(), x: (w.bbox.x0 + w.bbox.x1) / 2, y: (w.bbox.y0 + w.bbox.y1) / 2, h: w.bbox.y1 - w.bbox.y0 }))
+    .sort((a, b) =&gt; a.y - b.y);
+  if (!ws.length) return [];
+  const hs = ws.map(w =&gt; w.h).sort((a, b) =&gt; a - b);
+  const tol = Math.max(6, hs[Math.floor(hs.length / 2)] * 0.6);
+  const rows = [];
+  ws.forEach(w =&gt; {
+    const last = rows[rows.length - 1];
+    if (last &amp;&amp; Math.abs(w.y - last.y) &lt;= tol) { last.w.push(w); last.y = (last.y * (last.w.length - 1) + w.y) / last.w.length; }
+    else rows.push({ y: w.y, w: [w] });
+  });
+  return rows.map(r =&gt; r.w.sort((a, b) =&gt; a.x - b.x));
+}
+
+/* Un renglón → { raw, qty } (o null si no parece renglón de inventario) */
+function bodegaLeerRenglon(tokens, ancho) {
+  const izq = tokens.filter(t =&gt; t.x &lt; ancho * 0.5).map(t =&gt; t.t.replace(/\D/g, &#34;&#34;)).join(&#34;&#34;);
+  const nums = tokens.filter(t =&gt; /^\d{1,3}(,\d{3})*[.,]\d{2}$|^\d{1,5}[.,]\d{2}$/.test(t.t.replace(/\s/g, &#34;&#34;)));
+  if (izq.length &lt; 10 || !nums.length) return null;
+  const q = nums[nums.length - 1].t.replace(/\s/g, &#34;&#34;);
+  const val = parseFloat(q.replace(/,(?=\d{3}\b)/g, &#34;&#34;).replace(&#34;,&#34;, &#34;.&#34;));
+  if (!isFinite(val)) return null;
+  return { raw: izq.slice(0, 13), qty: Math.round(val) };
+}
+
+/* Fecha dd-mm-aaaa en el encabezado */
+function bodegaFecha(words) {
+  for (const w of words) { const m = String(w.text || &#34;&#34;).match(/(\d{2})[-/](\d{2})[-/](20\d{2})/); if (m) return `${m[1]}-${m[2]}-${m[3]}`; }
+  return &#34;&#34;;
+}
+
+/* ---------- Diferencias ---------- */
+function bodegaComparar(prev, nuevo, cat) {
+  const aumentos = [], bajas = [], nuevos = [], desaparecidos = [];
+  let sinCambio = 0;
+  new Set([...Object.keys(prev), ...Object.keys(nuevo)]).forEach(c =&gt; {
+    const a = prev[c] || 0, b = nuevo[c] || 0, nombre = bodegaNombre(cat, c);
+    if (a === b) { sinCambio++; return; }
+    const it = { code: c, nombre, antes: a, ahora: b, dif: b - a };
+    if (!(c in prev)) nuevos.push(it);
+    else if (!(c in nuevo)) desaparecidos.push(it);
+    else if (b &gt; a) aumentos.push(it);
+    else bajas.push(it);
+  });
+  const orden = (x, y) =&gt; Math.abs(y.dif) - Math.abs(x.dif);
+  [aumentos, bajas, nuevos, desaparecidos].forEach(l =&gt; l.sort(orden));
+  return { aumentos, bajas, nuevos, desaparecidos, sinCambio };
+}
+function bodegaTextoReporte(rep, fecha) {
+  const sg = n =&gt; (n &gt; 0 ? &#34;+&#34; : &#34;&#34;) + n;
+  const lin = it =&gt; `• ${it.nombre}: ${sg(it.dif)} pza${Math.abs(it.dif) === 1 ? &#34;&#34; : &#34;s&#34;} (${it.antes} → ${it.ahora})`;
+  const out = [`Reporte de bodega${fecha ? &#34; · &#34; + fecha : &#34;&#34;}`];
+  if (rep.aumentos.length) out.push(&#34;&#34;, &#34;AUMENTARON&#34;, ...rep.aumentos.map(lin));
+  if (rep.bajas.length) out.push(&#34;&#34;, &#34;BAJARON&#34;, ...rep.bajas.map(lin));
+  if (rep.nuevos.length) out.push(&#34;&#34;, &#34;NUEVOS EN LISTA&#34;, ...rep.nuevos.map(lin));
+  if (rep.desaparecidos.length) out.push(&#34;&#34;, &#34;YA NO APARECEN (pasan a 0)&#34;, ...rep.desaparecidos.map(lin));
+  if (out.length === 1) out.push(&#34;&#34;, &#34;Sin cambios.&#34;);
+  out.push(&#34;&#34;, `Sin cambio: ${rep.sinCambio} códigos`);
+  return out.join(&#34;\n&#34;);
+}
+
+/* Lista de {raw,qty} → existencias */
+function bodegaConstruir(filas, cat) {
+  const stock = {}, dudosos = [], nuevos = [];
+  filas.forEach(r =&gt; {
+    const res = bodegaResolver(r.raw, cat);
+    if (res.estado === &#34;ilegible&#34; || res.estado === &#34;ambiguo&#34;) { dudosos.push({ raw: r.raw, qty: r.qty }); return; }
+    if (res.estado === &#34;nuevo&#34; &amp;&amp; !nuevos.includes(res.code)) nuevos.push(res.code);
+    stock[res.code] = (stock[res.code] || 0) + r.qty;
+  });
+  return { stock, dudosos, nuevos, leidos: Object.keys(stock).length };
+}
+
+/* Texto (escaneado con el teclado del iPhone o pegado): un renglón por línea */
+function bodegaFilasDeTexto(texto) {
+  const filas = [];
+  String(texto || &#34;&#34;).split(/\r?\n/).forEach(l =&gt; {
+    // solo se corrigen letras (O, l, I) dentro de &#34;palabras&#34; que son números
+    const toks = l.trim().split(/\s+/).map(t =&gt; (/^[\dOolI|.,]+$/.test(t) &amp;&amp; /\d/.test(t)) ? t.replace(/[Oo]/g, &#34;0&#34;).replace(/[Il|]/g, &#34;1&#34;) : t);
+    let raw = &#34;&#34;, empezo = false;
+    for (const t of toks) {
+      if (/^\d+$/.test(t) &amp;&amp; (empezo || t.length &gt;= 3)) { raw += t; empezo = true; if (raw.length &gt;= 12) break; }
+      else if (empezo) break;
+    }
+    const nums = [...toks.join(&#34; &#34;).matchAll(/\d[\d,]*[.,]\d{2}(?!\d)/g)];
+    if (raw.length &lt; 10 || !nums.length) return;
+    const q = nums[nums.length - 1][0];
+    const val = parseFloat(q.replace(/,(?=\d{3}\b)/g, &#34;&#34;).replace(&#34;,&#34;, &#34;.&#34;));
+    if (isFinite(val)) filas.push({ raw: raw.slice(0, 13), qty: Math.round(val) });
+  });
+  return filas;
+}
+function bodegaLeerTexto(texto) {
+  const r = bodegaConstruir(bodegaFilasDeTexto(texto), bodegaCatalogo());
+  const m = String(texto).match(/(\d{2})[-/](\d{2})[-/](20\d{2})/);
+  r.fecha = m ? `${m[1]}-${m[2]}-${m[3]}` : &#34;&#34;;
+  return r;
+}
+
+/* ---------- Imagen: limpiar y escalar ---------- */
+function bodegaCargarImagen(file) {
+  return new Promise((res, rej) =&gt; {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () =&gt; { URL.revokeObjectURL(url); res(img); };
+    img.onerror = () =&gt; rej(new Error(&#34;No pude abrir la foto&#34;));
+    img.src = url;
+  });
+}
+function bodegaPreparar(img, simple) {
+  const MAX = 2400, esc = Math.min(1, MAX / Math.max(img.naturalWidth, img.naturalHeight));
+  const w = Math.round(img.naturalWidth * esc), h = Math.round(img.naturalHeight * esc);
+  const cv = document.createElement(&#34;canvas&#34;); cv.width = w; cv.height = h;
+  const ctx = cv.getContext(&#34;2d&#34;, { willReadFrequently: true });
+  ctx.drawImage(img, 0, 0, w, h);
+  const im = ctx.getImageData(0, 0, w, h), px = im.data, g = new Float32Array(w * h);
+  for (let i = 0; i &lt; w * h; i++) g[i] = px[i*4] * 0.299 + px[i*4+1] * 0.587 + px[i*4+2] * 0.114;
+  if (simple) { for (let i = 0; i &lt; w * h; i++) { const v = Math.max(0, Math.min(255, (g[i] - 60) * 1.4)); px[i*4] = px[i*4+1] = px[i*4+2] = v; } ctx.putImageData(im, 0, 0); return cv; }
+  // fondo = desenfoque grande (imagen integral); salida = gris / fondo → corrige luz despareja
+  const W = w + 1, S = new Float64Array(W * (h + 1));
+  for (let y = 0; y &lt; h; y++) { let fila = 0; for (let x = 0; x &lt; w; x++) { fila += g[y*w+x]; S[(y+1)*W+x+1] = S[y*W+x+1] + fila; } }
+  const R = Math.max(12, Math.round(Math.min(w, h) / 40));
+  for (let y = 0; y &lt; h; y++) {
+    const y0 = Math.max(0, y - R), y1 = Math.min(h, y + R + 1);
+    for (let x = 0; x &lt; w; x++) {
+      const x0 = Math.max(0, x - R), x1 = Math.min(w, x + R + 1);
+      const bg = (S[y1*W+x1] - S[y0*W+x1] - S[y1*W+x0] + S[y0*W+x0]) / ((x1 - x0) * (y1 - y0));
+      let v = (g[y*w+x] / Math.max(bg, 1)) * 255;
+      v = Math.max(0, Math.min(255, (v - 110) * 1.9 + 110));   // más contraste
+      const o = (y*w+x) * 4; px[o] = px[o+1] = px[o+2] = v; px[o+3] = 255;
+    }
+  }
+  ctx.putImageData(im, 0, 0);
+  return cv;
+}
+
+/* ---------- Lector de texto (Tesseract) ---------- */
+let bodegaWorkerP = null;
+function bodegaCargarScript(src) {
+  return new Promise((res, rej) =&gt; { const s = document.createElement(&#34;script&#34;); s.src = src; s.onload = res; s.onerror = () =&gt; rej(new Error(&#34;x&#34;)); document.head.appendChild(s); });
+}
+async function bodegaWorker(onProg) {
+  if (!window.Tesseract) {
+    try { await bodegaCargarScript(&#34;libs/tesseract/tesseract.min.js&#34;); window.__tessLocal = true; }
+    catch (e) { await bodegaCargarScript(&#34;https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js&#34;); window.__tessLocal = false; }
+  }
+  if (!bodegaWorkerP) {
+    const opt = { logger: m =&gt; { if (m.status === &#34;recognizing text&#34;) onProg &amp;&amp; onProg(m.progress); } };
+    if (window.__tessLocal) { opt.workerPath = &#34;libs/tesseract/worker.min.js&#34;; opt.corePath = &#34;libs/tesseract/&#34;; opt.langPath = &#34;libs/tesseract/lang&#34;; }
+    bodegaWorkerP = Tesseract.createWorker(&#34;eng&#34;, 1, opt).then(async w =&gt; {
+      await w.setParameters({ tessedit_char_whitelist: &#34;0123456789.,-/&#34;, tessedit_pageseg_mode: &#34;6&#34;, preserve_interword_spaces: &#34;1&#34; });
+      return w;
+    });
+    bodegaWorkerP.catch(() =&gt; { bodegaWorkerP = null; });
+  }
+  const w = await bodegaWorkerP;
+  w.__prog = onProg;
+  return w;
+}
+
+/* Foto → { stock, fecha, dudosos, nuevos, leidos }. Prueba varios intentos y se queda con el mejor */
+async function bodegaEscanear(file, onEstado, onProg) {
+  onEstado(&#34;Preparando la foto…&#34;);
+  const img = await bodegaCargarImagen(file);
+  onEstado(&#34;Cargando lector de texto…&#34;);
+  let worker;
+  try { worker = await bodegaWorker(onProg); }
+  catch (e) { throw new Error(&#34;No pude cargar el lector de texto (necesita internet la primera vez).&#34;); }
+  const cat = bodegaCatalogo();
+  const intentos = [
+    { simple: false, psm: &#34;6&#34;, wl: true },
+    { simple: true,  psm: &#34;6&#34;, wl: true },
+    { simple: false, psm: &#34;4&#34;, wl: true },
+    { simple: true,  psm: &#34;4&#34;, wl: false },
+  ];
+  let mejor = null;
+  for (let i = 0; i &lt; intentos.length; i++) {
+    const it = intentos[i];
+    onEstado(i === 0 ? &#34;Escaneando renglón por renglón…&#34; : `Reintentando con otro ajuste (${i + 1}/${intentos.length})…`);
+    const cv = bodegaPreparar(img, it.simple);
+    await worker.setParameters({ tessedit_char_whitelist: it.wl ? &#34;0123456789.,-/ &#34; : &#34;&#34;, tessedit_pageseg_mode: it.psm, preserve_interword_spaces: &#34;1&#34; });
+    const { data } = await worker.recognize(cv, {}, { blocks: true });
+    const words = data.words || (data.blocks || []).flatMap(b =&gt; (b.paragraphs || []).flatMap(p =&gt; (p.lines || []).flatMap(l =&gt; l.words || [])));
+    const filas = [];
+    bodegaRenglones(words, cv.width).forEach(tk =&gt; { const r = bodegaLeerRenglon(tk, cv.width); if (r) filas.push(r); });
+    let r1 = bodegaConstruir(filas, cat);
+    const r2 = bodegaConstruir(bodegaFilasDeTexto(data.text || &#34;&#34;), cat);
+    if (r2.leidos &gt; r1.leidos) r1 = r2;
+    r1.fecha = bodegaFecha(words) || (String(data.text || &#34;&#34;).match(/\d{2}-\d{2}-20\d{2}/) || [&#34;&#34;])[0];
+    if (!mejor || r1.leidos &gt; mejor.leidos) mejor = r1;
+    if (mejor.leidos &gt;= 25 &amp;&amp; mejor.dudosos.length &lt;= 2) break;
+  }
+  return mejor;
+}
+
+/* ---------- Pantalla ---------- */
+function bodegaEstilos() {
+  if (document.getElementById(&#34;bodEstilos&#34;)) return;
+  const st = document.createElement(&#34;style&#34;); st.id = &#34;bodEstilos&#34;;
+  st.textContent = `
+  .bod-card{ background:#fff; border-radius:16px; padding:16px; margin:12px 0; box-shadow:0 1px 3px rgba(0,0,0,.06); }
+  html[data-mode=&#34;dark&#34;] .bod-card{ background:#1c1c1e; }
+  .bod-card h3{ margin:0 0 4px; font-size:18px; }
+  .bod-card p{ margin:0 0 12px; font-size:14.5px; color:var(--text-secondary); line-height:1.4; }
+  .bod-big{ display:block; width:100%; padding:16px; font-size:17px; border-radius:14px; border:0; background:var(--accent); color:#fff; font-weight:600; text-align:center; cursor:pointer; margin-bottom:10px; box-sizing:border-box; }
+  .bod-big.sec{ background:#e8e8ed; color:var(--text); }
+  html[data-mode=&#34;dark&#34;] .bod-big.sec{ background:#3a3a3c; }
+  .bod-txt{ width:100%; box-sizing:border-box; min-height:130px; border-radius:12px; border:1px solid rgba(120,120,128,.35); padding:10px; font:14px ui-monospace,Menlo,monospace; background:transparent; color:var(--text); }
+  .bod-small{ display:flex; gap:16px; justify-content:center; margin:18px 0; flex-wrap:wrap; }
+  .bod-small button{ background:none; border:0; color:var(--accent); font-size:14.5px; padding:6px; }
+  .bod-small button.rojo{ color:#ff3b30; }
+  .bod-ok{ background:#34c759 !important; }`;
+  document.head.appendChild(st);
+}
+
+function buildBodega() {
+  bodegaEstilos();
+  const wrap = document.createElement(&#34;div&#34;);
+  wrap.className = &#34;bod-wrap&#34;;
+  const cat = () =&gt; bodegaCatalogo();
+  let estado = bodegaLoad();
+  let pendiente = null;
+  const ordenModelo = m =&gt; { const i = BODEGA_ORDEN.indexOf(m); return i &lt; 0 ? 99 : i; };
+
+  function pintar() {
+    const c = cat(), n = Object.keys(estado.stock).length;
+    const total = Object.values(estado.stock).reduce((a, b) =&gt; a + b, 0);
+    wrap.innerHTML = `
+      &lt;div class=&#34;reg-heading&#34;&gt;&lt;h2&gt;Bodega&lt;/h2&gt;
+        &lt;p class=&#34;ds-sub&#34;&gt;${n ? `${total} piezas en ${n} códigos${estado.fecha ? &#34; · lista del &#34; + estado.fecha : &#34;&#34;}` : &#34;Todavía no hay existencias guardadas.&#34;}&lt;/p&gt;&lt;/div&gt;
+
+      &lt;div class=&#34;bod-card&#34;&gt;
+        &lt;h3&gt;Actualizar existencias&lt;/h3&gt;
+        &lt;p&gt;Escanea o sube el listado del día. La app lo lee y te dice qué cambió.&lt;/p&gt;
+        &lt;label class=&#34;bod-big&#34;&gt;📄 Escanear / subir foto del listado
+          &lt;input type=&#34;file&#34; accept=&#34;image/*&#34; id=&#34;bodFoto&#34; hidden&gt;&lt;/label&gt;
+        &lt;button class=&#34;bod-big sec&#34; id=&#34;bodVerTexto&#34;&gt;📝 Pegar o escanear texto&lt;/button&gt;
+        &lt;div id=&#34;bodTextoBox&#34; hidden&gt;
+          &lt;p&gt;Toca el cuadro, mantén presionado y elige &lt;b&gt;“Escanear texto”&lt;/b&gt; (icono de cámara) y apunta al papel. Luego toca “Leer texto”.&lt;/p&gt;
+          &lt;textarea class=&#34;bod-txt&#34; id=&#34;bodTexto&#34; placeholder=&#34;Aquí aparece el texto…&#34;&gt;&lt;/textarea&gt;
+          &lt;button class=&#34;bod-big&#34; id=&#34;bodLeerTexto&#34; style=&#34;margin-top:10px&#34;&gt;Leer texto&lt;/button&gt;
+        &lt;/div&gt;
+        &lt;div id=&#34;bodEstado&#34; class=&#34;bod-estado&#34; hidden&gt;&lt;/div&gt;
+        &lt;div id=&#34;bodPreview&#34;&gt;&lt;/div&gt;
+      &lt;/div&gt;`;
+
+    if (n) {
+      const modelos = {};
+      Object.keys(estado.stock).forEach(code =&gt; {
+        const e = c[code] || { modelo: &#34;Código nuevo&#34;, color: &#34;&#34;, capacidad: &#34;&#34; };
+        (modelos[e.modelo] = modelos[e.modelo] || []).push({ code, e, qty: estado.stock[code] });
+      });
+      const box = document.createElement(&#34;div&#34;); box.className = &#34;bod-card&#34;;
+      box.innerHTML = `&lt;h3&gt;Existencias por modelo&lt;/h3&gt;&lt;p&gt;Toca un modelo para ver colores, capacidades y UPC.&lt;/p&gt;`;
+      Object.keys(modelos).sort((a, b) =&gt; ordenModelo(a) - ordenModelo(b) || a.localeCompare(b)).forEach(m =&gt; {
+        const items = modelos[m].sort((a, b) =&gt; parseInt(a.e.capacidad) - parseInt(b.e.capacidad) || a.e.color.localeCompare(b.e.color));
+        const det = document.createElement(&#34;details&#34;); det.className = &#34;bod-model&#34;;
+        det.innerHTML = `&lt;summary&gt;&lt;span&gt;${m}&lt;/span&gt;&lt;b&gt;${items.reduce((s, i) =&gt; s + i.qty, 0)}&lt;/b&gt;&lt;/summary&gt;` +
+          items.map(i =&gt; `&lt;div class=&#34;bod-row&#34;&gt;&lt;div&gt;&lt;strong&gt;${[i.e.color, bodegaCap(i.e.capacidad)].filter(Boolean).join(&#34; · &#34;) || &#34;Sin nombre&#34;}&lt;/strong&gt;&lt;small&gt;UPC ${i.code}&lt;/small&gt;&lt;/div&gt;&lt;b&gt;${i.qty}&lt;/b&gt;&lt;/div&gt;`).join(&#34;&#34;);
+        box.appendChild(det);
+      });
+      wrap.appendChild(box);
+    }
+    if (estado.ultimoReporte) {
+      const u = document.createElement(&#34;div&#34;); u.className = &#34;bod-card&#34;;
+      u.innerHTML = `&lt;h3&gt;Último reporte&lt;/h3&gt;&lt;pre style=&#34;white-space:pre-wrap;font:inherit;font-size:15px;margin:0&#34;&gt;${estado.ultimoReporte.replace(/&lt;/g, &#34;&amp;lt;&#34;)}&lt;/pre&gt;`;
+      wrap.appendChild(u);
+    }
+    const pie = document.createElement(&#34;div&#34;); pie.className = &#34;bod-small&#34;;
+    pie.innerHTML = `&lt;button id=&#34;bodPrueba&#34;&gt;Cargar datos de prueba&lt;/button&gt;&lt;button id=&#34;bodSeed&#34;&gt;Cargar lista del 21-10&lt;/button&gt;&lt;button class=&#34;rojo&#34; id=&#34;bodBorrar&#34;&gt;Borrar todo&lt;/button&gt;`;
+    wrap.appendChild(pie);
+
+    wrap.querySelector(&#34;#bodFoto&#34;).addEventListener(&#34;change&#34;, e =&gt; procesar(e.target.files[0]));
+    wrap.querySelector(&#34;#bodVerTexto&#34;).addEventListener(&#34;click&#34;, () =&gt; { const b = wrap.querySelector(&#34;#bodTextoBox&#34;); b.hidden = !b.hidden; if (!b.hidden) wrap.querySelector(&#34;#bodTexto&#34;).focus(); });
+    wrap.querySelector(&#34;#bodLeerTexto&#34;).addEventListener(&#34;click&#34;, () =&gt; {
+      const t = wrap.querySelector(&#34;#bodTexto&#34;).value, est = wrap.querySelector(&#34;#bodEstado&#34;), prev = wrap.querySelector(&#34;#bodPreview&#34;);
+      const esc = bodegaLeerTexto(t); est.hidden = false; prev.innerHTML = &#34;&#34;;
+      if (!esc.leidos) { est.textContent = &#34;No encontré renglones con código y existencia en ese texto.&#34;; return; }
+      pendiente = { esc }; est.textContent = `Leí ${esc.leidos} códigos.`; mostrarReporte(prev, cat());
+    });
+    const poner = (stock, fecha, msg) =&gt; {
+      if (Object.keys(estado.stock).length &amp;&amp; !confirm(msg)) return;
+      estado = { stock: { ...stock }, fecha, ultimoReporte: null }; bodegaSave(estado); pintar();
+    };
+    wrap.querySelector(&#34;#bodPrueba&#34;).addEventListener(&#34;click&#34;, () =&gt; poner(BODEGA_PRUEBA, &#34;datos de prueba&#34;, &#34;Esto reemplaza tus existencias por datos de prueba (con errores a propósito). ¿Seguir?&#34;));
+    wrap.querySelector(&#34;#bodSeed&#34;).addEventListener(&#34;click&#34;, () =&gt; poner(BODEGA_SEED, &#34;21-10-2026&#34;, &#34;Esto reemplaza tus existencias por la lista del 21-10-2026. ¿Seguir?&#34;));
+    wrap.querySelector(&#34;#bodBorrar&#34;).addEventListener(&#34;click&#34;, () =&gt; {
+      if (!confirm(&#34;¿Borrar todas las existencias de bodega de este teléfono?&#34;)) return;
+      estado = { stock: {}, fecha: &#34;&#34;, ultimoReporte: null }; bodegaSave(estado); pintar();
+    });
+  }
+
+  async function procesar(file) {
+    if (!file) return;
+    const est = wrap.querySelector(&#34;#bodEstado&#34;), prev = wrap.querySelector(&#34;#bodPreview&#34;);
+    est.hidden = false; est.textContent = &#34;Preparando…&#34;;
+    const url = URL.createObjectURL(file);
+    prev.innerHTML = `&lt;div class=&#34;bod-scan&#34;&gt;&lt;img src=&#34;${url}&#34; alt=&#34;&#34;&gt;&lt;div class=&#34;bod-scan-line&#34; id=&#34;bodLinea&#34;&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&#34;bod-bar&#34;&gt;&lt;i id=&#34;bodBarra&#34;&gt;&lt;/i&gt;&lt;/div&gt;`;
+    const linea = prev.querySelector(&#34;#bodLinea&#34;), barra = prev.querySelector(&#34;#bodBarra&#34;);
+    try {
+      const esc = await bodegaEscanear(file, t =&gt; { est.textContent = t; },
+        p =&gt; { barra.style.width = Math.round(p * 100) + &#34;%&#34;; linea.style.top = Math.round(p * 100) + &#34;%&#34;; });
+      barra.style.width = &#34;100%&#34;; linea.style.display = &#34;none&#34;;
+      if (!esc.leidos) { est.textContent = &#34;No logré leer renglones de esa foto. Prueba con “Pegar o escanear texto”, que es más tolerante.&#34;; return; }
+      pendiente = { esc };
+      est.textContent = `Leí ${esc.leidos} códigos${esc.dudosos.length ? ` · ${esc.dudosos.length} dudoso(s)` : &#34;&#34;}.`;
+      mostrarReporte(prev, cat(), true);
+    } catch (e) { est.textContent = &#34;Error: &#34; + (e.message || e); }
+  }
+
+  function mostrarReporte(prev, c, conservar) {
+    const { esc } = pendiente, fecha = esc.fecha;
+    const rep = Object.keys(estado.stock).length ? bodegaComparar(estado.stock, esc.stock, c) : null;
+    const tot = Object.values(esc.stock).reduce((a, b) =&gt; a + b, 0);
+    const texto = rep ? bodegaTextoReporte(rep, fecha) : `Primera captura${fecha ? &#34; · &#34; + fecha : &#34;&#34;}\n${esc.leidos} códigos · ${tot} piezas`;
+    let extra = &#34;&#34;;
+    if (esc.dudosos.length) extra += `&lt;p class=&#34;bod-aviso&#34;&gt;⚠️ No pude confirmar estos renglones y los dejé fuera: ${esc.dudosos.map(d =&gt; `${d.raw} (${d.qty})`).join(&#34;, &#34;)}.&lt;/p&gt;`;
+    if (esc.nuevos.length) extra += `&lt;p class=&#34;bod-aviso&#34;&gt;🆕 Códigos fuera del catálogo:&lt;/p&gt;${esc.nuevos.map(n =&gt; `&lt;button class=&#34;bod-big sec bod-nombrar&#34; data-c=&#34;${n}&#34;&gt;${n} — Poner nombre&lt;/button&gt;`).join(&#34;&#34;)}`;
+    const html = `&lt;div class=&#34;bod-reporte&#34;&gt;&lt;h3&gt;Cambios detectados&lt;/h3&gt;&lt;pre&gt;${texto.replace(/&lt;/g, &#34;&amp;lt;&#34;)}&lt;/pre&gt;${extra}
+      &lt;button class=&#34;bod-big bod-ok&#34; id=&#34;bodAplicar&#34;&gt;✓ Aplicar cambios&lt;/button&gt;
+      &lt;button class=&#34;bod-big sec&#34; id=&#34;bodCopiar&#34;&gt;Copiar reporte&lt;/button&gt;
+      &lt;button class=&#34;bod-big sec&#34; id=&#34;bodCancelar&#34;&gt;Descartar&lt;/button&gt;&lt;/div&gt;`;
+    if (!conservar) prev.innerHTML = &#34;&#34;;
+    prev.insertAdjacentHTML(&#34;beforeend&#34;, html);
+    prev.querySelectorAll(&#34;.bod-nombrar&#34;).forEach(b =&gt; b.addEventListener(&#34;click&#34;, () =&gt; {
+      const code = b.dataset.c, n = prompt(&#34;Nombre (ej. iPhone 18 Pro Max Naranja 512GB):&#34;, &#34;&#34;);
+      if (!n) return;
+      const ex = bodegaExtra(); ex[code] = { modelo: n, color: &#34;&#34;, capacidad: &#34;&#34; };
+      try { localStorage.setItem(BODEGA_EXTRA_KEY, JSON.stringify(ex)); } catch (e) {}
+      b.textContent = code + &#34; — &#34; + n; b.disabled = true;
+    }));
+    prev.querySelector(&#34;#bodCopiar&#34;).addEventListener(&#34;click&#34;, () =&gt; { navigator.clipboard &amp;&amp; navigator.clipboard.writeText(texto); });
+    prev.querySelector(&#34;#bodCancelar&#34;).addEventListener(&#34;click&#34;, () =&gt; { pendiente = null; pintar(); });
+    prev.querySelector(&#34;#bodAplicar&#34;).addEventListener(&#34;click&#34;, () =&gt; {
+      estado = { stock: esc.stock, fecha: fecha || estado.fecha, ultimoReporte: texto };
+      bodegaSave(estado); pendiente = null; pintar();
+    });
+  }
+
+  pintar();
+  return wrap;
+}
+
+if (typeof module !== &#34;undefined&#34;) module.exports = { bodegaFilasDeTexto, bodegaLeerTexto, bodegaResolver, bodegaRenglones, bodegaLeerRenglon, bodegaComparar, bodegaTextoReporte, bodegaUpcOk, bodegaFecha };
+</code></pre>
+
+</body></html>
