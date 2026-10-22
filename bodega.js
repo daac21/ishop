@@ -218,13 +218,32 @@ function bodegaCargarImagen(file) {
     img.src = url;
   });
 }
+/* Si el papel es claro y hay franjas casi negras en las orillas, las recorta. Devuelve null si no hay nada que quitar */
+function bodegaQuitarBordes(ctx, w, h) {
+  const px = ctx.getImageData(0, 0, w, h).data, col = new Float64Array(w), fil = new Float64Array(h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = (y*w+x)*4, v = px[i]*0.299 + px[i+1]*0.587 + px[i+2]*0.114; col[x] += v; fil[y] += v; }
+  for (let x = 0; x < w; x++) col[x] /= h; for (let y = 0; y < h; y++) fil[y] /= w;
+  const N = 40; let x0 = 0, x1 = w, y0 = 0, y1 = h;
+  while (x0 < w && col[x0] < N) x0++; while (x1 > x0 && col[x1-1] < N) x1--;
+  while (y0 < h && fil[y0] < N) y0++; while (y1 > y0 && fil[y1-1] < N) y1--;
+  const cw = x1 - x0, ch = y1 - y0;
+  if (cw < w * 0.3 || ch < h * 0.3 || (x0 === 0 && x1 === w && y0 === 0 && y1 === h)) return null;
+  let suma = 0, n = 0; for (let x = x0; x < x1; x++) { suma += col[x]; n++; }
+  if (suma / n < 110) return null;   // el resto también es oscuro: es una pantalla, no se recorta
+  const cv = document.createElement("canvas"); cv.width = cw; cv.height = ch;
+  const c2 = cv.getContext("2d", { willReadFrequently: true });
+  c2.drawImage(ctx.canvas, x0, y0, cw, ch, 0, 0, cw, ch);
+  return { cv, ctx: c2, w: cw, h: ch };
+}
 function bodegaBase(img) {
   const W0 = img.naturalWidth, H0 = img.naturalHeight;
   const esc = W0 > 1700 ? 1700 / W0 : W0 < 1200 ? Math.min(2, 1200 / W0) : 1;
-  const w = Math.round(W0 * esc), h = Math.round(H0 * esc);
-  const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
-  const ctx = cv.getContext("2d", { willReadFrequently: true });
+  let w = Math.round(W0 * esc), h = Math.round(H0 * esc);
+  let cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+  let ctx = cv.getContext("2d", { willReadFrequently: true });
   ctx.imageSmoothingQuality = "high"; ctx.drawImage(img, 0, 0, w, h);
+  { const r = bodegaQuitarBordes(ctx, w, h);   // franjas negras (capturas / fotos con borde) confunden al lector
+    if (r) { cv = r.cv; ctx = r.ctx; w = r.w; h = r.h; } }
   const im = ctx.getImageData(0, 0, w, h), px = im.data, g = new Uint8ClampedArray(w * h);
   let suma = 0;
   for (let i = 0; i < w * h; i++) { const v = px[i*4] * 0.299 + px[i*4+1] * 0.587 + px[i*4+2] * 0.114; g[i] = v; suma += v; }
@@ -456,7 +475,7 @@ async function bodegaEscanear(file, onEstado, onProg) {
   const listas = []; let fecha = "";
   const intentos = [{ norm: false, psm: "6" }, { norm: false, psm: "4" }, { norm: true, psm: "6" }, { norm: true, psm: "4" }];
   for (let i = 0; i < intentos.length; i++) {
-    if (i >= 2 && bodegaUnirFilas(listas).length >= 3) break;
+    if (i >= 2 && bodegaUnirFilas(listas).length >= 12) break;
     const it = intentos[i];
     onEstado(i === 0 ? "Buscando los renglones…" : "Buscando con otro ajuste…");
     const cv = it.norm ? bodegaNormalizar(base).cv : base.cv;
