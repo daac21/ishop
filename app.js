@@ -507,6 +507,8 @@ function buildScreen(entry) {
     el.appendChild(buildRegistros());
   } else if (entry.screen === "bodega") {
     el.appendChild(buildBodega());
+  } else if (entry.screen === "existencias") {
+    el.appendChild(buildExistencias());
   } else if (entry.screen === "docs") {
     el.appendChild(buildDocs());
   } else if (entry.screen === "docsFotos") {
@@ -562,7 +564,26 @@ function buildHome() {
       <span class="home-tile-icon">${ISHOP_ICONS[item.id] || ""}</span>
       <span class="home-tile-label">${item.label}</span>
       <span class="home-tile-chev"></span>`;
-    tile.addEventListener("click", () => handleMenuClick(item));
+    if (item.id === "cajas") {
+      // Toque normal → Código cajas. Mantener presionado 1 s → Existencias (oculto)
+      let t = null, largo = false;
+      tile.addEventListener("pointerdown", (e) => {
+        if (e.pointerType === "mouse" && e.button !== 0) return;
+        largo = false;
+        t = setTimeout(async () => {
+          largo = true;
+          if (navigator.vibrate) navigator.vibrate(15);
+          if (!ESCANER_DATA) await dataReady;
+          navigate({ screen: "existencias", title: "Existencias" });
+        }, 1000);
+      });
+      ["pointerup", "pointerleave", "pointercancel"].forEach(ev => tile.addEventListener(ev, () => clearTimeout(t)));
+      tile.addEventListener("contextmenu", (e) => e.preventDefault());
+      tile.addEventListener("click", (e) => { if (largo) { largo = false; e.preventDefault(); return; } handleMenuClick(item); });
+      tile.style.webkitTouchCallout = "none"; tile.style.webkitUserSelect = "none"; tile.style.userSelect = "none";
+    } else {
+      tile.addEventListener("click", () => handleMenuClick(item));
+    }
     grid.appendChild(tile);
   });
   wrap.appendChild(grid);
