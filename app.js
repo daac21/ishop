@@ -53,10 +53,10 @@ const ISHOP_ICONS = (() => {
     switchup:  s(`<path d="M19.5 11a7.5 7.5 0 0 0-13-4.6L4.5 8.5"/><path d="M4.5 4v4.5H9"/><path d="M4.5 13a7.5 7.5 0 0 0 13 4.6l2-2.1"/><path d="M19.5 20v-4.5H15"/>`),
     applecare: s(`<path d="M12 2.8 4.5 5.6v5.6c0 4.5 3.1 8.2 7.5 9.9 4.4-1.7 7.5-5.4 7.5-9.9V5.6L12 2.8z"/>`),
     forlife:   s(`<rect x="5" y="3" width="11" height="18" rx="2.4"/><path d="M8.5 5.6h4"/><path d="M19.5 3.5v5M17 6h5"/>`),
-    getac:     s(`<path d="M6 2.8h8.5L19 7.3V20a1.2 1.2 0 0 1-1.2 1.2H6A1.2 1.2 0 0 1 4.8 20V4A1.2 1.2 0 0 1 6 2.8z"/><path d="M14 3v4.5h4.5"/><path d="M8 12h8M8 15.5h8M8 8.8h3"/>`),
+    getac:     s(`<rect x="5" y="3" width="11" height="18" rx="2.4"/><path d="M8.5 5.6h4"/><path d="M19.5 3.5v5M17 6h5"/>`),
     cubre:     s(`<path d="M12 2.8 4.5 5.6v5.6c0 4.5 3.1 8.2 7.5 9.9 4.4-1.7 7.5-5.4 7.5-9.9V5.6L12 2.8z"/><path d="m9 12 2.2 2.2L15.5 10"/>`),
     scanner:   s(`<path d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16"/><rect x="8.5" y="8.5" width="7" height="7" rx="1.2"/>`),
-    cajas:     s(`<path d="M12 2.8 20 7v10l-8 4.2L4 17V7l8-4.2z"/><path d="M4 7l8 4.2L20 7M12 11.2v10"/>`),
+    cajas:     s(`<path d="M3.5 6.5v11M6.5 6.5v11M9.5 6.5v11M13 6.5v11M16 6.5v11M18.5 6.5v11M20.8 6.5v11"/><path d="M9.5 6.5v11" stroke-width="3"/><path d="M16 6.5v11" stroke-width="3"/>`),
     registros: s(`<rect x="3.5" y="4" width="17" height="16" rx="3"/><path d="M10 9h7M10 12.5h7M10 16h7"/><circle cx="7" cy="9" r=".6" fill="currentColor"/><circle cx="7" cy="12.5" r=".6" fill="currentColor"/><circle cx="7" cy="16" r=".6" fill="currentColor"/>`),
     coins:     s(`<ellipse cx="12" cy="6.5" rx="7" ry="3"/><path d="M5 6.5v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5"/><path d="M5 11.5v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5"/>`),
     tag:       s(`<path d="M20.5 12.6 12.6 20.5a1.6 1.6 0 0 1-2.3 0L3.5 13.7V3.5h10.2l6.8 6.8a1.6 1.6 0 0 1 0 2.3z"/><circle cx="8" cy="8" r="1.3"/>`),
@@ -66,14 +66,14 @@ const ISHOP_ICONS = (() => {
 
 // ---- Definición del menú principal ----
 const MENU = [
-  { id: "tradein",   label: "Trade In",       c1: "#1c3590", c2: "#2f58d6" },
-  { id: "switchup",  label: "Switch Up",      c1: "#7d4a1c", c2: "#c47f35" },
-  { id: "applecare", label: "AppleCare+",     c1: "#1b5f43", c2: "#2f9266" },
-  { id: "forlife",   label: "For Life + AC",  c1: "#43288f", c2: "#6a45d8" },
-  { id: "getac",     label: "GET + AC",       c1: "#7e2a4f", c2: "#c14577" },
-  { id: "cubre",     label: "¿Qué cubre?",    c1: "#155a68", c2: "#2a8fa3" },
-  { id: "scanner",   label: "Escáner",        c1: "#262d3c", c2: "#4a566f" },
-  { id: "cajas",     label: "Código cajas",   c1: "#5e4420", c2: "#a9803a" },
+  { id: "tradein",   label: "Trade In",       c1: "#5183e5", c2: "#4247d5" },
+  { id: "switchup",  label: "Switch Up",      c1: "#f6a850", c2: "#e8645e" },
+  { id: "applecare", label: "AppleCare+",     c1: "#65c58d", c2: "#3b8e7c" },
+  { id: "forlife",   label: "For Life + AC",  c1: "#7e61e6", c2: "#5642b9" },
+  { id: "getac",     label: "GET + AC",       c1: "#e96390", c2: "#c84172" },
+  { id: "cubre",     label: "¿Qué cubre?",    c1: "#6dbece", c2: "#4997ae" },
+  { id: "scanner",   label: "Escáner",        c1: "#747c8d", c2: "#3a404f" },
+  { id: "cajas",     label: "Código cajas",   c1: "#d6a76e", c2: "#a8703b" },
 ];
 
 // ---- iShop Arcade (oculto: se abre manteniendo presionado el nombre "iShop Tools") ----
@@ -1181,16 +1181,9 @@ function buildCajasModels(category) {
   const models = (CODIGOS_CAJAS && CODIGOS_CAJAS[category]) || [];
   const list = document.createElement("div");
   list.className = "sub-list";
-  models.forEach(m => {
-    const btn = document.createElement("button");
-    btn.className = "sub-btn";
-    btn.innerHTML = `<span>${m.modelo}</span><span class="chev"></span>`;
-    btn.addEventListener("click", () => {
-      navigate({ screen: "cajasDetail", category, modelo: m.modelo, title: m.modelo });
-    });
-    list.appendChild(btn);
-  });
-  wrap.appendChild(list);
+  buildModelPicker(category, models.map(m => m.modelo), wrap, (modelo) => {
+    navigate({ screen: "cajasDetail", category, modelo, title: modeloNombre(modelo) });
+  }, { titulo: category });
   return wrap;
 }
 
@@ -1436,6 +1429,7 @@ function modeloNombre(key) { return normalizarClave(String(key).replace(/ /g, "
 
 function modeloGrupo(cat, key) {
   const n = modeloNombre(key);
+  if (cat === "Otro") return { id: "_", titulo: "Modelos", orden: 0, chip: "Todos" };
   if (cat === "iPhone") {
     const t = n.replace(/^iPhone\s+/i, "").split(" ")[0] || "";
     if (/^SE/i.test(t)) return { id: "SE", titulo: "iPhone SE", orden: 0, chip: "SE" };
@@ -1468,7 +1462,7 @@ function modeloColor(cat, g, key) {
   return c;
 }
 
-function modeloThumb(cat, key, g) {
+function modeloThumb(cat, key, g, raw) {
   const vis = TRADEIN_VISUAL && TRADEIN_VISUAL._modelos && (TRADEIN_VISUAL._modelos[key] || TRADEIN_VISUAL._modelos[modeloNombre(key)]);
   if (vis && vis.imagen) return `<img class="mp-img" src="${vis.imagen}" alt="" loading="lazy">`;
   const c = modeloColor(cat, g, key);
@@ -1486,6 +1480,8 @@ function modeloThumb(cat, key, g) {
     body = `<svg viewBox="0 0 48 64"><rect x="3" y="3" width="42" height="58" rx="6" fill="#1c1c1e"/><rect x="6" y="6" width="36" height="52" rx="3" fill="${c}"/><rect x="6" y="6" width="36" height="52" rx="3" fill="#fff" fill-opacity=".18"/></svg>`;
   } else if (cat === "Apple Watch") {
     body = `<svg viewBox="0 0 40 64"><rect x="10" y="2" width="20" height="14" rx="4" fill="${c}" fill-opacity=".7"/><rect x="10" y="48" width="20" height="14" rx="4" fill="${c}" fill-opacity=".7"/><rect x="5" y="14" width="30" height="36" rx="9" fill="${c}"/><rect x="8.5" y="17.5" width="23" height="29" rx="6" fill="#1c1c1e"/><rect x="35" y="26" width="2.6" height="7" rx="1.3" fill="${c}"/></svg>`;
+  } else if (cat === "Otro") {
+    const ic0 = dsIconFor(key); return `<span class="mp-draw mp-glyph">${ic0 === DS_ICONS.box ? dsIconFor(raw) : ic0}</span>`;
   } else {
     body = `<svg viewBox="0 0 64 44"><rect x="9" y="4" width="46" height="29" rx="3" fill="#1c1c1e"/><rect x="11" y="6" width="42" height="25" rx="1.5" fill="${c}"/><path d="M3 35h58l-3 5H6z" fill="${c}"/><path d="M3 35h58l-.6 1.2H3.6z" fill="#fff" fill-opacity=".4"/></svg>`;
   }
@@ -1505,13 +1501,32 @@ function tradeGuardarReciente(cat, key) {
 }
 
 function buildTradeModelPicker(path, node, wrap) {
-  const cat = path[0];
-  const keys = Object.keys(node);
+  buildModelPicker(path[0], Object.keys(node), wrap, (key) => {
+    navigate({ screen: "tradeNode", path: [...path, key], title: modeloNombre(key) });
+  }, { recents: true });
+}
+
+// Categoría "visual" a partir del nombre (iPhone, iPad, Watch, Mac u otra).
+function mpCat(c) {
+  const t = String(c || "").toLowerCase();
+  if (/iphone/.test(t)) return "iPhone";
+  if (/ipad/.test(t)) return "iPad";
+  if (/watch/.test(t)) return "Apple Watch";
+  if (/mac/.test(t)) return "Mac";
+  return "Otro";
+}
+
+// Selector de modelos con imagen del equipo: se usa en Trade In, AppleCare+, For Life, GET, Switch Up y Código cajas.
+// keys = nombres tal como vienen en los JSON; onPick(key) recibe la clave original.
+function buildModelPicker(catRaw, keys, wrap, onPick, opts) {
+  opts = opts || {};
+  const cat = mpCat(catRaw);
 
   // Agrupar por generación / línea
   const groups = new Map();
   keys.forEach(key => {
     const g = modeloGrupo(cat, key);
+    if (cat === "Otro") g.titulo = opts.titulo || String(catRaw || "Modelos");
     if (!groups.has(g.id)) groups.set(g.id, Object.assign({ keys: [] }, g));
     groups.get(g.id).keys.push(key);
   });
@@ -1530,11 +1545,11 @@ function buildTradeModelPicker(path, node, wrap) {
   function modelRow(key, g) {
     const row = document.createElement("button");
     row.className = "mp-row";
-    row.innerHTML = `<span class="mp-thumb">${modeloThumb(cat, key, g)}</span><span class="mp-name"></span><span class="mp-chev"></span>`;
+    row.innerHTML = `<span class="mp-thumb">${modeloThumb(cat, key, g, catRaw)}</span><span class="mp-name"></span><span class="mp-chev"></span>`;
     row.querySelector(".mp-name").textContent = modeloNombre(key);
     row.addEventListener("click", () => {
-      tradeGuardarReciente(cat, key);
-      navigate({ screen: "tradeNode", path: [...path, key], title: modeloNombre(key) });
+      if (opts.recents) tradeGuardarReciente(cat, key);
+      onPick(key);
     });
     return row;
   }
@@ -1560,7 +1575,7 @@ function buildTradeModelPicker(path, node, wrap) {
   function paint() {
     chips.querySelectorAll(".mp-chip").forEach(b => b.classList.toggle("on", b.dataset.f === filtro));
     body.innerHTML = "";
-    if (filtro === "Todos") {
+    if (filtro === "Todos" && opts.recents) {
       const rec = tradeRecientes(cat).filter(r => keys.includes(r.key)).slice(0, 3);
       if (rec.length) {
         const clock = `<span class="mp-clock"><svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>`;
@@ -1581,7 +1596,8 @@ function buildTradeModelPicker(path, node, wrap) {
     chips.appendChild(b);
   });
 
-  wrap.append(chips, body);
+  if (ordered.length > 1) wrap.appendChild(chips);
+  wrap.appendChild(body);
   paint();
 }
 
@@ -1624,6 +1640,11 @@ function buildQuoteSelectNew(path, tradeIn) {
       });
       list.appendChild(btn);
     });
+  } else if (path.length === 0) {
+    buildModelPicker("iPhone", filteredModelKeys(node, path), wrap, (key) => {
+      navigate({ screen: "quoteSelectNew", path: [...path, key], tradeIn, title: modeloNombre(key) });
+    });
+    return wrap;
   } else {
     filteredModelKeys(node, path).forEach(key => {
       const btn = document.createElement("button");
@@ -1790,6 +1811,11 @@ function buildSwitchSelect(path) {
       });
       list.appendChild(btn);
     });
+  } else if (path.length === 0) {
+    buildModelPicker("iPhone", filteredModelKeys(node, path), wrap, (key) => {
+      navigate({ screen: "switchSelect", path: [...path, key], title: modeloNombre(key) });
+    });
+    return wrap;
   } else {
     filteredModelKeys(node, path).forEach(key => {
       const btn = document.createElement("button");
@@ -1870,23 +1896,14 @@ function buildAcModels(category) {
   wrap.appendChild(heading);
 
   const models = APPLECARE_INFO?.[category] || {};
-  const list = document.createElement("div");
-  list.className = "sub-list";
-  Object.keys(models).forEach(model => {
-    const btn = document.createElement("button");
-    btn.className = "sub-btn";
-    btn.innerHTML = `<span>${model}</span><span class="chev"></span>`;
-    btn.addEventListener("click", () => {
-      const variants = Object.keys(models[model]);
-      if (variants.length === 1) {
-        navigate({ screen: "acDetail", category, model, variant: variants[0], title: model });
-      } else {
-        navigate({ screen: "acVariants", category, model, title: model });
-      }
-    });
-    list.appendChild(btn);
-  });
-  wrap.appendChild(list);
+  buildModelPicker(category, Object.keys(models), wrap, (model) => {
+    const variants = Object.keys(models[model]);
+    if (variants.length === 1) {
+      navigate({ screen: "acDetail", category, model, variant: variants[0], title: modeloNombre(model) });
+    } else {
+      navigate({ screen: "acVariants", category, model, title: modeloNombre(model) });
+    }
+  }, { titulo: category });
   return wrap;
 }
 
@@ -2082,7 +2099,17 @@ function setupRepairTrigger(el, onOpen) {
     if (timer && Math.hypot(e.clientX - sx, e.clientY - sy) > 10) cancel();
   });
   ["pointerup", "pointerleave", "pointercancel"].forEach(t => el.addEventListener(t, cancel));
-  el.addEventListener("contextmenu", (e) => e.preventDefault());
+  // En algunos celulares (Android) la pulsación larga dispara "contextmenu" antes de que termine el
+  // temporizador: se usa también como disparador para que el menú secreto siempre abra.
+  el.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    if (timer) {
+      cancel();
+      if (navigator.vibrate) navigator.vibrate(15);
+      onOpen();
+    }
+  });
+  el.addEventListener("touchstart", () => {}, { passive: true });
 }
 
 // Algunos modelos usan otros nombres en los datos (p. ej. iPhone Duo): se acepta una lista de nombres posibles.
@@ -3692,16 +3719,9 @@ function buildFinanceSelect(path, planType) {
       wrap.appendChild(buildPlaceholder("Sin datos", "💳", "Aún no hay planes cargados en datos/financiamiento.json."));
       return wrap;
     }
-    models.forEach(model => {
-      const btn = document.createElement("button");
-      btn.className = "sub-btn";
-      btn.innerHTML = `<span>${model}</span><span class="chev"></span>`;
-      btn.addEventListener("click", () => {
-        navigate({ screen: "financeSelect", path: [model], planType, title: model });
-      });
-      list.appendChild(btn);
+    buildModelPicker("iPhone", models, wrap, (model) => {
+      navigate({ screen: "financeSelect", path: [model], planType, title: modeloNombre(model) });
     });
-    wrap.appendChild(list);
     return wrap;
   }
 
