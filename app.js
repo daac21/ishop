@@ -505,6 +505,8 @@ function buildScreen(entry) {
     el.appendChild(buildSettings(entry));
   } else if (entry.screen === "registros") {
     el.appendChild(buildRegistros());
+  } else if (entry.screen === "bodega") {
+    el.appendChild(buildBodega());
   } else if (entry.screen === "docs") {
     el.appendChild(buildDocs());
   } else if (entry.screen === "docsFotos") {
@@ -571,7 +573,24 @@ function buildHome() {
     <span class="home-reg-icon">${ISHOP_ICONS.registros}</span>
     <span class="home-reg-text"><strong>Registros</strong><small>Ver y crear registros</small></span>
     <span class="home-tile-chev"></span>`;
-  reg.addEventListener("click", () => navigate({ screen: "registros", title: "Registros" }));
+  // Toque normal → Registros. Mantener presionado 1 s → Bodega (oculto)
+  let regTimer = null, regLargo = false;
+  const regCancel = () => clearTimeout(regTimer);
+  reg.addEventListener("pointerdown", (e) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    regLargo = false;
+    regTimer = setTimeout(() => {
+      regLargo = true;
+      if (navigator.vibrate) navigator.vibrate(15);
+      navigate({ screen: "bodega", title: "Bodega" });
+    }, 1000);
+  });
+  ["pointerup", "pointerleave", "pointercancel"].forEach(ev => reg.addEventListener(ev, regCancel));
+  reg.addEventListener("contextmenu", (e) => e.preventDefault());
+  reg.addEventListener("click", (e) => {
+    if (regLargo) { regLargo = false; e.preventDefault(); return; }
+    navigate({ screen: "registros", title: "Registros" });
+  });
   wrap.appendChild(reg);
 
   async function handleMenuClick(item) {
