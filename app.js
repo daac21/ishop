@@ -507,6 +507,14 @@ function buildScreen(entry) {
     el.appendChild(buildRegistros());
   } else if (entry.screen === "bodega") {
     el.appendChild(buildBodega());
+  } else if (entry.screen === "bodegaManual") {
+    el.appendChild(buildBodegaManual());
+  } else if (entry.screen === "bodegaNoVend") {
+    el.appendChild(buildBodegaNoVend());
+  } else if (entry.screen === "bodegaHist") {
+    el.appendChild(buildBodegaHist());
+  } else if (entry.screen === "bodegaDetalle") {
+    el.appendChild(buildBodegaDetalle(entry.ts));
   } else if (entry.screen === "existencias") {
     el.appendChild(buildExistencias());
   } else if (entry.screen === "docs") {

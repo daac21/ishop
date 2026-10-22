@@ -44,8 +44,8 @@ function bodegaNombre(cat, code) {
 
 /* ---------- Guardado ---------- */
 function bodegaLoad() {
-  try { const d = JSON.parse(localStorage.getItem(BODEGA_KEY)); if (d && d.stock) return d; } catch (e) {}
-  return { stock: {}, fecha: "", ultimoReporte: null };
+  try { const d = JSON.parse(localStorage.getItem(BODEGA_KEY)); if (d && d.stock) { if (!Array.isArray(d.historial)) d.historial = []; return d; } } catch (e) {}
+  return { stock: {}, fecha: "", ultimoReporte: null, historial: [] };
 }
 function bodegaSave(d) { try { localStorage.setItem(BODEGA_KEY, JSON.stringify(d)); } catch (e) {} }
 
@@ -277,82 +277,377 @@ async function bodegaEscanear(file, onEstado, onProg) {
   return mejor;
 }
 
-/* ---------- Pantalla ---------- */
+/* =====================================================================
+   REPORTES CON DETALLE, EQUIPOS NO VENDIBLES Y APARTADOS
+   (el escaneo de arriba no se toca; esto solo guarda y muestra los cambios)
+   ===================================================================== */
+const BODEGA_NV_KEY = "ishop_bodega_nv_v1";
+const BODEGA_TIPOS = [
+  { id: "DOA", color: "#ff453a" },
+  { id: "Dañado", color: "#ff9f0a" },
+  { id: "No vendible", color: "#bf5af2" },
+  { id: "Apartado", color: "#0a84ff" },
+];
+const BX_ICON = {
+  cam: '<svg viewBox="0 0 24 24"><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.2l1.2-1.8h6.2L16.3 6h1.2A2.5 2.5 0 0 1 20 8.5v8a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5z"/><circle cx="12" cy="12.5" r="3.4"/></svg>',
+  doc: '<svg viewBox="0 0 24 24"><path d="M7 3.5h7l4 4v13H7z"/><path d="M14 3.5v4h4M9.5 12h5M9.5 15.5h5"/></svg>',
+  pen: '<svg viewBox="0 0 24 24"><path d="M4 20l1-4L16.5 4.5a2 2 0 0 1 3 3L8 19z"/><path d="M14.5 6.5l3 3"/></svg>',
+  warn: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.4v.1"/></svg>',
+  clock: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2"/></svg>',
+  chev: '<svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>',
+  arrow: '<svg viewBox="0 0 24 24"><path d="M4 12h15M14 7l5 5-5 5"/></svg>',
+  mark: '<svg viewBox="0 0 24 24"><path d="M7 4h10v16l-5-3.5L7 20z"/></svg>',
+  trash: '<svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V4.5h4V7M7 7l1 13h8l1-13M10.5 11v5.5M13.5 11v5.5"/></svg>',
+  search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>',
+};
+
+function bodegaEsc(t) { return String(t == null ? "" : t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+function bodegaColor(nombre) { return typeof exColor === "function" ? exColor(nombre) : "#c7c7cc"; }
+function bodegaCapTxt(c) { c = String(c || "").trim(); return !c ? "" : /^\d+$/.test(c) ? c + " GB" : c.replace(/\s*gb$/i, " GB").replace(/\s*tb$/i, " TB"); }
+function bodegaCapNum(c) { const m = String(c || "").match(/(\d+)\s*(tb|gb)?/i); return !m ? 0 : /tb/i.test(m[2] || "") ? +m[1] * 1000 : +m[1]; }
+function bodegaOrdenModelo(m) { const i = BODEGA_ORDEN.indexOf(m); return i < 0 ? 99 : i; }
+
+/* Equipos no vendibles / apartados (se guardan solo en este teléfono) */
+function bodegaNV() { try { const a = JSON.parse(localStorage.getItem(BODEGA_NV_KEY)); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+function bodegaNVSave(a) { try { localStorage.setItem(BODEGA_NV_KEY, JSON.stringify(a)); } catch (e) {} }
+function bodegaApartados() {
+  const o = {};
+  bodegaNV().forEach(r => { if (r.tipo === "Apartado") o[r.code] = (o[r.code] || 0) + (+r.qty || 0); });
+  return o;
+}
+
+/* Catálogo de TODOS los productos (iPhone, iPad, Mac…) + códigos nuevos que ya tengan existencia */
+function bodegaCatalogoTodo(stock) {
+  const out = {};
+  if (typeof exCatalogo === "function") { const b = exCatalogo(); Object.keys(b).forEach(k => { out[k] = b[k]; }); }
+  else { const c = bodegaCatalogo(); Object.keys(c).forEach(k => { out[k] = { ...c[k], seccion: "iPhone" }; }); }
+  Object.keys(stock || {}).forEach(k => { if (!out[k]) out[k] = { modelo: "Código nuevo", color: "", capacidad: "", seccion: "Otros" }; });
+  return out;
+}
+
+/* Al aplicar un escaneo: lo que ya estaba capturado a mano de otros productos (iPad, Mac…) se conserva */
+function bodegaMezclar(prev, escaneado) {
+  const out = { ...escaneado }, esc = (typeof ESCANER_DATA !== "undefined" && ESCANER_DATA) || {};
+  Object.keys(prev || {}).forEach(c => {
+    if (c in out) return;
+    if (esc[c] && !/^iPhone/i.test(esc[c].modelo || "")) out[c] = prev[c];
+  });
+  return out;
+}
+
+/* ---------- Detalle de un reporte ---------- */
+/* items = cambios + los demás colores del mismo modelo (para verlos en contexto) */
+function bodegaItems(prev, nuevo, cat) {
+  const modelo = c => (cat[c] && cat[c].modelo) || "Código nuevo";
+  const todos = new Set([...Object.keys(prev), ...Object.keys(nuevo)]);
+  const modelos = new Set();
+  todos.forEach(c => { if ((prev[c] || 0) !== (nuevo[c] || 0)) modelos.add(modelo(c)); });
+  const items = [];
+  todos.forEach(c => {
+    const a = prev[c] || 0, b = nuevo[c] || 0;
+    if (a === b) { if (a > 0 && modelos.has(modelo(c))) items.push({ code: c, antes: a, ahora: b, e: "" }); return; }
+    items.push({ code: c, antes: a, ahora: b, e: !(c in prev) ? "n" : !(c in nuevo) ? "q" : "" });
+  });
+  return items;
+}
+function bodegaGrupos(items, cat, filtro) {
+  const por = {};
+  items.filter(filtro || (() => true)).forEach(it => {
+    const e = cat[it.code] || { modelo: "Código nuevo", color: "", capacidad: "" };
+    (por[e.modelo] = por[e.modelo] || []).push({ ...it, color: e.color || "", cap: e.capacidad || "" });
+  });
+  return Object.keys(por).map(m => {
+    const filas = por[m].sort((a, b) => bodegaCapNum(a.cap) - bodegaCapNum(b.cap) || a.color.localeCompare(b.color));
+    const antes = filas.reduce((s, f) => s + f.antes, 0), ahora = filas.reduce((s, f) => s + f.ahora, 0);
+    return { modelo: m, filas, antes, ahora, dif: ahora - antes };
+  }).sort((a, b) => Math.abs(b.dif) - Math.abs(a.dif) || bodegaOrdenModelo(a.modelo) - bodegaOrdenModelo(b.modelo) || a.modelo.localeCompare(b.modelo));
+}
+function bodegaRegistrar(estado, prev, nuevo, cat, origen, fecha) {
+  const items = bodegaItems(prev, nuevo, cat);
+  const hist = (estado.historial || []).slice();
+  if (items.some(i => i.antes !== i.ahora)) hist.unshift({ ts: Date.now(), fecha: fecha || "", origen, items });
+  return hist.slice(0, 100);
+}
+function bodegaResumen(items) {
+  const r = { cambios: 0, nuevos: 0, quitados: 0, antes: 0, ahora: 0 };
+  items.forEach(i => {
+    if (i.antes === i.ahora) return;
+    r.cambios++; if (i.e === "n") r.nuevos++; if (i.e === "q") r.quitados++;
+    r.antes += i.antes; r.ahora += i.ahora;
+  });
+  return r;
+}
+function bodegaFechaHora(ts) {
+  const d = new Date(ts), hoy = new Date();
+  const ini = x => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const dd = Math.round((ini(hoy) - ini(d)) / 864e5);
+  let h = d.getHours(); const m = String(d.getMinutes()).padStart(2, "0"), ap = h >= 12 ? "p.m." : "a.m."; h = h % 12 || 12;
+  const meses = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+  const dia = dd === 0 ? "Hoy" : dd === 1 ? "Ayer" : `${d.getDate()} ${meses[d.getMonth()]}${d.getFullYear() !== hoy.getFullYear() ? " " + d.getFullYear() : ""}`;
+  return `${dia}, ${h}:${m} ${ap}`;
+}
+
+/* ---------- Piezas HTML (mismos renglones en todas las pantallas) ---------- */
+function bodegaPill(n) {
+  n = +n || 0;
+  if (n <= 0) return `<span class="bx-q zero">0</span>`;
+  if (n <= 3) return `<span class="bx-q low">${n}<small>POCAS</small></span>`;
+  return `<span class="bx-q ok">${n}</span>`;
+}
+function bodegaFilaHtml(f) {
+  const dif = f.ahora - f.antes;
+  const cambio = f.e === "n" ? `<span class="bx-tag nuevo">Nuevo</span>`
+    : f.e === "q" ? `<span class="bx-tag quit">Quitado</span>`
+    : !dif ? `<span class="bx-sin">Sin cambio</span>`
+    : `<b class="bx-dif ${dif > 0 ? "up" : "down"}">${dif > 0 ? "+" : "−"}${Math.abs(dif)}</b>`;
+  const cap = bodegaCapTxt(f.cap);
+  return `<div class="bx-r">
+    <div class="bx-c1"><i class="bx-dot" style="background:${bodegaColor(f.color)}"></i><span>${bodegaEsc(f.color || "UPC " + f.code)}</span></div>
+    <div class="bx-cp">${cap ? `<span>${bodegaEsc(cap)}</span>` : ""}</div>
+    <div class="bx-n">${bodegaPill(f.antes)}</div>
+    <div class="bx-n">${bodegaPill(f.ahora)}</div>
+    <div class="bx-c5">${cambio}</div></div>`;
+}
+function bodegaGrupoHtml(g) {
+  const d = g.dif;
+  return `<div class="bx-g">
+    <div class="bx-gh"><strong>${bodegaEsc(g.modelo)}</strong>
+      <div class="bx-gs">
+        <div class="bx-gb"><small>Antes</small>${bodegaPill(g.antes)}</div>
+        <span class="bx-ar">${BX_ICON.arrow}</span>
+        <div class="bx-gb"><small>Ahora</small>${bodegaPill(g.ahora)}</div>
+        <div class="bx-gd ${d > 0 ? "up" : d < 0 ? "down" : ""}">${d > 0 ? "+" : d < 0 ? "−" : ""}${Math.abs(d)}<small>pieza${Math.abs(d) === 1 ? "" : "s"}</small></div>
+      </div></div>
+    <div class="bx-th"><span>Color</span><span>Cap.</span><span>Antes</span><span>Ahora</span><span>Cambio</span></div>
+    ${g.filas.map(bodegaFilaHtml).join("")}</div>`;
+}
+/* Todo lo que cambió, lo que se agregó y lo que se quitó */
+function bodegaDetalleHtml(items, cat) {
+  const sec = (titulo, cls, filtro) => {
+    const g = bodegaGrupos(items, cat, filtro);
+    return g.length ? `<div class="bx-sec ${cls}"><h4>${titulo}</h4><span>${items.filter(filtro).length}</span></div>${g.map(bodegaGrupoHtml).join("")}` : "";
+  };
+  return sec("Cambiaron", "", it => !it.e && it.antes !== it.ahora)
+    + sec("Agregados", "add", it => it.e === "n")
+    + sec("Quitados", "del", it => it.e === "q")
+    || `<div class="bx-vacio">Sin cambios.</div>`;
+}
+
+/* ---------- Estilos ---------- */
 function bodegaEstilos() {
   if (document.getElementById("bodEstilos")) return;
   const st = document.createElement("style"); st.id = "bodEstilos";
   st.textContent = `
+  .bx,.ex-wrap{ --bx-card:#fff; --bx-fill:#e8e8ed; --bx-line:rgba(120,120,128,.2); --bx-green:#1f9d46; --bx-orange:#c77700; --bx-cap:#0a6fd8; --bx-red:#e0342b; }
+  html[data-mode="dark"] .bx, html[data-mode="dark"] .ex-wrap{ --bx-card:#1c1c1e; --bx-fill:#2c2c2e; --bx-line:rgba(255,255,255,.12); --bx-green:#30d158; --bx-orange:#ffb340; --bx-cap:#64b5ff; --bx-red:#ff6259; }
+  .bx{ padding-bottom:40px; }
+  .bx svg{ fill:none; stroke:currentColor; stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; }
+  .bx-card{ display:block; width:100%; text-align:left; border:0; color:var(--text); font:inherit; background:var(--bx-card); border-radius:20px; padding:18px 14px; margin:12px 0; }
+  .bx-card h3{ margin:0 0 4px; font-size:24px; letter-spacing:-.02em; padding:0 4px; }
+  .bx-sub{ margin:0 0 14px; padding:0 4px; font-size:15px; line-height:1.4; color:var(--text-secondary); }
+  .bx-btn{ display:flex; align-items:center; gap:14px; width:100%; margin-top:10px; padding:17px 18px; border:0; border-radius:14px; font:inherit; font-size:18px; font-weight:600; text-align:left; cursor:pointer; background:var(--bx-fill); color:var(--text); }
+  .bx-btn svg{ width:28px; height:28px; flex:0 0 28px; }
+  .bx-btn.pri{ background:var(--accent); color:#fff; }
+  .bx-btn.ok{ background:#34c759; color:#fff; justify-content:center; }
+  .bx-btn.ghost{ position:relative; background:transparent; border:1.5px solid var(--accent); color:var(--accent); justify-content:center; padding:14px 40px; margin-top:12px; font-size:17px; }
+  .bx-btn.ghost svg{ position:absolute; right:14px; width:20px; height:20px; flex:none; }
+  .bx-btn.mid{ justify-content:center; }
+  .bx-btn[disabled]{ opacity:.45; }
+  .bx-g{ border:1px solid var(--bx-line); border-radius:16px; overflow:hidden; margin:10px 0; background:transparent; }
+  .bx-gh{ padding:14px 14px 12px; }
+  .bx-gh strong{ display:block; font-size:19px; letter-spacing:-.01em; margin-bottom:10px; }
+  .bx-gs{ display:flex; align-items:flex-end; gap:10px; }
+  .bx-gb{ display:flex; flex-direction:column; align-items:flex-start; gap:4px; }
+  .bx-gb small{ font-size:13px; color:var(--text-secondary); }
+  .bx-gb .bx-q{ min-width:70px; height:50px; font-size:30px; border-radius:12px; }
+  .bx-gb .bx-q small{ font-size:9px; color:inherit; }
+  .bx-ar{ width:30px; height:30px; margin-bottom:10px; color:var(--text-secondary); }
+  .bx-gd{ margin-left:auto; text-align:center; font-weight:800; font-size:30px; line-height:1; color:var(--text-secondary); }
+  .bx-gd.up{ color:var(--bx-green); } .bx-gd.down{ color:var(--bx-red); }
+  .bx-gd small{ display:block; font-size:14px; font-weight:500; margin-top:4px; color:var(--text-secondary); }
+  .bx-th,.bx-r{ display:grid; grid-template-columns:minmax(0,1fr) 54px 44px 44px 52px; align-items:center; column-gap:3px; padding:0 8px; }
+  .bx-th{ height:34px; font-size:12.5px; color:var(--text-secondary); border-top:1px solid var(--bx-line); }
+  .bx-th span:nth-child(n+2){ text-align:center; }
+  .bx-r{ height:58px; border-top:1px solid var(--bx-line); }
+  .bx-c1{ display:flex; align-items:center; gap:7px; min-width:0; font-size:13.5px; font-weight:500; line-height:1.15; }
+  .bx-c1 span{ min-width:0; overflow-wrap:break-word; word-break:normal; }
+  .bx-dot{ width:22px; height:22px; border-radius:50%; flex:0 0 22px; border:1px solid rgba(120,120,128,.35); box-shadow:inset 0 -4px 6px rgba(0,0,0,.14), inset 0 2px 4px rgba(255,255,255,.3); }
+  .bx-cp,.bx-n,.bx-c5{ display:flex; justify-content:center; align-items:center; }
+  .bx-cp span{ font-size:11px; font-weight:700; padding:3px 5px; border-radius:7px; background:rgba(10,132,255,.14); color:var(--bx-cap); white-space:nowrap; }
+  .bx-q{ display:inline-flex; flex-direction:column; align-items:center; justify-content:center; min-width:40px; height:42px; padding:0 6px; border-radius:10px; font-weight:800; font-size:18px; line-height:1; }
+  .bx-q small{ font-size:8px; font-weight:700; letter-spacing:.03em; margin-top:2px; }
+  .bx-q.ok{ background:rgba(52,199,89,.17); color:var(--bx-green); }
+  .bx-q.low{ background:rgba(255,159,10,.2); color:var(--bx-orange); }
+  .bx-q.zero{ background:var(--bx-fill); color:var(--text-secondary); }
+  .bx-dif{ font-size:19px; font-weight:800; } .bx-dif.up{ color:var(--bx-green); } .bx-dif.down{ color:var(--bx-red); }
+  .bx-sin{ font-size:12px; line-height:1.15; text-align:center; color:var(--text-secondary); }
+  .bx-tag{ font-size:10.5px; font-weight:800; padding:4px 7px; border-radius:7px; letter-spacing:.02em; }
+  .bx-tag.nuevo{ background:rgba(52,199,89,.17); color:var(--bx-green); } .bx-tag.quit{ background:rgba(255,69,58,.16); color:var(--bx-red); }
+  .bx-sec{ display:flex; align-items:center; justify-content:space-between; margin:20px 4px 2px; }
+  .bx-sec h4{ margin:0; font-size:15px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-secondary); }
+  .bx-sec span{ font-size:13px; font-weight:700; padding:2px 10px; border-radius:999px; background:var(--bx-fill); }
+  .bx-sec.add h4{ color:var(--bx-green); } .bx-sec.del h4{ color:var(--bx-red); }
+  .bx-vacio{ text-align:center; padding:26px 12px; color:var(--text-secondary); }
+  .bx-inner{ display:block; width:100%; text-align:left; font:inherit; color:var(--text); background:transparent; border:1px solid var(--bx-line); border-radius:16px; padding:14px; margin-top:6px; }
+  .bx-inner-h{ display:flex; align-items:center; gap:12px; font-size:17px; font-weight:600; }
+  .bx-inner-h svg{ width:30px; height:30px; flex:0 0 30px; color:var(--bx-red); }
+  .bx-inner-h > span{ flex:1; min-width:0; }
+  .bx-inner-h .bx-ch{ width:20px; height:20px; flex:0 0 20px; color:var(--text-secondary); }
+  .bx-inner p{ margin:10px 0 0; font-size:14.5px; line-height:1.4; color:var(--text-secondary); }
+  .bx-badge{ font-size:14px; font-weight:700; padding:6px 12px; border-radius:10px; background:rgba(255,69,58,.18); color:var(--bx-red); white-space:nowrap; flex:0 0 auto; }
+  .bx-badge.ap{ background:rgba(10,132,255,.16); color:var(--bx-cap); }
+  .bx-hist{ display:flex; align-items:center; gap:16px; padding:20px 18px; font-size:20px; font-weight:600; }
+  .bx-hist svg{ width:40px; height:40px; flex:0 0 40px; color:var(--accent); }
+  .bx-hist span{ flex:1; }
+  .bx-hist .bx-ch{ width:22px; height:22px; flex:0 0 22px; color:var(--text-secondary); }
+  .bx-fecha{ margin:-2px 4px 10px; font-size:16px; color:var(--text-secondary); }
+  .bx-prev{ margin:14px -6px 0; }
+  .bx-prev h3{ margin:0 0 2px; font-size:19px; }
+  .bx-search{ position:relative; margin:4px 0 10px; }
+  .bx-search svg{ position:absolute; left:13px; top:50%; width:19px; height:19px; margin-top:-9.5px; color:var(--text-secondary); }
+  .bx-search input{ width:100%; padding:13px 14px 13px 42px; border-radius:14px; border:0; font-size:16px; background:var(--bx-fill); color:var(--text); }
+  .bx-chips{ display:flex; gap:8px; overflow-x:auto; padding:2px 2px 12px; scrollbar-width:none; }
+  .bx-chips::-webkit-scrollbar{ display:none; }
+  .bx-chip{ flex:0 0 auto; border:0; border-radius:999px; padding:9px 16px; font:inherit; font-size:15px; font-weight:600; background:var(--bx-fill); color:var(--text); }
+  .bx-chip.on{ background:var(--accent); color:#fff; }
+  .bx-m{ background:var(--bx-card); border-radius:18px; margin:10px 0; overflow:hidden; }
+  .bx-mh{ padding:14px 16px 8px; font-size:18px; font-weight:700; letter-spacing:-.01em; }
+  .bx-mr{ display:flex; align-items:center; gap:12px; padding:10px 14px; min-height:62px; border-top:1px solid var(--bx-line); cursor:pointer; }
+  .bx-mr .bx-dot{ width:28px; height:28px; flex-basis:28px; }
+  .bx-mi{ flex:1; min-width:0; }
+  .bx-mi b{ font-size:15.5px; font-weight:600; margin-right:6px; }
+  .bx-mi .cap{ display:inline-block; white-space:nowrap; font-size:11.5px; font-weight:700; padding:2px 7px; border-radius:7px; background:rgba(10,132,255,.14); color:var(--bx-cap); }
+  .bx-mi small{ display:block; margin-top:3px; font:12px ui-monospace,Menlo,monospace; color:var(--text-secondary); }
+  .bx-mr.chg{ background:rgba(10,132,255,.08); }
+  .bx-mr .bx-ch{ width:18px; height:18px; color:var(--text-secondary); flex:0 0 18px; }
+  .bx-step{ display:flex; align-items:center; gap:6px; }
+  .bx-step button{ width:34px; height:36px; border:0; border-radius:10px; font-size:22px; line-height:1; font-weight:600; background:var(--bx-fill); color:var(--text); }
+  .bx-step input{ width:56px; height:36px; text-align:center; font-size:18px; font-weight:700; border:1px solid transparent; border-radius:10px; background:transparent; color:var(--text); -moz-appearance:textfield; }
+  .bx-step input::-webkit-outer-spin-button,.bx-step input::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
+  .bx-mr.chg .bx-step input{ border-color:var(--accent); }
+  .bx-bar{ position:sticky; bottom:calc(10px + var(--safe-bottom)); margin-top:14px; z-index:5; }
+  .bx-bar .bx-btn[disabled]{ opacity:1; background:var(--bx-fill); color:var(--text-secondary); }
+  .bx-bar .bx-btn{ margin:0; justify-content:center; box-shadow:0 8px 22px rgba(0,0,0,.28); }
+  .bx-nvr{ display:flex; align-items:center; gap:10px; padding:11px 14px; min-height:62px; border-top:1px solid var(--bx-line); }
+  .bx-nvi{ flex:1; min-width:0; } .bx-nvi b{ display:block; font-size:15px; } .bx-nvi span{ font-size:13px; color:var(--text-secondary); } .bx-nvi small{ display:block; font-size:12.5px; margin-top:2px; color:var(--text-secondary); font-style:italic; }
+  .bx-tipo{ font-size:11px; font-weight:800; padding:4px 8px; border-radius:8px; color:var(--t); background:color-mix(in srgb,var(--t) 16%, transparent); white-space:nowrap; }
+  .bx-nvq{ font-size:17px; min-width:30px; text-align:right; }
+  .bx-x{ border:0; background:none; padding:6px; color:var(--text-secondary); } .bx-x svg{ width:22px; height:22px; }
+  .bx-sheet-bg{ position:fixed; inset:0; z-index:60; background:rgba(0,0,0,.5); display:flex; align-items:flex-end; justify-content:center; }
+  .bx-sheet{ width:100%; max-width:560px; background:var(--bx-card); color:var(--text); border-radius:22px 22px 0 0; padding:20px 18px calc(20px + var(--safe-bottom)); }
+  .bx-sheet h3{ margin:0; font-size:19px; } .bx-sheet p{ margin:4px 0 14px; font-size:14px; color:var(--text-secondary); }
+  .bx-seg{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:14px; }
+  .bx-seg button{ padding:13px 8px; border-radius:12px; border:2px solid transparent; font:inherit; font-size:15.5px; font-weight:700; background:var(--bx-fill); color:var(--text); }
+  .bx-seg button.on{ border-color:var(--t); color:var(--t); background:color-mix(in srgb,var(--t) 14%, transparent); }
+  .bx-qty{ display:flex; align-items:center; justify-content:center; gap:16px; margin-bottom:14px; }
+  .bx-qty button{ width:48px; height:48px; border:0; border-radius:14px; font-size:26px; background:var(--bx-fill); color:var(--text); }
+  .bx-qty b{ font-size:30px; min-width:50px; text-align:center; }
+  .bx-nota{ width:100%; padding:13px 14px; border-radius:12px; border:0; font-size:16px; background:var(--bx-fill); color:var(--text); margin-bottom:6px; }
+  .bx-ch{ display:inline-flex; } .bx-ch svg{ width:100%; height:100%; color:inherit; }
+  .bx-hr{ display:flex; align-items:center; gap:12px; text-align:left; }
+  .bx-hr .t{ flex:1; min-width:0; } .bx-hr b{ display:block; font-size:17px; } .bx-hr small{ font-size:13.5px; color:var(--text-secondary); }
+  .bx-or{ font-size:11px; font-weight:800; padding:3px 8px; border-radius:7px; background:var(--bx-fill); color:var(--text-secondary); text-transform:uppercase; letter-spacing:.04em; }
   .bod-card{ background:#fff; border-radius:16px; padding:16px; margin:12px 0; box-shadow:0 1px 3px rgba(0,0,0,.06); }
   html[data-mode="dark"] .bod-card{ background:#1c1c1e; }
-  .bod-card h3{ margin:0 0 4px; font-size:18px; }
-  .bod-card p{ margin:0 0 12px; font-size:14.5px; color:var(--text-secondary); line-height:1.4; }
-  .bod-big{ display:block; width:100%; padding:16px; font-size:17px; border-radius:14px; border:0; background:var(--accent); color:#fff; font-weight:600; text-align:center; cursor:pointer; margin-bottom:10px; box-sizing:border-box; }
-  .bod-big.sec{ background:#e8e8ed; color:var(--text); }
-  html[data-mode="dark"] .bod-big.sec{ background:#3a3a3c; }
   .bod-txt{ width:100%; box-sizing:border-box; min-height:130px; border-radius:12px; border:1px solid rgba(120,120,128,.35); padding:10px; font:14px ui-monospace,Menlo,monospace; background:transparent; color:var(--text); }
   .bod-small{ display:flex; gap:16px; justify-content:center; margin:18px 0; flex-wrap:wrap; }
   .bod-small button{ background:none; border:0; color:var(--accent); font-size:14.5px; padding:6px; }
   .bod-small button.rojo{ color:#ff3b30; }
-  .bod-ok{ background:#34c759 !important; }`;
+  .bod-textobox p{ font-size:14.5px; color:var(--text-secondary); line-height:1.4; margin:10px 4px; }`;
   document.head.appendChild(st);
 }
 
+/* ---------- Lista de todos los equipos (búsqueda + secciones) para capturar / registrar ---------- */
+function bodegaPicker(cfg) {
+  const cat = cfg.cat, secs = (typeof EX_SECCIONES !== "undefined") ? EX_SECCIONES : [{ id: "iPhone", label: "iPhone" }];
+  const items = Object.keys(cat).map(k => ({ code: k, ...cat[k] }));
+  const tiene = id => items.some(i => i.seccion === id);
+  const ops = secs.filter(s => s.id !== "Otros" || tiene("Otros"));
+  const prim = ops.find(s => tiene(s.id));
+  let sec = prim ? prim.id : "iPhone", texto = "";
+  const box = document.createElement("div");
+  box.innerHTML = `<div class="bx-search">${BX_ICON.search}<input type="search" placeholder="Buscar modelo, color o UPC" autocomplete="off"></div>
+    <div class="bx-chips">${ops.map(s => `<button class="bx-chip" data-s="${bodegaEsc(s.id)}">${bodegaEsc(s.label || s.id)}</button>`).join("")}</div>
+    <div class="bx-plist"></div>`;
+  const lista = box.querySelector(".bx-plist"), chips = box.querySelectorAll(".bx-chip");
+  function pinta() {
+    chips.forEach(c => c.classList.toggle("on", !texto && c.dataset.s === sec));
+    const t = texto.toLowerCase();
+    const sel = items.filter(i => t ? (i.modelo + " " + i.color + " " + i.capacidad + " " + i.code).toLowerCase().includes(t) : i.seccion === sec);
+    const por = {};
+    sel.forEach(i => { (por[i.modelo] = por[i.modelo] || []).push(i); });
+    const nombres = Object.keys(por).sort((a, b) => bodegaOrdenModelo(a) - bodegaOrdenModelo(b) || b.localeCompare(a, undefined, { numeric: true }));
+    lista.innerHTML = nombres.length ? nombres.map(m => `<div class="bx-m"><div class="bx-mh">${bodegaEsc(m)}</div>${por[m].sort((a, b) => bodegaCapNum(a.capacidad) - bodegaCapNum(b.capacidad) || a.color.localeCompare(b.color)).map(cfg.fila).join("")}</div>`).join("")
+      : `<div class="bx-vacio">${texto ? "No encontré nada con esa búsqueda." : "No hay productos en esta sección."}</div>`;
+  }
+  chips.forEach(c => c.addEventListener("click", () => { sec = c.dataset.s; texto = ""; box.querySelector("input").value = ""; pinta(); }));
+  box.querySelector("input").addEventListener("input", e => { texto = e.target.value.trim(); pinta(); });
+  box.lista = lista; box.refresh = pinta; pinta();
+  return box;
+}
+function bodegaFilaInfo(i) {
+  const cap = bodegaCapTxt(i.capacidad);
+  return `<i class="bx-dot" style="background:${bodegaColor(i.color)}"></i><div class="bx-mi"><b>${bodegaEsc(i.color || "Sin color")}</b>${cap ? `<span class="cap">${bodegaEsc(cap)}</span>` : ""}<small>UPC ${bodegaEsc(i.code)}</small></div>`;
+}
+
+/* ---------- Pantalla principal de Bodega ---------- */
 function buildBodega() {
   bodegaEstilos();
   const wrap = document.createElement("div");
-  wrap.className = "bod-wrap";
-  const cat = () => bodegaCatalogo();
+  wrap.className = "bod-wrap bx";
   let estado = bodegaLoad();
   let pendiente = null;
-  const ordenModelo = m => { const i = BODEGA_ORDEN.indexOf(m); return i < 0 ? 99 : i; };
+  const cat = () => bodegaCatalogoTodo(estado.stock);
 
   function pintar() {
-    const c = cat(), n = Object.keys(estado.stock).length;
-    const total = Object.values(estado.stock).reduce((a, b) => a + b, 0);
-    wrap.innerHTML = `
-      <div class="reg-heading"><h2>Bodega <small style="font-size:13px;font-weight:500;color:var(--text-secondary)">v3</small></h2>
-        <p class="ds-sub">${n ? `${total} piezas en ${n} códigos${estado.fecha ? " · lista del " + estado.fecha : ""}` : "Todavía no hay existencias guardadas."}</p></div>
+    const c = cat(), nv = bodegaNV(), hist = estado.historial || [], ult = hist[0];
+    const nvTot = nv.filter(r => r.tipo !== "Apartado").reduce((s, r) => s + (+r.qty || 0), 0);
+    const apTot = nv.filter(r => r.tipo === "Apartado").reduce((s, r) => s + (+r.qty || 0), 0);
+    const n = Object.keys(estado.stock).length;
 
-      <div class="bod-card">
+    let ultimo;
+    if (ult) {
+      const g = bodegaGrupos(ult.items, c)[0];
+      ultimo = `<h3>Último reporte</h3><p class="bx-fecha">${bodegaFechaHora(ult.ts)}</p>${g ? bodegaGrupoHtml(g) : ""}
+        <button class="bx-btn ghost" id="bodVerCambios"><span>Ver todos los cambios</span>${BX_ICON.chev}</button>`;
+    } else if (estado.ultimoReporte) {
+      ultimo = `<h3>Último reporte</h3><pre style="white-space:pre-wrap;font:inherit;font-size:15px;margin:8px 4px 0">${bodegaEsc(estado.ultimoReporte)}</pre>`;
+    } else {
+      ultimo = `<h3>Último reporte</h3><p class="bx-sub" style="margin:0">Todavía no hay reportes. Cuando apliques el primero, aquí verás qué cambió.</p>`;
+    }
+
+    wrap.innerHTML = `
+      <div class="bx-card">
         <h3>Actualizar existencias</h3>
-        <p>Escanea o sube el listado del día. La app lo lee y te dice qué cambió.</p>
-        <label class="bod-big">📄 Escanear / subir foto del listado
+        <p class="bx-sub">${n ? `Sube el reporte de hoy o captura un cambio manual.${estado.fecha ? " Última lista: " + bodegaEsc(estado.fecha) + "." : ""}` : "Sube el reporte de hoy o captura un cambio manual. Todavía no hay existencias guardadas."}</p>
+        <label class="bx-btn pri">${BX_ICON.cam}<span>Escanear / subir reporte</span>
           <input type="file" accept="image/*" id="bodFoto" hidden></label>
-        <button class="bod-big sec" id="bodVerTexto">📝 Pegar o escanear texto</button>
-        <div id="bodTextoBox" hidden>
+        <button class="bx-btn" id="bodVerTexto">${BX_ICON.doc}<span>Pegar o escanear texto</span></button>
+        <div id="bodTextoBox" class="bod-textobox" hidden>
           <p>Toca el cuadro, mantén presionado y elige <b>“Escanear texto”</b> (icono de cámara) y apunta al papel. Luego toca “Leer texto”.</p>
           <textarea class="bod-txt" id="bodTexto" placeholder="Aquí aparece el texto…"></textarea>
-          <button class="bod-big" id="bodLeerTexto" style="margin-top:10px">Leer texto</button>
+          <button class="bx-btn pri mid" id="bodLeerTexto">Leer texto</button>
         </div>
+        <button class="bx-btn" id="bodManual">${BX_ICON.pen}<span>Capturar cantidades manualmente</span></button>
         <div id="bodEstado" class="bod-estado" hidden></div>
         <div id="bodPreview"></div>
-      </div>`;
+      </div>
 
-    if (n) {
-      const modelos = {};
-      Object.keys(estado.stock).forEach(code => {
-        const e = c[code] || { modelo: "Código nuevo", color: "", capacidad: "" };
-        (modelos[e.modelo] = modelos[e.modelo] || []).push({ code, e, qty: estado.stock[code] });
-      });
-      const box = document.createElement("div"); box.className = "bod-card";
-      box.innerHTML = `<h3>Existencias por modelo</h3><p>Toca un modelo para ver colores, capacidades y UPC.</p>`;
-      Object.keys(modelos).sort((a, b) => ordenModelo(a) - ordenModelo(b) || a.localeCompare(b)).forEach(m => {
-        const items = modelos[m].sort((a, b) => parseInt(a.e.capacidad) - parseInt(b.e.capacidad) || a.e.color.localeCompare(b.e.color));
-        const det = document.createElement("details"); det.className = "bod-model";
-        det.innerHTML = `<summary><span>${m}</span><b>${items.reduce((s, i) => s + i.qty, 0)}</b></summary>` +
-          items.map(i => `<div class="bod-row"><div><strong>${[i.e.color, bodegaCap(i.e.capacidad)].filter(Boolean).join(" · ") || "Sin nombre"}</strong><small>UPC ${i.code}</small></div><b>${i.qty}</b></div>`).join("");
-        box.appendChild(det);
-      });
-      wrap.appendChild(box);
-    }
-    if (estado.ultimoReporte) {
-      const u = document.createElement("div"); u.className = "bod-card";
-      u.innerHTML = `<h3>Último reporte</h3><pre style="white-space:pre-wrap;font:inherit;font-size:15px;margin:0">${estado.ultimoReporte.replace(/</g, "&lt;")}</pre>`;
-      wrap.appendChild(u);
-    }
-    const pie = document.createElement("div"); pie.className = "bod-small";
-    pie.innerHTML = `<button id="bodPrueba">Cargar datos de prueba</button><button id="bodSeed">Cargar lista del 21-10</button><button class="rojo" id="bodBorrar">Borrar todo</button>`;
-    wrap.appendChild(pie);
+      <div class="bx-card">${ultimo}</div>
+
+      <div class="bx-card">
+        <h3>Equipos no vendibles</h3>
+        <button class="bx-inner" id="bodNV">
+          <div class="bx-inner-h">${BX_ICON.warn}<span>Registrar DOA / equipo dañado</span>
+            ${nvTot ? `<em class="bx-badge" style="font-style:normal">${nvTot} equipo${nvTot === 1 ? "" : "s"}</em>` : ""}${apTot ? `<em class="bx-badge ap" style="font-style:normal">${apTot} apartado${apTot === 1 ? "" : "s"}</em>` : ""}
+            <span class="bx-ch" style="flex:0 0 20px;color:var(--text-secondary)">${BX_ICON.chev}</span></div>
+          <p>DOA, dañados, equipos aún no vendibles y apartados. Solo los apartados se ven en Existencias, como etiqueta.</p>
+        </button>
+      </div>
+
+      <button class="bx-card bx-hist" id="bodHist">${BX_ICON.clock}<span>Historial de reportes</span><i class="bx-ch">${BX_ICON.chev}</i></button>
+
+      <div class="bod-small"><button id="bodPrueba">Cargar datos de prueba</button><button id="bodSeed">Cargar lista del 21-10</button><button class="rojo" id="bodBorrar">Borrar todo</button></div>`;
 
     wrap.querySelector("#bodFoto").addEventListener("change", e => procesar(e.target.files[0]));
     wrap.querySelector("#bodVerTexto").addEventListener("click", () => { const b = wrap.querySelector("#bodTextoBox"); b.hidden = !b.hidden; if (!b.hidden) wrap.querySelector("#bodTexto").focus(); });
@@ -360,17 +655,23 @@ function buildBodega() {
       const t = wrap.querySelector("#bodTexto").value, est = wrap.querySelector("#bodEstado"), prev = wrap.querySelector("#bodPreview");
       const esc = bodegaLeerTexto(t); est.hidden = false; prev.innerHTML = "";
       if (!esc.leidos) { est.textContent = "No encontré renglones con código y existencia en ese texto."; return; }
-      pendiente = { esc }; est.textContent = `Leí ${esc.leidos} códigos.`; mostrarReporte(prev, cat());
+      pendiente = { esc, origen: "texto" }; est.textContent = `Leí ${esc.leidos} códigos.`; mostrarReporte(prev, cat());
     });
+    wrap.querySelector("#bodManual").addEventListener("click", () => navigate({ screen: "bodegaManual", title: "Capturar cantidades" }));
+    wrap.querySelector("#bodNV").addEventListener("click", () => navigate({ screen: "bodegaNoVend", title: "Equipos no vendibles" }));
+    wrap.querySelector("#bodHist").addEventListener("click", () => navigate({ screen: "bodegaHist", title: "Historial de reportes" }));
+    const vc = wrap.querySelector("#bodVerCambios");
+    if (vc) vc.addEventListener("click", () => navigate({ screen: "bodegaDetalle", title: "Cambios del reporte", ts: ult.ts }));
+
     const poner = (stock, fecha, msg) => {
       if (Object.keys(estado.stock).length && !confirm(msg)) return;
-      estado = { stock: { ...stock }, fecha, ultimoReporte: null }; bodegaSave(estado); pintar();
+      estado = { stock: { ...stock }, fecha, ultimoReporte: null, historial: estado.historial || [] }; bodegaSave(estado); pintar();
     };
     wrap.querySelector("#bodPrueba").addEventListener("click", () => poner(BODEGA_PRUEBA, "datos de prueba", "Esto reemplaza tus existencias por datos de prueba (con errores a propósito). ¿Seguir?"));
     wrap.querySelector("#bodSeed").addEventListener("click", () => poner(BODEGA_SEED, "21-10-2026", "Esto reemplaza tus existencias por la lista del 21-10-2026. ¿Seguir?"));
     wrap.querySelector("#bodBorrar").addEventListener("click", () => {
-      if (!confirm("¿Borrar todas las existencias de bodega de este teléfono?")) return;
-      estado = { stock: {}, fecha: "", ultimoReporte: null }; bodegaSave(estado); pintar();
+      if (!confirm("¿Borrar las existencias, el historial y los registros de equipos no vendibles / apartados de este teléfono?")) return;
+      estado = { stock: {}, fecha: "", ultimoReporte: null, historial: [] }; bodegaSave(estado); bodegaNVSave([]); pintar();
     });
   }
 
@@ -379,49 +680,218 @@ function buildBodega() {
     const est = wrap.querySelector("#bodEstado"), prev = wrap.querySelector("#bodPreview");
     est.hidden = false; est.textContent = "Preparando…";
     const url = URL.createObjectURL(file);
-    prev.innerHTML = `<div class="bod-scan"><img src="${url}" alt=""><div class="bod-scan-line" id="bodLinea"></div></div><div class="bod-bar"><i id="bodBarra"></i></div>`;
+    prev.innerHTML = `<div class="bod-scan bx-scan"><img src="${url}" alt=""><div class="bod-scan-line" id="bodLinea"></div></div><div class="bod-bar"><i id="bodBarra"></i></div>`;
     const linea = prev.querySelector("#bodLinea"), barra = prev.querySelector("#bodBarra");
     try {
       const esc = await bodegaEscanear(file, t => { est.textContent = t; },
         p => { barra.style.width = Math.round(p * 100) + "%"; linea.style.top = Math.round(p * 100) + "%"; });
       barra.style.width = "100%"; linea.style.display = "none";
       if (!esc.leidos) { est.textContent = "No logré leer renglones de esa foto. Prueba con “Pegar o escanear texto”, que es más tolerante."; return; }
-      pendiente = { esc };
+      pendiente = { esc, origen: "foto" };
       est.textContent = `Leí ${esc.leidos} códigos${esc.dudosos.length ? ` · ${esc.dudosos.length} dudoso(s)` : ""}.`;
       mostrarReporte(prev, cat(), true);
     } catch (e) { est.textContent = "Error: " + (e.message || e); }
   }
 
+  /* Vista previa de lo que cambió ANTES de guardar */
   function mostrarReporte(prev, c, conservar) {
-    const { esc } = pendiente, fecha = esc.fecha;
-    const rep = Object.keys(estado.stock).length ? bodegaComparar(estado.stock, esc.stock, c) : null;
-    const tot = Object.values(esc.stock).reduce((a, b) => a + b, 0);
+    const { esc, origen } = pendiente, fecha = esc.fecha;
+    const nuevoStock = bodegaMezclar(estado.stock, esc.stock);
+    const hayPrev = Object.keys(estado.stock).length > 0;
+    const items = bodegaItems(estado.stock, nuevoStock, c);
+    const res = bodegaResumen(items);
+    const rep = hayPrev ? bodegaComparar(estado.stock, nuevoStock, c) : null;
+    const tot = Object.values(nuevoStock).reduce((a, b) => a + b, 0);
     const texto = rep ? bodegaTextoReporte(rep, fecha) : `Primera captura${fecha ? " · " + fecha : ""}\n${esc.leidos} códigos · ${tot} piezas`;
     let extra = "";
-    if (esc.dudosos.length) extra += `<p class="bod-aviso">⚠️ No pude confirmar estos renglones y los dejé fuera: ${esc.dudosos.map(d => `${d.raw} (${d.qty})`).join(", ")}.</p>`;
-    if (esc.nuevos.length) extra += `<p class="bod-aviso">🆕 Códigos fuera del catálogo:</p>${esc.nuevos.map(n => `<button class="bod-big sec bod-nombrar" data-c="${n}">${n} — Poner nombre</button>`).join("")}`;
-    const html = `<div class="bod-reporte"><h3>Cambios detectados</h3><pre>${texto.replace(/</g, "&lt;")}</pre>${extra}
-      <button class="bod-big bod-ok" id="bodAplicar">✓ Aplicar cambios</button>
-      <button class="bod-big sec" id="bodCopiar">Copiar reporte</button>
-      <button class="bod-big sec" id="bodCancelar">Descartar</button></div>`;
+    if (esc.dudosos.length) extra += `<p class="bod-aviso">⚠️ No pude confirmar estos renglones y los dejé fuera: ${esc.dudosos.map(d => `${bodegaEsc(d.raw)} (${d.qty})`).join(", ")}.</p>`;
+    if (esc.nuevos.length) extra += `<p class="bod-aviso">🆕 Códigos fuera del catálogo:</p>${esc.nuevos.map(n => `<button class="bx-btn bod-nombrar" data-c="${n}"><span>${n} — Poner nombre</span></button>`).join("")}`;
+    const old = prev.querySelector(".bod-reporte"); if (old) old.remove();
     if (!conservar) prev.innerHTML = "";
-    prev.insertAdjacentHTML("beforeend", html);
+    prev.insertAdjacentHTML("beforeend", `<div class="bod-reporte bx-prev">
+      <h3>Cambios detectados</h3>
+      <p class="bx-sub" style="margin-bottom:6px">${fecha ? "Lista del " + bodegaEsc(fecha) + " · " : ""}${esc.leidos} códigos leídos · ${res.cambios ? res.cambios + " con cambio" : "sin cambios"}. Revísalos antes de guardar.</p>
+      ${bodegaDetalleHtml(items, c)}${extra}
+      <button class="bx-btn ok" id="bodAplicar">✓ Aplicar cambios</button>
+      <button class="bx-btn mid" id="bodCopiar">Copiar reporte</button>
+      <button class="bx-btn mid" id="bodCancelar">Descartar</button></div>`);
     prev.querySelectorAll(".bod-nombrar").forEach(b => b.addEventListener("click", () => {
       const code = b.dataset.c, n = prompt("Nombre (ej. iPhone 18 Pro Max Naranja 512GB):", "");
       if (!n) return;
       const ex = bodegaExtra(); ex[code] = { modelo: n, color: "", capacidad: "" };
       try { localStorage.setItem(BODEGA_EXTRA_KEY, JSON.stringify(ex)); } catch (e) {}
-      b.textContent = code + " — " + n; b.disabled = true;
+      mostrarReporte(prev, cat(), true);
     }));
     prev.querySelector("#bodCopiar").addEventListener("click", () => { navigator.clipboard && navigator.clipboard.writeText(texto); });
     prev.querySelector("#bodCancelar").addEventListener("click", () => { pendiente = null; pintar(); });
     prev.querySelector("#bodAplicar").addEventListener("click", () => {
-      estado = { stock: esc.stock, fecha: fecha || estado.fecha, ultimoReporte: texto };
+      const hist = bodegaRegistrar(estado, estado.stock, nuevoStock, cat(), origen, fecha);
+      estado = { stock: nuevoStock, fecha: fecha || estado.fecha, ultimoReporte: texto, historial: hist };
       bodegaSave(estado); pendiente = null; pintar();
     });
   }
 
   pintar();
+  return wrap;
+}
+
+/* ---------- Capturar cantidades manualmente ---------- */
+function buildBodegaManual() {
+  bodegaEstilos();
+  const wrap = document.createElement("div"); wrap.className = "bod-wrap bx";
+  const estado = bodegaLoad(), stock = estado.stock || {}, cat = bodegaCatalogoTodo(stock);
+  const edits = {};
+  const val = c => (c in edits ? edits[c] : (stock[c] || 0));
+
+  const picker = bodegaPicker({
+    cat,
+    fila: i => `<div class="bx-mr ${i.code in edits ? "chg" : ""}" data-c="${i.code}">${bodegaFilaInfo(i)}
+      <div class="bx-step"><button data-d="-1" aria-label="Quitar uno">−</button><input type="number" inputmode="numeric" min="0" value="${val(i.code)}" aria-label="Cantidad"><button data-d="1" aria-label="Agregar uno">+</button></div></div>`,
+  });
+  const head = document.createElement("div");
+  head.innerHTML = `<div class="bx-card" style="margin-top:4px"><h3>Cantidades en bodega</h3><p class="bx-sub" style="margin:0">Cambia las piezas de lo que haga falta. Solo se guardan los renglones que modifiques.</p></div>`;
+  const bar = document.createElement("div"); bar.className = "bx-bar";
+  bar.innerHTML = `<button class="bx-btn pri" id="mRev" disabled>Revisar cambios</button>`;
+  const btn = bar.querySelector("button");
+
+  function marca(row, c) {
+    row.classList.toggle("chg", c in edits);
+    const n = Object.keys(edits).length;
+    btn.disabled = !n; btn.textContent = n ? `Revisar cambios (${n})` : "Revisar cambios";
+  }
+  function poner(c, v, row, input) {
+    v = Math.max(0, Math.min(99999, Math.round(+v || 0)));
+    if (v === (stock[c] || 0)) delete edits[c]; else edits[c] = v;
+    if (input) input.value = v;
+    marca(row, c);
+  }
+  picker.lista.addEventListener("click", e => {
+    const b = e.target.closest("button[data-d]"); if (!b) return;
+    const row = b.closest(".bx-mr"), inp = row.querySelector("input");
+    poner(row.dataset.c, val(row.dataset.c) + (+b.dataset.d), row, inp);
+  });
+  picker.lista.addEventListener("change", e => {
+    const inp = e.target.closest("input"); if (!inp) return;
+    const row = inp.closest(".bx-mr"); poner(row.dataset.c, inp.value, row, inp);
+  });
+  picker.lista.addEventListener("focusin", e => { if (e.target.matches("input")) e.target.select(); });
+
+  const lista = document.createElement("div");
+  function vistaLista() { lista.innerHTML = ""; lista.append(head, picker, bar); picker.refresh(); }
+
+  function vistaRevision() {
+    const nuevo = { ...stock };
+    Object.keys(edits).forEach(c => { if (edits[c] > 0) nuevo[c] = edits[c]; else delete nuevo[c]; });
+    const items = bodegaItems(stock, nuevo, cat), res = bodegaResumen(items);
+    lista.innerHTML = `<div class="bx-card" style="margin-top:4px"><h3>Cambios detectados</h3><p class="bx-sub" style="margin:0">${res.cambios} renglón${res.cambios === 1 ? "" : "es"} con cambio. Revísalos antes de guardar.</p></div>
+      ${bodegaDetalleHtml(items, cat)}
+      <button class="bx-btn ok" id="mOk" style="margin-top:16px">✓ Aplicar cambios</button>
+      <button class="bx-btn mid" id="mVolver">Seguir editando</button>`;
+    lista.querySelector("#mVolver").addEventListener("click", vistaLista);
+    lista.querySelector("#mOk").addEventListener("click", () => {
+      const texto = bodegaTextoReporte(bodegaComparar(stock, nuevo, cat), "captura manual");
+      bodegaSave({ stock: nuevo, fecha: estado.fecha, ultimoReporte: texto, historial: bodegaRegistrar(estado, stock, nuevo, cat, "manual", estado.fecha) });
+      goBack();
+    });
+    lista.scrollIntoView({ block: "start" });
+  }
+  btn.addEventListener("click", vistaRevision);
+  wrap.appendChild(lista); vistaLista();
+  return wrap;
+}
+
+/* ---------- Equipos no vendibles / apartados ---------- */
+function buildBodegaNoVend() {
+  bodegaEstilos();
+  const wrap = document.createElement("div"); wrap.className = "bod-wrap bx";
+  const estado = bodegaLoad(), stock = estado.stock || {}, cat = bodegaCatalogoTodo(stock);
+  const libre = c => Math.max(0, (stock[c] || 0) - bodegaNV().filter(r => r.code === c).reduce((s, r) => s + (+r.qty || 0), 0));
+  const tipoColor = t => (BODEGA_TIPOS.find(x => x.id === t) || BODEGA_TIPOS[0]).color;
+
+  const intro = document.createElement("div"); intro.className = "bx-card"; intro.style.marginTop = "4px";
+  intro.innerHTML = `<h3>Equipos no vendibles</h3><p class="bx-sub" style="margin:0"><b>DOA, dañado y no vendible</b> no se ven en Existencias y no se restan del conteo físico. Un <b>apartado</b> sí aparece en Existencias como una etiqueta bajo el equipo.</p>`;
+  const reg = document.createElement("div");
+
+  function pintaReg() {
+    const nv = bodegaNV();
+    if (!nv.length) { reg.innerHTML = ""; return; }
+    reg.innerHTML = `<div class="bx-m"><div class="bx-mh">Registrados</div>${nv.map(r => {
+      const e = cat[r.code] || { modelo: "Código nuevo", color: "", capacidad: "" };
+      return `<div class="bx-nvr"><i class="bx-dot" style="background:${bodegaColor(e.color)}"></i>
+        <div class="bx-nvi"><b>${bodegaEsc(e.modelo)}</b><span>${bodegaEsc([e.color, bodegaCapTxt(e.capacidad)].filter(Boolean).join(" · ") || "UPC " + r.code)}</span>${r.nota ? `<small>${bodegaEsc(r.nota)}</small>` : ""}</div>
+        <span class="bx-tipo" style="--t:${tipoColor(r.tipo)}">${bodegaEsc(r.tipo)}</span><b class="bx-nvq">×${r.qty}</b>
+        <button class="bx-x" data-id="${r.id}" aria-label="Quitar registro">${BX_ICON.trash}</button></div>`;
+    }).join("")}</div>`;
+  }
+  reg.addEventListener("click", e => {
+    const b = e.target.closest(".bx-x"); if (!b) return;
+    if (!confirm("¿Quitar este registro? El equipo vuelve a contar como normal.")) return;
+    bodegaNVSave(bodegaNV().filter(r => r.id !== b.dataset.id)); pintaReg();
+  });
+
+  function hoja(code) {
+    const e = cat[code], max = libre(code);
+    if (max <= 0) { alert(`No hay piezas libres de ese equipo en bodega (existencia: ${stock[code] || 0}). Primero actualiza las existencias.`); return; }
+    let tipo = "DOA", qty = 1;
+    const bg = document.createElement("div"); bg.className = "bx-sheet-bg";
+    bg.innerHTML = `<div class="bx-sheet"><h3>${bodegaEsc(e.modelo)}</h3><p>${bodegaEsc([e.color, bodegaCapTxt(e.capacidad)].filter(Boolean).join(" · "))} · libres en bodega: ${max}</p>
+      <div class="bx-seg">${BODEGA_TIPOS.map(t => `<button data-t="${t.id}" style="--t:${t.color}">${t.id}</button>`).join("")}</div>
+      <div class="bx-qty"><button data-q="-1">−</button><b>1</b><button data-q="1">+</button></div>
+      <input class="bx-nota" placeholder="Nota (opcional): cliente, folio, motivo…" maxlength="80">
+      <button class="bx-btn pri mid" data-ok>Guardar</button><button class="bx-btn mid" data-no>Cancelar</button></div>`;
+    const pinta = () => { bg.querySelectorAll(".bx-seg button").forEach(b => b.classList.toggle("on", b.dataset.t === tipo)); bg.querySelector(".bx-qty b").textContent = qty; };
+    bg.addEventListener("click", ev => {
+      if (ev.target === bg || ev.target.closest("[data-no]")) { bg.remove(); return; }
+      const t = ev.target.closest("[data-t]"); if (t) { tipo = t.dataset.t; pinta(); return; }
+      const q = ev.target.closest("[data-q]"); if (q) { qty = Math.max(1, Math.min(max, qty + (+q.dataset.q))); pinta(); return; }
+      if (ev.target.closest("[data-ok]")) {
+        const a = bodegaNV();
+        a.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), code, tipo, qty, nota: bg.querySelector(".bx-nota").value.trim(), ts: Date.now() });
+        bodegaNVSave(a); bg.remove(); pintaReg();
+      }
+    });
+    pinta(); document.body.appendChild(bg);
+  }
+
+  const picker = bodegaPicker({
+    cat,
+    fila: i => `<div class="bx-mr" data-c="${i.code}">${bodegaFilaInfo(i)}${bodegaPill(stock[i.code] || 0)}<span class="bx-ch">${BX_ICON.chev}</span></div>`,
+  });
+  picker.lista.addEventListener("click", e => { const r = e.target.closest(".bx-mr"); if (r) hoja(r.dataset.c); });
+  const sub = document.createElement("p"); sub.className = "bx-sub"; sub.style.margin = "16px 4px 8px";
+  sub.innerHTML = "<b>Toca un equipo</b> para marcarlo como DOA, dañado, no vendible o apartado.";
+  wrap.append(intro, reg, sub, picker);
+  pintaReg();
+  return wrap;
+}
+
+/* ---------- Historial y detalle de reportes ---------- */
+function buildBodegaHist() {
+  bodegaEstilos();
+  const wrap = document.createElement("div"); wrap.className = "bod-wrap bx";
+  const estado = bodegaLoad(), hist = estado.historial || [], cat = bodegaCatalogoTodo(estado.stock);
+  const ORIGEN = { foto: "Foto", texto: "Texto", manual: "Manual" };
+  wrap.innerHTML = `<div class="bx-card" style="margin-top:4px"><h3>Historial de reportes</h3><p class="bx-sub" style="margin:0">${hist.length ? "Todo lo que fue subiendo, bajando, agregándose o quitándose. Toca un reporte para ver el detalle." : "Todavía no hay reportes. Aparecerán aquí cuando apliques cambios."}</p></div>`;
+  hist.forEach(h => {
+    const r = bodegaResumen(h.items), d = r.ahora - r.antes;
+    const b = document.createElement("button"); b.className = "bx-card bx-hr";
+    b.innerHTML = `<div class="t"><b>${bodegaFechaHora(h.ts)}</b><small>${r.cambios} cambio${r.cambios === 1 ? "" : "s"}${r.nuevos ? " · " + r.nuevos + " agregado" + (r.nuevos === 1 ? "" : "s") : ""}${r.quitados ? " · " + r.quitados + " quitado" + (r.quitados === 1 ? "" : "s") : ""}${h.fecha ? " · lista " + bodegaEsc(h.fecha) : ""}</small></div>
+      <span class="bx-or">${ORIGEN[h.origen] || "Reporte"}</span>
+      <b class="bx-dif ${d > 0 ? "up" : d < 0 ? "down" : ""}" style="font-size:20px;min-width:44px;text-align:right">${d > 0 ? "+" : d < 0 ? "−" : ""}${Math.abs(d)}</b>`;
+    b.addEventListener("click", () => navigate({ screen: "bodegaDetalle", title: "Cambios del reporte", ts: h.ts }));
+    wrap.appendChild(b);
+  });
+  return wrap;
+}
+function buildBodegaDetalle(ts) {
+  bodegaEstilos();
+  const wrap = document.createElement("div"); wrap.className = "bod-wrap bx";
+  const estado = bodegaLoad(), h = (estado.historial || []).find(x => x.ts === ts), cat = bodegaCatalogoTodo(estado.stock);
+  if (!h) { wrap.innerHTML = `<div class="bx-vacio">No encontré ese reporte.</div>`; return wrap; }
+  const r = bodegaResumen(h.items), d = r.ahora - r.antes;
+  wrap.innerHTML = `<div class="bx-card" style="margin-top:4px"><h3>${bodegaFechaHora(h.ts)}</h3>
+    <p class="bx-sub" style="margin:0">${r.cambios} renglón${r.cambios === 1 ? "" : "es"} con cambio · ${r.antes} → ${r.ahora} piezas (${d > 0 ? "+" : d < 0 ? "−" : ""}${Math.abs(d)})${h.fecha ? " · lista del " + bodegaEsc(h.fecha) : ""}</p></div>
+    ${bodegaDetalleHtml(h.items, cat)}`;
   return wrap;
 }
 
