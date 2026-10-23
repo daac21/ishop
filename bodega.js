@@ -178,7 +178,7 @@ function bodegaConstruir(filas, cat) {
     if (res.estado === "nuevo" && !nuevos.includes(res.code)) nuevos.push(res.code);
     const repetido = res.code in stock;
     stock[res.code] = (stock[res.code] || 0) + r.qty;
-    if (r.dudoso || repetido) info[res.code] = { code: res.code, qty: stock[res.code], alt: r.alt == null ? null : r.alt, repetido };
+    if (r.dudoso || repetido) info[res.code] = { code: res.code, qty: stock[res.code], alt: r.alt == null ? null : r.alt, repetido, mini: r.mini || (info[res.code] && info[res.code].mini) || null };
   });
   return { stock, dudosos, nuevos, leidos: Object.keys(stock).length, revisar: Object.values(info) };
 }
@@ -462,9 +462,49 @@ async function bodegaLeerCantidad(worker, base, fila) {
 }
 
 /* Foto → { stock, fecha, dudosos, nuevos, leidos, revisar } */
+/* ---------- Pantalla verde (terminal): lector propio, sin internet ---------- */
+function bodegaMiniatura(r, f) {
+  try {
+    const cc = f.cajaCant, x0 = Math.max(0, Math.min(f.caja.x, cc ? cc.x : f.caja.x) - 14), y0 = Math.max(0, Math.min(f.caja.y, cc ? cc.y : f.caja.y) - 10);
+    const x1 = Math.min(r.ancho, (cc ? cc.x + cc.w : f.caja.x + f.caja.w) + 14), y1 = Math.min(r.alto, Math.max(f.caja.y + f.caja.h, cc ? cc.y + cc.h : 0) + 10);
+    if (!bodegaMiniatura.full) { const c = document.createElement("canvas"); c.width = r.ancho; c.height = r.alto; c.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(r.imagen), r.ancho, r.alto), 0, 0); bodegaMiniatura.full = c; }
+    const k = 1.4, cv = document.createElement("canvas"); cv.width = Math.round((x1 - x0) * k); cv.height = Math.round((y1 - y0) * k);
+    cv.getContext("2d").drawImage(bodegaMiniatura.full, x0, y0, x1 - x0, y1 - y0, 0, 0, cv.width, cv.height);
+    return cv.toDataURL("image/jpeg", 0.8);
+  } catch (e) { return null; }
+}
+function bodegaLeerPantalla(img, cat) {
+  if (typeof LectorPantalla === "undefined" || typeof LECTOR_MODELO === "undefined") return null;
+  let escala = Math.min(1, 1280 / Math.max(img.naturalWidth, img.naturalHeight)), r = null;
+  for (let intento = 0; intento < 2; intento++) {
+    const w = Math.max(200, Math.round(img.naturalWidth * escala)), h = Math.max(200, Math.round(img.naturalHeight * escala));
+    const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+    const ctx = cv.getContext("2d", { willReadFrequently: true }); ctx.drawImage(img, 0, 0, w, h);
+    r = LectorPantalla.leer(ctx.getImageData(0, 0, w, h).data, w, h, LECTOR_MODELO, cat);
+    if (!r || r.filas.length < 3) { r = null; if (intento === 0 && img.naturalWidth < 1100) { escala *= 1.6; continue; } return null; }
+    if (intento === 0 && (r.H < 14 || r.H > 32)) { escala *= 21 / r.H; continue; }   // letra muy chica o muy grande: se reajusta
+    break;
+  }
+  if (!r) return null;
+  bodegaMiniatura.full = null;
+  const lista = [];
+  r.filas.forEach(f => {
+    if (f.estadoCodigo === "ilegible" && f.qty == null) return;   // basura (barra, encabezado…)
+    const dudCod = f.estadoCodigo === "corregido" && f.margenCodigo < 0.5;
+    const dud = f.qty == null || f.confQty < 0.85 || dudCod || f.confCodigo < 0.45;
+    lista.push({ raw: f.raw, qty: f.qty == null ? 0 : f.qty, share: f.confQty, alt: f.alt, dudoso: dud, mini: dud ? bodegaMiniatura(r, f) : null });
+  });
+  return lista;
+}
+
 async function bodegaEscanear(file, onEstado, onProg) {
   onEstado("Preparando la foto…");
-  const img = await bodegaCargarImagen(file), base = bodegaBase(img);
+  const img = await bodegaCargarImagen(file);
+  { const cat0 = bodegaCatalogoEscaneo();
+    onEstado("Leyendo la pantalla…"); await new Promise(res => setTimeout(res, 30));
+    const lista = bodegaLeerPantalla(img, cat0);
+    if (lista && lista.length >= 3) { onProg && onProg(1); const rp = bodegaConstruir(lista, cat0); rp.fecha = ""; rp.metodo = "pantalla"; return rp; } }
+  const base = bodegaBase(img);
   onEstado("Cargando lector de texto…");
   let worker;
   try { worker = await bodegaWorker(onProg); }
@@ -953,7 +993,7 @@ function buildBodega() {
     let extra = "";
     if (esc.dudosos.length) extra += `<p class="bod-aviso">⚠️ No pude confirmar estos renglones y los dejé fuera: ${esc.dudosos.map(d => `${bodegaEsc(d.raw)} (${d.qty})`).join(", ")}.</p>`;
     const rev = (esc.revisar || []).filter(x => !(esc.confirmadas || {})[x.code]);
-    if (rev.length) extra += `<p class="bod-aviso">🔎 Revisa estas cantidades (no estoy seguro de que estén bien). Toca para corregir:</p>${rev.map(x => `<button class="bx-btn bod-revisar" data-c="${x.code}"><span>${bodegaEsc(bodegaNombre(c, x.code))} — leí ${esc.stock[x.code]}${x.alt != null && x.alt !== esc.stock[x.code] ? " (¿" + x.alt + "?)" : ""}${x.repetido ? " · salió repetido" : ""}</span></button>`).join("")}`;
+    if (rev.length) extra += `<p class="bod-aviso">🔎 Revisa estas cantidades (no estoy seguro de que estén bien). Toca para corregir:</p>${rev.map(x => `${x.mini ? `<img src="${x.mini}" alt="" style="display:block;width:100%;border-radius:8px;margin:8px 0 2px;background:#000">` : ""}<button class="bx-btn bod-revisar" data-c="${x.code}"><span>${bodegaEsc(bodegaNombre(c, x.code))} — leí ${esc.stock[x.code]}${x.alt != null && x.alt !== esc.stock[x.code] ? " (¿" + x.alt + "?)" : ""}${x.repetido ? " · salió repetido" : ""}</span></button>`).join("")}`;
     if (esc.nuevos.length) extra += `<p class="bod-aviso">🆕 Códigos fuera del catálogo:</p>${esc.nuevos.map(n => `<button class="bx-btn bod-nombrar" data-c="${n}"><span>${n} — Poner nombre</span></button>`).join("")}`;
     const old = prev.querySelector(".bod-reporte"); if (old) old.remove();
     if (!conservar) prev.innerHTML = "";
