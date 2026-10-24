@@ -108,6 +108,19 @@ const COBERTURA_TO_AC_INFO = {
   "Apple TV":    { source: "Apple TV" },
 };
 
+// Si a un iPhone le falta el precio "Robo y Extravío" en applecare_info.json, se toma del catálogo (escaner.json / applecare.json).
+function completarRoboAppleCare() {
+  try {
+    const ip = APPLECARE_INFO && APPLECARE_INFO.iPhone; if (!ip) return;
+    const fuentes = [ESCANER_DATA || {}];
+    fuentes.forEach(src => Object.values(src).forEach(v => {
+      if (!v || typeof v.applecare_robo_perdida !== "number") return;
+      const m = ip[v.modelo]; if (!m || !m["AppleCare+"]) return;
+      if (typeof m["AppleCare+"]["Robo y Extravío"] !== "number") m["AppleCare+"]["Robo y Extravío"] = v.applecare_robo_perdida;
+    }));
+  } catch (e) {}
+}
+
 // Lista de modelos de applecare_info.json que le corresponden a una categoría
 // de cobertura.json, cada uno con su precio normal y (si aplica) el de Robo y
 // Extravío. Alimenta el dropdown de modelo en la sección "Costo de AppleCare+".
@@ -314,6 +327,7 @@ async function loadAllData() {
     COBERTURA_DATA = c;
     APPLECARE_INFO = aci;
     ESCANER_DATA = esc;
+    completarRoboAppleCare();
     CODIGOS_CAJAS = caj;
     localStorage.setItem("ishop_data_cache", JSON.stringify({ tradein: t, tradein_categorias: tv, precios_iphone: p, applecare: a, switchup_modelos: s, financiamiento: f, cobertura: c, applecare_info: aci, escaner: esc, codigos_cajas: caj }));
   } catch (e) {
@@ -329,6 +343,7 @@ async function loadAllData() {
       COBERTURA_DATA = data.cobertura || {};
       APPLECARE_INFO = data.applecare_info || {};
       ESCANER_DATA = data.escaner || {};
+      completarRoboAppleCare();
       CODIGOS_CAJAS = data.codigos_cajas || {};
     } else {
       TRADEIN_DATA = {};
