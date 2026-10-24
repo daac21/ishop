@@ -244,5 +244,17 @@
         "residual": 16619.0
       }
     }
+  },
+  "iPhone Duo": {
+    "256 GB": {
+      "IFL": {
+        "monthly": 1409.0,
+        "residual": 14183.0
+      },
+      "GET": {
+        "monthly": 1639.0,
+        "residual": 15219.0
+      }
+    }
   }
 }
