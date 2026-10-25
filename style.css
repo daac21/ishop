@@ -1575,3 +1575,8 @@ html[data-mode="dark"] .bod-reporte{ background:#1c1c1e; }
 .bod-reporte pre{ white-space:pre-wrap; font:inherit; font-size:15px; margin:0; }
 .bod-aviso{ font-size:14px; margin:10px 0 6px; }
 .bod-nuevos .docs-btn{ display:block; width:100%; margin-bottom:6px; }
+
+/* ---- Botón Registros de la pantalla principal: oculto (mismo lugar, sigue funcionando al tocar / mantener) ---- */
+.home-reg{ background:transparent !important; box-shadow:none !important; border:none; -webkit-tap-highlight-color:transparent; outline:none; }
+.home-reg > *{ opacity:0; }
+.home-reg:active{ transform:none; }
