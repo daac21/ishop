@@ -1625,6 +1625,13 @@ function tradeGuardarReciente(cat, key) {
   } catch (e) {}
 }
 
+function tradeEliminarReciente(cat, key) {
+  try {
+    const all = JSON.parse(localStorage.getItem(TRADE_RECIENTES_KEY) || "[]") || [];
+    localStorage.setItem(TRADE_RECIENTES_KEY, JSON.stringify(all.filter(r => !(r.cat === cat && r.key === key))));
+  } catch (e) {}
+}
+
 function buildTradeModelPicker(path, node, wrap) {
   buildModelPicker(path[0], Object.keys(node), wrap, (key) => {
     navigate({ screen: "tradeNode", path: [...path, key], title: "Trade In · " + modeloNombre(key) });
@@ -1655,7 +1662,9 @@ function buildModelPicker(catRaw, keys, wrap, onPick, opts) {
     if (!groups.has(g.id)) groups.set(g.id, Object.assign({ keys: [] }, g));
     groups.get(g.id).keys.push(key);
   });
-  const ordered = [...groups.values()].sort((a, b) => a.orden - b.orden);
+  // opts.desc: modelos nuevos de arriba hacia abajo -> Duo, 18, 17, Air, 16, 15, ...
+  const ordenDesc = (g) => g.id === "Duo" ? 10000 : g.id === "Air" ? 16.5 : g.id === "SE" ? -1 : g.orden;
+  const ordered = [...groups.values()].sort((a, b) => (opts.desc && cat === "iPhone") ? ordenDesc(b) - ordenDesc(a) : a.orden - b.orden);
 
   let filtro = "Todos";
   const collapsed = new Set();
@@ -1666,6 +1675,46 @@ function buildModelPicker(catRaw, keys, wrap, onPick, opts) {
   body.className = "mp-body";
 
   const chevSvg = `<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M6 15l6-6 6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+  // Fila deslizable (izquierda o derecha) para quitar un "usado recientemente"
+  function swipeRow(key, g) {
+    const box = document.createElement("div");
+    box.className = "mp-swipe";
+    box.innerHTML = `<span class="mp-swipe-bg"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>Eliminar</span>`;
+    const row = modelRow(key, g);
+    box.appendChild(row);
+    let x0 = 0, y0 = 0, dx = 0, drag = false, decided = false, moved = false;
+    row.style.touchAction = "pan-y";
+    row.addEventListener("pointerdown", e => { x0 = e.clientX; y0 = e.clientY; dx = 0; drag = true; decided = false; moved = false; row.style.transition = "none"; });
+    row.addEventListener("pointermove", e => {
+      if (!drag) return;
+      const mx = e.clientX - x0, my = e.clientY - y0;
+      if (!decided) {
+        if (Math.abs(mx) < 8 && Math.abs(my) < 8) return;
+        if (Math.abs(my) > Math.abs(mx)) { drag = false; return; }
+        decided = true;
+        try { row.setPointerCapture(e.pointerId); } catch (err) {}
+      }
+      dx = mx; moved = true;
+      row.style.transform = `translateX(${dx}px)`;
+    });
+    const end = () => {
+      if (!drag) return;
+      drag = false;
+      row.style.transition = "transform .22s ease";
+      if (moved && Math.abs(dx) > Math.min(110, box.offsetWidth * 0.3)) {
+        row.style.transform = `translateX(${dx > 0 ? "110%" : "-110%"})`;
+        setTimeout(() => { tradeEliminarReciente(cat, key); paint(); }, 200);
+      } else {
+        row.style.transform = "translateX(0)";
+      }
+    };
+    row.addEventListener("pointerup", end);
+    row.addEventListener("pointercancel", end);
+    // si fue un deslizamiento, no abrir el modelo
+    row.addEventListener("click", e => { if (moved) { e.stopImmediatePropagation(); e.preventDefault(); moved = false; } }, true);
+    return box;
+  }
 
   function modelRow(key, g) {
     const row = document.createElement("button");
@@ -1704,7 +1753,7 @@ function buildModelPicker(catRaw, keys, wrap, onPick, opts) {
       const rec = tradeRecientes(cat).filter(r => keys.includes(r.key)).slice(0, 3);
       if (rec.length) {
         const clock = `<span class="mp-clock"><svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>`;
-        body.appendChild(panel("_rec", "Usados recientemente", clock, rec.map(r => modelRow(r.key, modeloGrupo(cat, r.key)))));
+        body.appendChild(panel("_rec", "Usados recientemente", clock, rec.map(r => swipeRow(r.key, modeloGrupo(cat, r.key)))));
       }
     }
     ordered.filter(g => filtro === "Todos" || g.id === filtro).forEach(g => {
@@ -1721,8 +1770,14 @@ function buildModelPicker(catRaw, keys, wrap, onPick, opts) {
     chips.appendChild(b);
   });
 
-  if (ordered.length > 1) wrap.appendChild(chips);
-  wrap.appendChild(body);
+  if (ordered.length > 1) {
+    const layout = document.createElement("div");
+    layout.className = "mp-layout";
+    layout.append(chips, body);
+    wrap.appendChild(layout);
+  } else {
+    wrap.appendChild(body);
+  }
   paint();
 }
 
@@ -1768,7 +1823,7 @@ function buildQuoteSelectNew(path, tradeIn) {
   } else if (path.length === 0) {
     buildModelPicker("iPhone", filteredModelKeys(node, path), wrap, (key) => {
       navigate({ screen: "quoteSelectNew", path: [...path, key], tradeIn, title: modeloNombre(key) });
-    });
+    }, { desc: true });
     return wrap;
   } else {
     filteredModelKeys(node, path).forEach(key => {
@@ -1812,16 +1867,18 @@ function buildQuoteResult(tradeIn, newModel, newCapacity) {
   wrap.appendChild(banner);
 
   function updateBanner(opt) {
+    banner.classList.add("quote");
     if (newPrice === null) {
       banner.innerHTML = `<span>${newModel} ${newCapacity}</span><strong>Precio pendiente de cargar</strong>`;
       return;
     }
-    let html = `<span>${newModel} ${newCapacity}</span><strong>${money(newPrice)} − ${money(tradeIn.value)} (Trade In) = ${money(base)}`;
-    if (opt && opt.extra !== null && opt.extra !== undefined && opt.extra > 0) {
-      html += ` + ${money(opt.extra)} ${opt.shortLabel} = ${money(base + opt.extra)}</strong>`;
-    } else {
-      html += `</strong>`;
-    }
+    const extra = opt && opt.extra > 0 ? opt.extra : 0;
+    const line = (cls, label, val) => `<div class="q-line ${cls}"><i></i><em>${label}</em><b>${val}</b></div>`;
+    let html = `<span>${newModel} ${newCapacity}</span><strong class="q-total">${money(base + extra)}</strong><div class="q-lines">`;
+    html += line("q-eq", "Equipo nuevo", money(newPrice));
+    html += line("q-ti", "Trade In", "− " + money(tradeIn.value));
+    if (extra) html += line("q-ac", opt.shortLabel, "+ " + money(extra));
+    html += `</div>`;
     banner.innerHTML = html;
   }
 
@@ -1855,7 +1912,9 @@ function buildTradeInAltFinancing(tradeIn, newModel, newCapacity, newPrice, ac) 
   select.innerHTML = `
     <option value="">Elegir…</option>
     <option value="IFL">iPhone For Life + AC</option>
+    <option value="IFL_SOLO">iPhone For Life (solo, sin AC)</option>
     <option value="GET">GET + AC</option>
+    <option value="GET_SOLO">GET (solo, sin AC)</option>
     <option value="switchup">Switch Up</option>
   `;
   wrap.appendChild(select);
@@ -1883,8 +1942,10 @@ function buildTradeInAltFinancing(tradeIn, newModel, newCapacity, newPrice, ac) 
       return;
     }
 
-    const cfg = FINANCE_CONFIG[select.value];
-    const finData = FINANCIAMIENTO_DATA?.[newModel]?.[newCapacity]?.[select.value];
+    const solo = /_SOLO$/.test(select.value);
+    const planKey = select.value.replace(/_SOLO$/, "");
+    const cfg = FINANCE_CONFIG[planKey];
+    const finData = FINANCIAMIENTO_DATA?.[newModel]?.[newCapacity]?.[planKey];
     if (!finData) {
       resultArea.appendChild(buildPlaceholder("Sin datos", "💳", "Aún no hay plan " + cfg.label + " cargado para este equipo."));
       return;
@@ -1899,10 +1960,10 @@ function buildTradeInAltFinancing(tradeIn, newModel, newCapacity, newPrice, ac) 
 
     const banner = document.createElement("div");
     banner.className = "trade-banner";
-    banner.innerHTML = `<span>${cfg.label} con Trade In</span><strong>${money(finData.monthly)}/mes − ${money(descuentoMensual)} (Trade In ÷ ${totalMsi} msi) = ${money(discountedFinData.monthly)}/mes</strong>`;
+    banner.innerHTML = `<span>${cfg.label}${solo ? " solo" : ""} con Trade In</span><strong>${money(finData.monthly)}/mes − ${money(descuentoMensual)} (Trade In ÷ ${totalMsi} msi) = ${money(discountedFinData.monthly)}/mes</strong>`;
     resultArea.appendChild(banner);
 
-    resultArea.appendChild(buildFinanceColumnsGrid(discountedFinData, ac, cfg));
+    resultArea.appendChild(buildFinanceColumnsGrid(discountedFinData, ac, cfg, { solo }));
   });
 
   return wrap;
@@ -1939,7 +2000,7 @@ function buildSwitchSelect(path) {
   } else if (path.length === 0) {
     buildModelPicker("iPhone", filteredModelKeys(node, path), wrap, (key) => {
       navigate({ screen: "switchSelect", path: [...path, key], title: modeloNombre(key) });
-    });
+    }, { desc: true });
     return wrap;
   } else {
     filteredModelKeys(node, path).forEach(key => {
@@ -1960,18 +2021,25 @@ function buildSwitchResult(newModel, newCapacity) {
   const wrap = document.createElement("div");
   const newPrice = PRECIOS_IPHONE?.[newModel]?.[newCapacity] ?? null;
   const ac = findApplecareForModel(newModel);
-  const base = newPrice === null ? null : newPrice + MEMBRESIA_SWITCH;
+  let incluir = true;
+  let lastOpt = null;
 
   const banner = document.createElement("div");
   banner.className = "trade-banner";
   wrap.appendChild(banner);
 
+  const baseActual = () => newPrice === null ? null : newPrice + (incluir ? MEMBRESIA_SWITCH : 0);
+
   function updateBanner(opt) {
+    lastOpt = opt || lastOpt;
+    opt = lastOpt;
     if (newPrice === null) {
       banner.innerHTML = `<span>${newModel} ${newCapacity}</span><strong>Precio pendiente de cargar</strong>`;
       return;
     }
-    let html = `<span>${newModel} ${newCapacity}</span><strong>${money(newPrice)} + ${money(MEMBRESIA_SWITCH)} membresía`;
+    const base = baseActual();
+    let html = `<span>${newModel} ${newCapacity}</span><strong>${money(newPrice)}`;
+    if (incluir) html += ` + ${money(MEMBRESIA_SWITCH)} membresía`;
     if (opt && opt.extra !== null && opt.extra !== undefined) {
       html += ` + ${money(opt.extra)} ${opt.label} = ${money(base + opt.extra)}</strong>`;
     } else {
@@ -1985,7 +2053,32 @@ function buildSwitchResult(newModel, newCapacity) {
     { key: "acrp", label: "AppleCare+ R y P", extra: ac.ROBO_PERDIDA },
   ];
 
-  wrap.appendChild(buildPlanTabs(options, base, { onSelect: updateBanner, phonePrice: newPrice }));
+  // Recuadro: incluir membresía Switch Up (Sí / No, solo equipo)
+  const memb = document.createElement("div");
+  memb.className = "sw-memb";
+  memb.innerHTML = `
+    <div class="sw-memb-head"><span class="sw-memb-ico"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 3l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 16.4 6.8 19.2l1-5.9L3.5 9.2l5.9-.8z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span><div><b>Incluir membresía Switch Up</b><small>Membresía Switch Up · ${money(MEMBRESIA_SWITCH)}</small></div></div>
+    <div class="sw-memb-opts"><button type="button" class="on" data-v="1">Sí, incluir</button><button type="button" data-v="0">No, solo equipo</button></div>`;
+  wrap.appendChild(memb);
+
+  const planHost = document.createElement("div");
+  wrap.appendChild(planHost);
+
+  function renderPlans() {
+    planHost.innerHTML = "";
+    lastOpt = null;
+    planHost.appendChild(buildPlanTabs(options, baseActual(), { onSelect: updateBanner, phonePrice: newPrice }));
+  }
+
+  memb.querySelectorAll(".sw-memb-opts button").forEach(b => {
+    b.addEventListener("click", () => {
+      incluir = b.dataset.v === "1";
+      memb.querySelectorAll(".sw-memb-opts button").forEach(x => x.classList.toggle("on", x === b));
+      renderPlans();
+    });
+  });
+
+  renderPlans();
   return wrap;
 }
 
@@ -2028,7 +2121,7 @@ function buildAcModels(category) {
     } else {
       navigate({ screen: "acVariants", category, model, title: modeloNombre(model) });
     }
-  }, { titulo: category });
+  }, { titulo: category, desc: true });
   return wrap;
 }
 
@@ -3846,7 +3939,7 @@ function buildFinanceSelect(path, planType) {
     }
     buildModelPicker("iPhone", models, wrap, (model) => {
       navigate({ screen: "financeSelect", path: [model], planType, title: modeloNombre(model) });
-    });
+    }, { desc: true });
     return wrap;
   }
 
@@ -3889,14 +3982,16 @@ function buildFinanceResult(model, capacity, planType) {
   return wrap;
 }
 
-function buildFinanceColumnsGrid(finData, ac, cfg) {
-  const cols = [
-    { label: "AppleCare+", extra: ac.APPLECARE },
-    { label: "AppleCare+ R y P", extra: ac.ROBO_PERDIDA },
-  ];
+function buildFinanceColumnsGrid(finData, ac, cfg, o = {}) {
+  const cols = o.solo
+    ? [{ label: "Solo equipo (sin AppleCare+)", extra: 0 }]
+    : [
+        { label: "AppleCare+", extra: ac.APPLECARE },
+        { label: "AppleCare+ R y P", extra: ac.ROBO_PERDIDA },
+      ];
 
   const grid = document.createElement("div");
-  grid.className = "finance-columns";
+  grid.className = "finance-columns" + (o.solo ? " solo" : "");
 
   cols.forEach(col => {
     const card = document.createElement("div");
