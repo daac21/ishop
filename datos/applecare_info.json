@@ -61,7 +61,8 @@
           "Daño de la parte posterior de vidrio": 559,
           "Daño en la pantalla exterior": 559,
           "Daño en la pantalla interior": 1899,
-          "Otro daño accidental": 1899
+          "Otro daño accidental": 1899,
+          "Robo y extravío": 3299
         },
         "sinAppleCare": {
           "Daño en la capa de la cubierta": 989,
