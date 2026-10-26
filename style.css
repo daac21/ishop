@@ -1580,3 +1580,34 @@ html[data-mode="dark"] .bod-reporte{ background:#1c1c1e; }
 .home-reg{ background:transparent !important; box-shadow:none !important; border:none; -webkit-tap-highlight-color:transparent; outline:none; }
 .home-reg > *{ opacity:0; }
 .home-reg:active{ transform:none; }
+
+/* =====================================================================
+   CONTRASTE: letras de botones/pestañas sin seleccionar (Solo equipo, + AppleCare+, etc.)
+   Antes eran gris sobre gris y se perdían. Ahora: texto fuerte + contorno.
+   ===================================================================== */
+.plan-tab, .sw-memb-opts button, .ds-tab, .set-seg button{
+  color:var(--text);
+  font-weight:700;
+  border:1.5px solid color-mix(in srgb, var(--text) 18%, transparent);
+  text-shadow:0 0 .6px color-mix(in srgb, var(--text) 35%, transparent);
+}
+.plan-tabs, .sw-memb-opts{ background:color-mix(in srgb, var(--text) 9%, var(--surface)); }
+html[data-mode="dark"] .plan-tabs, html[data-mode="dark"] .sw-memb-opts{ background:#2c2c2e; }
+.plan-tab{ font-size:13.5px; }
+.plan-tab.active, .sw-memb-opts button.on{
+  color:var(--accent);
+  border-color:var(--accent);
+  font-weight:800;
+  text-shadow:none;
+}
+html[data-mode="dark"] .plan-tab.active, html[data-mode="dark"] .sw-memb-opts button.on{ color:#fff; background:var(--accent); border-color:var(--accent); }
+.ds-tab.on, .set-seg button.on{ color:#fff; border-color:transparent; text-shadow:0 1px 2px rgba(0,0,0,.25); }
+/* textos secundarios más legibles */
+html[data-mode="dark"]{ --text-secondary:#b4b4ba; }
+:root{ --text-secondary:#5c5c61; }
+html[data-mode="dark"]{ --text-secondary:#b4b4ba; }
+.plan-note, .ds-plan-note{ font-weight:600; }
+/* leyenda "Cubre aluminio · titanio · cerámica" (AppleCare+ Watch Series 12) */
+.ds-aplica{ position:relative; margin:12px auto 0; display:inline-flex; gap:6px; align-items:center; padding:7px 14px; border-radius:999px; background:rgba(255,255,255,.2); border:1px solid rgba(255,255,255,.5); color:#fff; font-size:14px; font-weight:700; }
+.ds-aplica b{ font-weight:800; }
+.mp-sub{ display:block; margin-top:3px; font-size:13px; font-weight:700; color:var(--accent); letter-spacing:0; }

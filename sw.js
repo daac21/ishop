@@ -1,4 +1,4 @@
-const CACHE_NAME = "ishop-tools-v41";
+const CACHE_NAME = "ishop-tools-v42";
 const ASSETS = [
   "./index.html",
   "./style.css",

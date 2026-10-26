@@ -1721,6 +1721,8 @@ function buildModelPicker(catRaw, keys, wrap, onPick, opts) {
     row.className = "mp-row";
     row.innerHTML = `<span class="mp-thumb">${modeloThumb(cat, key, g, catRaw)}</span><span class="mp-name"></span><span class="mp-chev"></span>`;
     row.querySelector(".mp-name").textContent = modeloNombre(key);
+    const subTxt = typeof opts.sub === "function" ? opts.sub(key) : "";
+    if (subTxt) { const sm = document.createElement("small"); sm.className = "mp-sub"; sm.textContent = subTxt; row.querySelector(".mp-name").appendChild(sm); }
     row.addEventListener("click", () => {
       if (opts.recents) tradeGuardarReciente(cat, key);
       onPick(key);
@@ -2121,7 +2123,7 @@ function buildAcModels(category) {
     } else {
       navigate({ screen: "acVariants", category, model, title: modeloNombre(model) });
     }
-  }, { titulo: category, desc: true });
+  }, { titulo: category, desc: true, sub: (m) => { const v = models[m] && Object.values(models[m])[0]; return v && v.aplica ? "Cubre " + v.aplica : ""; } });
   return wrap;
 }
 
@@ -2193,7 +2195,9 @@ function buildAcDetail(category, model, variant) {
       </div>
       ${diff && diff > 0 ? `<p class="ds-plan-note">Agrega protección contra robo y extravío por ${money(diff)} más.</p>` : ""}
     ` : `<div class="ds-price">${money(info.precio)}</div>`}
+    ${info.aplica ? `<p class="ds-aplica"><b>Cubre</b> <span></span></p>` : ""}
   `;
+  if (info.aplica) hero.querySelector(".ds-aplica span").textContent = info.aplica;
   hero.querySelector("h2").textContent = model;
   hero.querySelector(".ds-hero-sub").textContent = variant;
   wrap.appendChild(hero);

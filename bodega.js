@@ -1406,7 +1406,7 @@ function buildBodegaHist() {
   bodegaEstilos();
   const wrap = document.createElement("div"); wrap.className = "bod-wrap bx bx-t-morado";
   const estado = bodegaLoad(), hist = estado.historial || [], cat = bodegaCatalogoTodo(estado.stock);
-  const ORIGEN = { foto: "Foto", texto: "Texto", manual: "Manual", venta: "Venta" };
+  const ORIGEN = { foto: "Foto", texto: "Texto", manual: "Manual", venta: "Venta", deshacer: "Venta deshecha" };
   wrap.innerHTML = `<div class="bx-card" style="margin-top:4px"><h3>Historial de reportes</h3><p class="bx-sub" style="margin:0">${hist.length ? "Todo lo que fue subiendo, bajando, agregándose o quitándose. Toca un reporte para ver el detalle." : "Todavía no hay reportes. Aparecerán aquí cuando apliques cambios."}</p></div>`;
   hist.forEach(h => {
     const r = bodegaResumen(h.items), d = r.ahora - r.antes;
