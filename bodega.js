@@ -920,7 +920,19 @@ function bodegaEstilos() {
   .bod-small{ display:flex; gap:16px; justify-content:center; margin:18px 0; flex-wrap:wrap; }
   .bod-small button{ background:none; border:0; color:var(--accent); font-size:14.5px; padding:6px; }
   .bod-small button.rojo{ color:#ff3b30; }
-  .bod-textobox p{ font-size:14.5px; color:var(--text-secondary); line-height:1.4; margin:10px 4px; }`;
+  .bod-textobox p{ font-size:14.5px; color:var(--text-secondary); line-height:1.4; margin:10px 4px; }
+  /* contornos de color por sección: azul = actualizar, verde = reportes, naranja = no vendibles, morado = historial */
+  .bx-s-azul,.bx-t-azul{ --sc:#0a84ff; } .bx-s-verde,.bx-t-verde{ --sc:#30d158; } .bx-s-naranja,.bx-t-naranja{ --sc:#ff9f0a; } .bx-s-morado,.bx-t-morado{ --sc:#bf5af2; }
+  .bx .bx-card[class*="bx-s-"], .bx[class*="bx-t-"] .bx-card, .bx[class*="bx-t-"] .bx-m, .bx[class*="bx-t-"] .bx-g{ border:2px solid color-mix(in srgb,var(--sc) 70%, transparent); background:color-mix(in srgb,var(--sc) 5%, var(--bx-card)); }
+  .bx .bx-card[class*="bx-s-"] h3::before, .bx[class*="bx-t-"] .bx-card h3::before{ content:""; display:inline-block; width:10px; height:10px; border-radius:50%; background:var(--sc); margin-right:10px; vertical-align:middle; position:relative; top:-2px; }
+  .bx-hist[class*="bx-s-"] svg{ color:var(--sc); }
+  .bx-s-azul .bx-btn.pri{ background:var(--sc); }
+  .bx-s-azul .bx-btn:not(.pri), .bx-t-azul .bx-btn:not(.pri){ box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--sc) 45%, transparent); }
+  .bx-s-naranja .bx-inner{ border:1.5px solid color-mix(in srgb,var(--sc) 55%, transparent); }
+  .bx-s-naranja .bx-inner-h > svg{ color:var(--sc); }
+  .bx-t-naranja .bx-mh{ color:var(--sc); }
+  .bx-t-azul .bx-mh{ color:var(--sc); }
+  `;
   document.head.appendChild(st);
 }
 
@@ -1031,7 +1043,7 @@ function buildBodega() {
     }
 
     wrap.innerHTML = `
-      <div class="bx-card">
+      <div class="bx-card bx-s-azul">
         <h3>Actualizar existencias</h3>
         <p class="bx-sub">${n ? `Sube el reporte de hoy o captura un cambio manual.${estado.fecha ? " Última lista: " + bodegaEsc(estado.fecha) + "." : ""}` : "Sube el reporte de hoy o captura un cambio manual. Todavía no hay existencias guardadas."}</p>
         <label class="bx-btn pri">${BX_ICON.cam}<span>Escanear / subir reporte</span>
@@ -1047,9 +1059,9 @@ function buildBodega() {
         <div id="bodPreview"></div>
       </div>
 
-      <div class="bx-card">${ultimo}</div>
+      <div class="bx-card bx-s-verde">${ultimo}</div>
 
-      <div class="bx-card">
+      <div class="bx-card bx-s-naranja">
         <h3>Equipos no vendibles</h3>
         <button class="bx-inner" id="bodNV">
           <div class="bx-inner-h">${BX_ICON.warn}<span>Registrar DOA / equipo dañado</span>
@@ -1059,7 +1071,7 @@ function buildBodega() {
         </button>
       </div>
 
-      <button class="bx-card bx-hist" id="bodHist">${BX_ICON.clock}<span>Historial de reportes</span><i class="bx-ch">${BX_ICON.chev}</i></button>
+      <button class="bx-card bx-hist bx-s-morado" id="bodHist">${BX_ICON.clock}<span>Historial de reportes</span><i class="bx-ch">${BX_ICON.chev}</i></button>
 
       <div class="bod-small"><button id="bodPrueba">Cargar datos de prueba</button><button id="bodSeed">Cargar lista del 21-10</button><button class="rojo" id="bodBorrar">Borrar todo</button></div>`;
 
@@ -1262,7 +1274,7 @@ function buildBodega() {
 /* ---------- Capturar cantidades manualmente ---------- */
 function buildBodegaManual() {
   bodegaEstilos();
-  const wrap = document.createElement("div"); wrap.className = "bod-wrap bx";
+  const wrap = document.createElement("div"); wrap.className = "bod-wrap bx bx-t-azul";
   const estado = bodegaLoad(), stock = estado.stock || {}, cat = bodegaCatalogoTodo(stock);
   const edits = {};
   const val = c => (c in edits ? edits[c] : (stock[c] || 0));
@@ -1327,7 +1339,7 @@ function buildBodegaManual() {
 /* ---------- Equipos no vendibles / apartados ---------- */
 function buildBodegaNoVend() {
   bodegaEstilos();
-  const wrap = document.createElement("div"); wrap.className = "bod-wrap bx";
+  const wrap = document.createElement("div"); wrap.className = "bod-wrap bx bx-t-naranja";
   const estado = bodegaLoad(), stock = estado.stock || {}, cat = bodegaCatalogoTodo(stock);
   const libre = c => Math.max(0, (stock[c] || 0) - bodegaNV().filter(r => r.code === c).reduce((s, r) => s + (+r.qty || 0), 0));
   const tipoColor = t => (BODEGA_TIPOS.find(x => x.id === t) || BODEGA_TIPOS[0]).color;
@@ -1392,9 +1404,9 @@ function buildBodegaNoVend() {
 /* ---------- Historial y detalle de reportes ---------- */
 function buildBodegaHist() {
   bodegaEstilos();
-  const wrap = document.createElement("div"); wrap.className = "bod-wrap bx";
+  const wrap = document.createElement("div"); wrap.className = "bod-wrap bx bx-t-morado";
   const estado = bodegaLoad(), hist = estado.historial || [], cat = bodegaCatalogoTodo(estado.stock);
-  const ORIGEN = { foto: "Foto", texto: "Texto", manual: "Manual" };
+  const ORIGEN = { foto: "Foto", texto: "Texto", manual: "Manual", venta: "Venta" };
   wrap.innerHTML = `<div class="bx-card" style="margin-top:4px"><h3>Historial de reportes</h3><p class="bx-sub" style="margin:0">${hist.length ? "Todo lo que fue subiendo, bajando, agregándose o quitándose. Toca un reporte para ver el detalle." : "Todavía no hay reportes. Aparecerán aquí cuando apliques cambios."}</p></div>`;
   hist.forEach(h => {
     const r = bodegaResumen(h.items), d = r.ahora - r.antes;
@@ -1409,7 +1421,7 @@ function buildBodegaHist() {
 }
 function buildBodegaDetalle(ts) {
   bodegaEstilos();
-  const wrap = document.createElement("div"); wrap.className = "bod-wrap bx";
+  const wrap = document.createElement("div"); wrap.className = "bod-wrap bx bx-t-verde";
   const estado = bodegaLoad(), h = (estado.historial || []).find(x => x.ts === ts), cat = bodegaCatalogoTodo(estado.stock);
   if (!h) { wrap.innerHTML = `<div class="bx-vacio">No encontré ese reporte.</div>`; return wrap; }
   const r = bodegaResumen(h.items), d = r.ahora - r.antes;
