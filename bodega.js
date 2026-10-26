@@ -107,7 +107,9 @@ function bodegaResolver(raw, cat) {
   }
   // un UPC con dígito verificador correcto que no está en el catálogo es un código nuevo (no se "corrige" a otro)
   if (hallados.size === 0 && r.length === 12 && !valido) {
-    keys.forEach(k => { let d = 0; for (let i = 0; i < 12 && d < 3; i++) if (k[i] !== r[i]) d++; if (d <= 2) hallados.add(k); });
+    // con 2 diferencias solo se acepta si ambas son confusiones típicas del lector (si no, se mandaría a un producto que no está en la hoja)
+    const conf = (a, b) => (BODEGA_CONF[a] || "").includes(b) || (BODEGA_CONF[b] || "").includes(a);
+    keys.forEach(k => { let d = 0, ok = true; for (let i = 0; i < 12 && d < 3; i++) if (k[i] !== r[i]) { d++; if (!conf(k[i], r[i])) ok = false; } if (d <= 2 && ok) hallados.add(k); });
   }
   if (hallados.size === 1) return { code: [...hallados][0], estado: "corregido" };
   if (valido) return { code: r, estado: "nuevo" };
