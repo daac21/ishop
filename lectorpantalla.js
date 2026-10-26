@@ -227,6 +227,25 @@ function parear(codigos, cants) {
   return pr;
 }
 
+/* Cantidad de cada renglón siguiendo la inclinación del texto: la cantidad queda a la derecha y la perspectiva la
+   sube o baja respecto al código, así que se busca sobre la línea que marca el propio renglón (no por altura igual). */
+function parearInclinados(codigos, cants, angs) {
+  const aa = angs.filter(a => a != null);
+  if (aa.length < 3 || !cants.length) return null;
+  const a0 = mediana(aa) * Math.PI / 180, cy = codigos.map(b => (b.y0 + b.y1) / 2), cx = codigos.map(b => (b.x0 + b.x1) / 2);
+  const pasoMed = cy.length > 1 ? mediana(cy.slice(1).map((v, i) => v - cy[i])) : 30;
+  let mejor = null;
+  for (const sl of [-Math.tan(a0), Math.tan(a0), 0]) {
+    const pr = new Array(codigos.length).fill(null), usado = new Set(); let n = 0, err = 0;
+    const cand = [];
+    codigos.forEach((b, i) => cants.forEach((q, j) => { const r = ((q.y0 + q.y1) / 2 - cy[i]) - sl * ((q.x0 + q.x1) / 2 - cx[i]); if (Math.abs(r) < 0.45 * pasoMed) cand.push([Math.abs(r), i, j]); }));
+    cand.sort((x, y) => x[0] - y[0]);
+    cand.forEach(([r, i, j]) => { if (pr[i] == null && !usado.has(j)) { pr[i] = j; usado.add(j); n++; err += r; } });
+    if (!mejor || n > mejor.n || (n === mejor.n && err < mejor.err)) mejor = { pr, n, err };
+  }
+  return mejor && mejor.n >= Math.max(2, 0.6 * Math.min(codigos.length, cants.length)) ? mejor.pr : null;
+}
+
 /* ---------- Enderezar toda la foto (los renglones salen ladeados) ---------- */
 function anguloGlobal(d, w, h) {
   const m = maskVerde(d, w, h, 0.25), xs = [], ys = [];
@@ -253,13 +272,47 @@ function rotarRGBA(d, w, h, ang) {
   return o;
 }
 
+/* Varios renglones de cantidades pueden salir pegados en un solo bloque alto (luz tenue, foto con perspectiva): se parten por filas de tinta */
+function partirAltos(bs, m, w, H) {
+  const out = [];
+  bs.forEach(b => {
+    if (b.h <= 1.6 * H) { out.push(b); return; }
+    const hh = b.h, prof = new Float32Array(hh); let mx = 0;
+    for (let y = 0; y < hh; y++) { let s = 0; for (let x = b.x0; x < b.x1; x++) s += m[(b.y0 + y) * w + x]; prof[y] = s; if (s > mx) mx = s; }
+    const thr = 0.12 * mx, runs = []; let y = 0;
+    while (y < hh) { if (prof[y] > thr) { let y1 = y; while (y1 < hh && prof[y1] > thr) y1++; runs.push([y, y1]); y = y1; } else y++; }
+    const uni = []; runs.forEach(r => { const l = uni[uni.length - 1]; if (l && r[0] - l[1] < 0.25 * H) l[1] = r[1]; else uni.push(r.slice()); });
+    const sub = uni.filter(r => r[1] - r[0] >= 0.5 * H);
+    if (sub.length < 2) { out.push(b); return; }
+    sub.forEach(r => {
+      let x0 = 1e9, x1 = -1; for (let yy = r[0]; yy < r[1]; yy++) for (let x = b.x0; x < b.x1; x++) if (m[(b.y0 + yy) * w + x]) { if (x < x0) x0 = x; if (x + 1 > x1) x1 = x + 1; }
+      if (x1 < 0) return;
+      out.push({ x0, x1, y0: b.y0 + r[0], y1: b.y0 + r[1], w: x1 - x0, h: r[1] - r[0], area: b.area / sub.length });
+    });
+  });
+  return out.sort((a, b) => a.y0 - b.y0);
+}
+/* Renglones tan tenues que no se vieron: si hay un hueco de ~2 renglones se agrega uno en medio (queda marcado para revisar) */
+function rellenarHuecos(bs) {
+  if (bs.length < 4) return bs;
+  const cy = bs.map(b => (b.y0 + b.y1) / 2), d = []; for (let i = 1; i < cy.length; i++) d.push(cy[i] - cy[i - 1]);
+  const med = mediana(d); if (!med) return bs;
+  const out = [bs[0]];
+  for (let i = 1; i < bs.length; i++) {
+    const n = Math.round(d[i - 1] / med) - 1;
+    if (d[i - 1] / med >= 1.6 && n >= 1 && n <= 3) for (let j = 1; j <= n; j++) {
+      const t = j / (n + 1), a = bs[i - 1], b = bs[i], L = (p, q) => p + (q - p) * t;
+      const y0 = L(a.y0, b.y0), y1 = L(a.y1, b.y1), x0 = L(a.x0, b.x0), x1 = L(a.x1, b.x1);
+      out.push({ x0, x1, y0, y1, w: x1 - x0, h: y1 - y0, area: a.area, sintetico: true });
+    }
+    out.push(bs[i]);
+  }
+  return out;
+}
+
 /* ---------- Detección completa: RGBA → renglones con sus celdas ---------- */
-function buscarFilas(d, w, h, frac) {
-  const geo = geometria(d, w, h, frac), H = geo.H; if (!H) return null;
-  const esc = (H / H_OBJ) * (H / H_OBJ);
-  const codigos = geo.bloques.filter(b => b.h >= 0.6 * H && b.w >= 7.5 * H && b.w <= 14 * H && b.area > 800 * esc && b.area / (b.w * b.h) < 0.5).sort((a, b) => a.y0 - b.y0);
-  if (codigos.length < 3) return null;
-  const xCod = mediana(codigos.map(b => b.x1));
+function cantsDe(geo, codigos, H, w) {
+  const esc = (H / H_OBJ) * (H / H_OBJ), xCod = mediana(codigos.map(b => b.x1));
   // cantidades: se juntan los pedazos de un mismo renglón (una letra tenue puede quedar partida)
   const trozos = geo.bloques.filter(b => b.h >= 0.35 * H && b.x0 > xCod && b.y0 > codigos[0].y0 - 0.9 * H && b.area > 20 * esc).sort((a, b) => (a.y0 + a.y1) - (b.y0 + b.y1));
   const grupos = [];
@@ -268,20 +321,56 @@ function buscarFilas(d, w, h, frac) {
     if (g && cy - g.cy < 0.55 * H) { g.x0 = Math.min(g.x0, b.x0); g.x1 = Math.max(g.x1, b.x1); g.y0 = Math.min(g.y0, b.y0); g.y1 = Math.max(g.y1, b.y1); g.area += b.area; g.n++; g.cy = (g.y0 + g.y1) / 2; }
     else grupos.push({ x0: b.x0, x1: b.x1, y0: b.y0, y1: b.y1, area: b.area, n: 1, cy });
   });
-  const cants = grupos.map(g => ({ ...g, w: g.x1 - g.x0, h: g.y1 - g.y0 })).filter(b => b.h >= 0.6 * H && b.w >= 2 * H && b.w <= 6.8 * H && b.area > 250 * esc).sort((a, b) => a.y0 - b.y0);
-  return { H, codigos, cants };
+  let cants = grupos.map(g => ({ ...g, w: g.x1 - g.x0, h: g.y1 - g.y0 })).filter(b => b.h >= 0.6 * H && b.w >= 2 * H && (b.w <= 6.8 * H || b.h > 1.6 * H) && b.area > 250 * esc).sort((a, b) => a.y0 - b.y0);
+  return partirAltos(cants, geo.m, w, H).filter(b => b.w <= 6.8 * H);
+}
+function buscarFilas(d, w, h, frac) {
+  const geo = geometria(d, w, h, frac), H = geo.H; if (!H) return null;
+  const esc = (H / H_OBJ) * (H / H_OBJ);
+  let cand = geo.bloques.filter(b => b.h >= 0.6 * H && b.w >= 7.5 * H && b.w <= 14 * H && b.area > 800 * esc && b.area / (b.w * b.h) < 0.5);
+  cand = partirAltos(cand, geo.m, w, H);   // renglones pegados (foto con perspectiva) se separan
+  const solos = cand.filter(b => b.h <= 1.8 * H), ref = mediana((solos.length >= 3 ? solos : cand).map(b => b.x0));
+  const codigos = cand.filter(b => b.h <= 1.8 * H && Math.abs(b.x0 - ref) < 4 * H).sort((a, b) => a.y0 - b.y0);
+  if (codigos.length < 3) return null;
+  const cants = cantsDe(geo, codigos, H, w);
+  return { H, codigos, cants, geo };
 }
 function extraer(d0, w, h) {
   const ang = anguloGlobal(d0, w, h), d = Math.abs(ang) > 0.4 ? rotarRGBA(d0, w, h, ang) : d0;
   let mejor = null, mf = 0;
   for (const frac of [0.18, 0.25, 0.35]) { const r = buscarFilas(d, w, h, frac); if (r && (!mejor || r.codigos.length > mejor.codigos.length)) { mejor = r; mf = frac; } }
   if (!mejor) return null;
-  const g = verdor(d, w, h), { H, codigos, cants } = mejor, pr = parear(codigos, cants), filas = [];
+  const g = verdor(d, w, h), H = mejor.H, filas = [];
+  const codigos = rellenarHuecos(mejor.codigos), cants = rellenarHuecos(mejor.cants);
+  const cs = codigos.map(b => celdasCodigo(g, w, h, b));
+  const angs = cs.map(c => c ? c.angulo : null), pares = (cn) => parearInclinados(codigos, cn, angs) || parear(codigos, cn), nPar = (p) => p.filter(x => x != null).length;
+  let pr = pares(cants);
+  if (nPar(pr) < 0.8 * codigos.length) {   // cantidades tenues: se buscan con un umbral más sensible
+    for (const fr of [0.12, 0.08]) {
+      const gx = geometria(d, w, h, fr); if (!gx.H) continue;
+      const cx = rellenarHuecos(cantsDe(gx, codigos, gx.H, w)), px = pares(cx);
+      if (nPar(px) > nPar(pr)) { cants.length = 0; cx.forEach(q => cants.push(q)); pr = px; }
+    }
+  }
+  // renglones sin cantidad detectada (luz tenue / letra borrosa): se busca la cantidad en una ventana ancha a la derecha del código,
+  // a la altura que tienen los renglones vecinos que sí la tienen. celdasCantidad ubica sola el borde derecho de la tinta.
+  const cyOf = b => (b.y0 + b.y1) / 2, sint = new Set();
+  { const con = codigos.map((b, i) => (pr[i] != null ? i : -1)).filter(i => i >= 0);
+    codigos.forEach((b, i) => {
+      if (pr[i] != null || !cs[i]) return;
+      const vec = con.slice().sort((a, c) => Math.abs(a - i) - Math.abs(c - i)).slice(0, 3);
+      const dy = vec.length ? mediana(vec.map(k => cyOf(cants[pr[k]]) - cyOf(codigos[k]))) : 0, yc = cyOf(b) + dy, hq = Math.max(b.h, H) * 1.25;
+      const x0 = b.x1 + 1.5 * H, x1 = Math.min(w, b.x1 + 13 * H);
+      if (x1 - x0 < 4 * H) return;
+      cants.push({ x0, x1, y0: yc - hq / 2, y1: yc + hq / 2, w: x1 - x0, h: hq, area: 0, sintetico: true });
+      pr[i] = cants.length - 1; sint.add(i);
+    });
+  }
   codigos.forEach((b, i) => {
-    const c = celdasCodigo(g, w, h, b); if (!c) return;
+    const c = cs[i]; if (!c) return;
     let q = null; if (pr[i] != null) q = celdasCantidad(g, w, h, cants[pr[i]], c.paso, c.angulo);
     const qb = pr[i] != null ? cants[pr[i]] : null;
-    filas.push({ caja: { x: b.x0, y: b.y0, w: b.w, h: b.h }, cajaCant: qb ? { x: qb.x0, y: qb.y0, w: qb.w, h: qb.h } : null, celdas: c.celdas, cant: q, angulo: c.angulo });
+    filas.push({ qtySint: sint.has(i), sintetico: !!b.sintetico, caja: { x: b.x0, y: b.y0, w: b.w, h: b.h }, cajaCant: qb ? { x: qb.x0, y: qb.y0, w: qb.w, h: qb.h } : null, celdas: c.celdas, cant: q, angulo: c.angulo });
   });
   return filas.length >= 3 ? { filas, H, anguloFoto: ang, umbral: mf, imagen: d, ancho: w, alto: h } : null;
 }
@@ -346,13 +435,27 @@ function decodificarCantidad(P) {   // P: n x 10
 }
 
 /* ---------- Todo junto: RGBA → [{ raw, qty, share, alt, dudoso, ... }] ---------- */
+function iniciosUPC(cat) {
+  const s = new Set(["19594", "19595"]); for (const k in cat) if (/^\d{12}$/.test(k)) s.add(k.slice(0, 5)); return [...s];
+}
+function repararInicio(code, ini, cat) {   // 1939… → 1959…: se acepta solo si queda un único UPC con dígito verificador correcto
+  const c = new Set();
+  ini.forEach(pf => { let d = 0; for (let i = 0; i < 5; i++) if (pf[i] !== code[i]) d++; if (d <= 2) { const q = pf + code.slice(5); if (upcOk(q) || cat[q]) c.add(q); } });
+  return c.size === 1 ? [...c][0] : null;
+}
 function leer(d, w, h, modelo, cat) {
   const ex = extraer(d, w, h); if (!ex) return null;
+  const ini = iniciosUPC(cat);
   const filas = ex.filas.map(f => {
-    const rc = decodificar(f.celdas.map(v => probaCelda(modelo, v)), cat);
+    let rc = decodificar(f.celdas.map(v => probaCelda(modelo, v)), cat);
+    if (!ini.includes(rc.code.slice(0, 5))) {
+      const rr = repararInicio(rc.code, ini, cat);
+      if (!rr) return null;   // encabezado, asteriscos, barra de estado…
+      rc = { ...rc, code: rr, estado: cat[rr] ? "corregido" : "ok", margen: Math.min(rc.margen, 0.4) };
+    }
     let q = null; if (f.cant) q = decodificarCantidad(f.cant.map(v => probaCelda(modelo, v)));
-    return { raw: rc.code, estadoCodigo: rc.estado, confCodigo: rc.conf, margenCodigo: rc.margen, qty: q ? q.qty : null, confQty: q ? q.conf : 0, alt: q ? q.alt : null, caja: f.caja, cajaCant: f.cajaCant };
-  });
+    return { raw: rc.code, estadoCodigo: rc.estado, confCodigo: rc.conf, margenCodigo: rc.margen, qty: q ? q.qty : null, confQty: q ? (f.qtySint ? Math.min(q.conf, 0.6) : q.conf) : 0, alt: q ? q.alt : null, caja: f.caja, cajaCant: f.cajaCant, sintetico: !!f.sintetico, qtySint: !!f.qtySint };
+  }).filter(Boolean);
   return { filas, H: ex.H, imagen: ex.imagen, ancho: ex.ancho, alto: ex.alto };
 }
 

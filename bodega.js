@@ -76,9 +76,24 @@ function bodegaUpcOk(c) {
 const BODEGA_CONF = { "0": "896", "1": "7", "2": "7", "3": "58", "4": "1", "5": "6389", "6": "5809", "7": "12", "8": "0693", "9": "84" };
 
 /* Corrige errores del lector comparando contra el catálogo y el dígito verificador. Devuelve {code, estado} */
+/* Los UPC de esta bodega siempre empiezan igual (19594…, 19595…): se toman también los inicios del catálogo */
+function bodegaInicios(cat) {
+  const s = new Set(["19594", "19595"]);
+  Object.keys(cat || {}).forEach(k => { if (/^\d{12}$/.test(k)) s.add(k.slice(0, 5)); });
+  return [...s];
+}
 function bodegaResolver(raw, cat) {
-  const r = String(raw || "").replace(/\D/g, "");
+  let r = String(raw || "").replace(/\D/g, "");
   if (cat[r]) return { code: r, estado: "ok" };
+  // inicio mal leído (ej. 1939… en vez de 1959…): se prueba con los inicios conocidos y se confirma con el dígito verificador
+  if (r.length === 12) {
+    const ini = bodegaInicios(cat);
+    if (!ini.includes(r.slice(0, 5))) {
+      const cands = new Set();
+      ini.forEach(pf => { let d = 0; for (let i = 0; i < 5; i++) if (pf[i] !== r[i]) d++; if (d <= 2) { const c = pf + r.slice(5); if (cat[c] || bodegaUpcOk(c)) cands.add(c); } });
+      if (cands.size === 1) { const c = [...cands][0]; return { code: c, estado: cat[c] ? "corregido" : "nuevo" }; }
+    }
+  }
   const keys = Object.keys(cat);
   const hallados = new Set();
   const probar = (c) => { if (cat[c]) hallados.add(c); };
@@ -172,8 +187,10 @@ function bodegaTextoReporte(rep, fecha) {
 /* Lista de {raw,qty} → existencias. Marca para revisar las cantidades poco seguras y los códigos repetidos */
 function bodegaConstruir(filas, cat) {
   const stock = {}, dudosos = [], nuevos = [], info = {};
+  let ignorados = 0;
   filas.forEach((r, i) => {
     const idx = r.idx || i + 1;
+    if (/^20\d{11}$/.test(String(r.raw || "").replace(/\D/g, ""))) { ignorados++; return; }   // devoluciones / códigos 2021… con cantidad negativa
     const res = bodegaResolver(r.raw, cat);
     if (res.estado === "ilegible" || res.estado === "ambiguo") { dudosos.push({ raw: r.raw, qty: r.qty, mini: r.mini || null, idx }); return; }
     if (res.estado === "nuevo" && !nuevos.includes(res.code)) nuevos.push(res.code);
@@ -182,7 +199,7 @@ function bodegaConstruir(filas, cat) {
     const dudCod = res.estado === "corregido" || res.estado === "nuevo";
     if (r.dudoso || repetido) info[res.code] = { code: res.code, qty: stock[res.code], alt: r.alt == null ? null : r.alt, repetido, raw: r.raw, leido: res.estado === "corregido" ? r.raw : "", idx, mini: r.mini || (info[res.code] && info[res.code].mini) || null };
   });
-  return { stock, dudosos, nuevos, leidos: Object.keys(stock).length, revisar: Object.values(info), total: filas.length };
+  return { stock, dudosos, nuevos, leidos: Object.keys(stock).length, revisar: Object.values(info), total: filas.length, ignorados };
 }
 
 /* Texto (escaneado con el teclado del iPhone o pegado): un renglón por línea */
@@ -490,23 +507,27 @@ function bodegaMiniatura(r, f) {
 }
 function bodegaLeerPantalla(img, cat) {
   if (typeof LectorPantalla === "undefined" || typeof LECTOR_MODELO === "undefined") return null;
-  let escala = Math.min(1, 1280 / Math.max(img.naturalWidth, img.naturalHeight)), r = null;
-  for (let intento = 0; intento < 2; intento++) {
-    const w = Math.max(200, Math.round(img.naturalWidth * escala)), h = Math.max(200, Math.round(img.naturalHeight * escala));
+  // La foto se prueba a varios tamaños y se queda con la lectura más segura (códigos válidos + cantidades claras)
+  const largo = Math.max(img.naturalWidth, img.naturalHeight);
+  const tamanos = [...new Set([Math.min(largo, 1280), Math.min(largo, 900), Math.min(largo, 700), Math.min(largo, 1600)])];
+  const puntaje = (rr) => rr.filas.reduce((t, f) => t + (f.estadoCodigo === "ok" ? 1 : f.estadoCodigo === "corregido" ? 0.6 : 0) * (f.qty == null ? 0.2 : 0.3 + 0.7 * f.confQty), 0);
+  let r = null, mejorP = -1;
+  tamanos.forEach(L => {
+    const escala = L / largo, w = Math.max(200, Math.round(img.naturalWidth * escala)), h = Math.max(200, Math.round(img.naturalHeight * escala));
     const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
     const ctx = cv.getContext("2d", { willReadFrequently: true }); ctx.drawImage(img, 0, 0, w, h);
-    r = LectorPantalla.leer(ctx.getImageData(0, 0, w, h).data, w, h, LECTOR_MODELO, cat);
-    if (!r || r.filas.length < 3) { r = null; if (intento === 0 && img.naturalWidth < 1100) { escala *= 1.6; continue; } return null; }
-    if (intento === 0 && (r.H < 14 || r.H > 32)) { escala *= 21 / r.H; continue; }   // letra muy chica o muy grande: se reajusta
-    break;
-  }
+    let rr = null; try { rr = LectorPantalla.leer(ctx.getImageData(0, 0, w, h).data, w, h, LECTOR_MODELO, cat); } catch (e) { rr = null; }
+    if (!rr || rr.filas.length < 3) return;
+    const pt = puntaje(rr);
+    if (pt > mejorP) { mejorP = pt; r = rr; }
+  });
   if (!r) return null;
   bodegaMiniatura.full = null;
   const lista = [];
   r.filas.forEach(f => {
     if (f.estadoCodigo === "ilegible" && f.qty == null) return;   // basura (barra, encabezado…)
     const dudCod = f.estadoCodigo === "corregido" && f.margenCodigo < 0.5;
-    const dud = f.qty == null || f.confQty < 0.85 || dudCod || f.confCodigo < 0.45;
+    const dud = f.qty == null || f.confQty < 0.93 || f.qty >= 100 || dudCod || f.confCodigo < 0.45 || f.sintetico;
     lista.push({ raw: f.raw, qty: f.qty == null ? 0 : f.qty, share: f.confQty, alt: f.alt, dudoso: dud, idx: lista.length + 1, mini: (dud || f.estadoCodigo === "ilegible") ? bodegaMiniatura(r, f) : null });
   });
   return lista;
@@ -786,6 +807,16 @@ function bodegaEstilos() {
   .bx-zoom-h b{ font-size:15px; word-break:break-all; } .bx-zoom-h button{ border:0; background:#3a3a3c; color:#fff; border-radius:10px; padding:10px 14px; font:inherit; font-weight:650; white-space:nowrap; }
   .bx-zoom-b{ flex:1; overflow:auto; -webkit-overflow-scrolling:touch; }
   .bx-zoom-b img{ display:block; width:100%; }
+  .bx-edit-b{ padding:8px 16px 24px; color:#fff; } .bx-edit-b label{ display:block; font-size:13px; color:#aaa; margin:14px 0 6px; }
+  .bx-edit-b input{ width:100%; box-sizing:border-box; font:700 26px ui-monospace,Menlo,monospace; letter-spacing:.04em; padding:12px; border-radius:12px; border:1.5px solid #555; background:#1c1c1e; color:#fff; }
+  .bx-edit-prev{ margin-top:10px; padding:12px; border-radius:12px; font-size:16px; font-weight:600; background:#2c2c2e; color:#ddd; }
+  .bx-edit-prev.ok{ background:rgba(52,199,89,.2); color:#5ee07f; } .bx-edit-prev.warn{ background:rgba(255,159,10,.2); color:#ffb340; }
+  .bx-edit-b .bx-rv-b{ width:100%; margin-top:20px; } .bx-edit-b .bx-rv-b[disabled]{ opacity:.4; }
+  .bx-todos{ margin:10px 0; } .bx-todos summary{ font-weight:650; padding:8px 2px; }
+  .bx-td{ display:flex; align-items:center; gap:8px; padding:8px 4px; border-top:1px solid var(--bx-line); }
+  .bx-td-t{ flex:1; min-width:0; } .bx-td-t b{ display:block; font:700 15px ui-monospace,Menlo,monospace; } .bx-td-t small{ display:block; font-size:13px; color:var(--text-secondary); }
+  .bx-td-q{ font-weight:800; font-size:18px; min-width:34px; text-align:right; }
+  .bx-td button{ border:0; border-radius:10px; background:var(--bx-fill); color:var(--text); font:inherit; font-size:14px; font-weight:650; padding:8px 12px; }
   .bx-zoom p{ margin:0; padding:10px; text-align:center; color:#aaa; font-size:13px; }
   .bx-g{ border:1px solid var(--bx-line); border-radius:16px; overflow:hidden; margin:10px 0; background:transparent; }
   .bx-gh{ padding:14px 14px 12px; }
@@ -946,6 +977,32 @@ function bodegaZoom(src, titulo) {
   document.body.appendChild(o);
 }
 
+/* Editor de UPC: escribes el número y al momento muestra qué modelo es */
+function bodegaEditor(cat, code, qty, onSave) {
+  const o = document.createElement("div");
+  o.className = "bx-zoom bx-edit";
+  o.innerHTML = `<div class="bx-zoom-h"><b>Corregir UPC</b><button type="button" data-x>Cancelar</button></div>
+    <div class="bx-edit-b">
+      <label>UPC (12 dígitos)</label><input id="bxeU" inputmode="numeric" autocomplete="off" maxlength="13">
+      <div class="bx-edit-prev" id="bxeP"></div>
+      <label>Cantidad</label><input id="bxeQ" inputmode="numeric" autocomplete="off" maxlength="5">
+      <button type="button" class="bx-rv-b main" id="bxeG">Guardar</button></div>`;
+  const u = o.querySelector("#bxeU"), q = o.querySelector("#bxeQ"), pv = o.querySelector("#bxeP"), g = o.querySelector("#bxeG");
+  u.value = String(code || "").replace(/\D/g, ""); q.value = qty == null ? "" : String(qty);
+  const act = () => {
+    const v = u.value.replace(/\D/g, ""), ok = v.length === 12;
+    g.disabled = !ok || q.value.replace(/\D/g, "") === "";
+    if (!v) { pv.className = "bx-edit-prev"; pv.textContent = "Escribe el código del renglón."; return; }
+    if (!ok) { pv.className = "bx-edit-prev warn"; pv.textContent = `Faltan ${12 - v.length > 0 ? 12 - v.length : 0} dígito(s)${v.length > 12 ? " — sobran " + (v.length - 12) : ""}.`; return; }
+    if (cat[v]) { pv.className = "bx-edit-prev ok"; pv.textContent = "✓ " + bodegaNombre(cat, v); }
+    else { pv.className = "bx-edit-prev warn"; pv.textContent = (bodegaUpcOk(v) ? "Código válido pero no está en el catálogo (se guarda como código nuevo)." : "Este código no está en el catálogo y su dígito verificador no cuadra. Revisa el número."); }
+  };
+  u.addEventListener("input", act); q.addEventListener("input", act);
+  o.querySelector("[data-x]").addEventListener("click", () => o.remove());
+  g.addEventListener("click", () => { const v = u.value.replace(/\D/g, ""), n = parseInt(q.value.replace(/\D/g, ""), 10); if (v.length === 12 && isFinite(n)) { o.remove(); onSave(v, n); } });
+  document.body.appendChild(o); act(); u.focus();
+}
+
 function buildBodega() {
   bodegaEstilos();
   const wrap = document.createElement("div");
@@ -1089,7 +1146,7 @@ function buildBodega() {
         ${x.leido ? `<div class="bx-rv-nota">El código se leyó como ${bodegaEsc(x.leido)} y lo corregí a este.</div>` : ""}
         ${x.repetido ? `<div class="bx-rv-nota">Este código salió repetido en la foto.</div>` : ""}
         ${img(x, x.code + " · " + nom)}
-        <div class="bx-rv-opts"><button class="bx-rv-b main" data-act="qty" data-c="${x.code}" data-v="${leido}">Leí ${leido} ✓</button>${x.alt != null && x.alt !== leido ? `<button class="bx-rv-b" data-act="qty" data-c="${x.code}" data-v="${x.alt}">¿${x.alt}?</button>` : ""}<button class="bx-rv-b" data-act="otra" data-c="${x.code}">Otra cantidad</button></div></div>`);
+        <div class="bx-rv-opts"><button class="bx-rv-b main" data-act="qty" data-c="${x.code}" data-v="${leido}">Leí ${leido} ✓</button>${x.alt != null && x.alt !== leido ? `<button class="bx-rv-b" data-act="qty" data-c="${x.code}" data-v="${x.alt}">¿${x.alt}?</button>` : ""}<button class="bx-rv-b" data-act="otra" data-c="${x.code}">Otra cantidad</button><button class="bx-rv-b" data-act="upc" data-c="${x.code}">Corregir UPC</button></div></div>`);
     });
     dud.forEach((d, i) => {
       cards.push(`<div class="bx-rv" data-i="${i}">${cab(d.idx)}
@@ -1110,7 +1167,7 @@ function buildBodega() {
       cards.push(`<div class="bx-rv" data-c="${code}"><div class="bx-rv-top"><span class="bx-rv-n">Cambio muy grande</span><span class="bx-rv-s">${bodegaEsc(sec(code))}</span></div>
         <div class="bx-rv-tag g">${p} → ${n}</div>
         <div class="bx-rv-upc">${code}</div><div class="bx-rv-nom">${bodegaEsc(nom)}</div>
-        <div class="bx-rv-opts"><button class="bx-rv-b main" data-act="grande" data-c="${code}">Sí, ${n} es correcto</button><button class="bx-rv-b" data-act="otra" data-c="${code}">Corregir</button></div></div>`);
+        <div class="bx-rv-opts"><button class="bx-rv-b main" data-act="grande" data-c="${code}">Sí, ${n} es correcto</button><button class="bx-rv-b" data-act="otra" data-c="${code}">Corregir cantidad</button><button class="bx-rv-b" data-act="upc" data-c="${code}">Corregir UPC</button></div></div>`);
     });
 
     let extra = "";
@@ -1129,6 +1186,8 @@ function buildBodega() {
       <p class="bx-sub" style="margin-bottom:8px">${fecha ? "Lista del " + bodegaEsc(fecha) + " · " : ""}${res.cambios ? res.cambios + " código" + (res.cambios === 1 ? "" : "s") + " con cambio." : "Sin cambios contra lo guardado."}</p>
       ${resumen}
       ${pend ? `<div class="bx-sec warn"><h4>Por revisar</h4><span>${pend}</span></div>${cards.join("")}` : `<div class="bx-listo">✅ Ya no hay nada pendiente. Revisa los cambios y guarda.</div>`}
+      ${esc.ignorados ? `<p class="bod-aviso">ℹ️ Ignoré ${esc.ignorados} renglón(es) con códigos 2021… y cantidad negativa (no son existencias).</p>` : ""}
+      <details class="bx-todos"><summary>Ver todos los códigos leídos (${Object.keys(esc.stock).length}) y corregir un UPC</summary>${Object.keys(esc.stock).map(code => `<div class="bx-td"><div class="bx-td-t"><b>${code}</b><small>${bodegaEsc(bodegaNombre(c, code))}</small></div><span class="bx-td-q">${esc.stock[code]}</span><button type="button" data-act="upc" data-c="${code}">Editar</button></div>`).join("")}</details>
       ${hechos.length ? `<details class="bx-hechos"><summary>Ya revisados (${hechos.length})</summary>${hechos.map(t => `<div>✓ ${bodegaEsc(t)}</div>`).join("")}</details>` : ""}
       ${hayPrev ? `<label class="bod-aviso" style="display:flex;gap:10px;align-items:flex-start;cursor:pointer"><input type="checkbox" id="bodParcial" ${pendiente.parcial ? "checked" : ""} style="margin-top:3px;width:20px;height:20px"><span><b>La foto es solo una parte de la lista</b><br><small>Actualizo: ${bodegaSeccionesTxt(esc.stock)}. ${pendiente.parcial ? "Lo que no aparece en la foto se queda como estaba." : "Lo que no aparece de esas secciones pasa a 0."}</small></span></label>` : ""}
       <div class="bx-sec"><h4>Cambios a guardar</h4></div>
@@ -1157,14 +1216,23 @@ function buildBodega() {
       else if (act === "cero") { esc.faltaOk[code] = true; hecho(code, `${bodegaNombre(c, code)} · 0`); }
       else if (act === "quitar") { esc.dudosos.splice(i, 1); }
       else if (act === "cod") {
-        const d = esc.dudosos[i], t = prompt("Escribe el código de 12 dígitos de este renglón:", d.raw || "");
-        if (t === null) return;
-        const r = bodegaResolver(t, bodegaCatalogoEscaneo());
-        if (r.estado === "ilegible" || r.estado === "ambiguo") { alert("Ese código no es válido. Revisa que tenga 12 dígitos."); return; }
-        const n = pedir(r.code, d.qty); if (n === null) return;
-        esc.stock[r.code] = (esc.stock[r.code] || 0) + n; esc.confirmadas[r.code] = true; esc.leidos = Object.keys(esc.stock).length;
-        if (r.estado === "nuevo" && !esc.nuevos.includes(r.code)) esc.nuevos.push(r.code);
-        esc.dudosos.splice(i, 1); hecho(r.code, `${bodegaNombre(cat(), r.code)} · ${n}`);
+        const d = esc.dudosos[i], raw12 = String(d.raw || "").replace(/\D/g, "");
+        bodegaEditor(cat(), raw12.length === 12 ? raw12 : "", d.qty, (v, n) => {
+          esc.stock[v] = n; esc.confirmadas[v] = true; esc.leidos = Object.keys(esc.stock).length;
+          if (!bodegaCatalogoEscaneo()[v] && !esc.nuevos.includes(v)) esc.nuevos.push(v);
+          const k = esc.dudosos.indexOf(d); if (k >= 0) esc.dudosos.splice(k, 1);
+          hecho(v, `${bodegaNombre(cat(), v)} · ${n}`); again();
+        });
+        return;
+      }
+      else if (act === "upc") {
+        bodegaEditor(cat(), code, esc.stock[code], (v, n) => {
+          if (v !== code) { delete esc.stock[code]; esc.revisar = (esc.revisar || []).filter(x => x.code !== code); }
+          esc.stock[v] = n; esc.confirmadas[v] = true; esc.leidos = Object.keys(esc.stock).length;
+          if (!bodegaCatalogoEscaneo()[v] && !esc.nuevos.includes(v)) esc.nuevos.push(v);
+          hecho(v, `${bodegaNombre(cat(), v)} · ${n}`); again();
+        });
+        return;
       }
       again();
     }));
