@@ -3117,5 +3117,29 @@
     "color": "Caja AppleCare+",
     "capacidad": "N/A",
     "applecare": 799
+  },
+  "195951078458": {
+    "modelo": "Mac Studio M5 Max 36GB CPU 18 / GPU 32",
+    "color": "Plata",
+    "capacidad": "512 Gb",
+    "applecare": 4199
+  },
+  "195951020990": {
+    "modelo": "Mac mini M6 16GB CPU 12 / GPU 12",
+    "color": "Plata",
+    "capacidad": "256 Gb",
+    "applecare": 2299
+  },
+  "195951021386": {
+    "modelo": "Mac mini M6 16GB CPU 12 / GPU 12",
+    "color": "Plata",
+    "capacidad": "512 Gb",
+    "applecare": 2299
+  },
+  "195951078861": {
+    "modelo": "Mac Studio M5 Ultra 96GB CPU 30 / GPU 64",
+    "color": "Plata",
+    "capacidad": "1 TB",
+    "applecare": 4199
   }
 }

@@ -1,0 +1,11 @@
+{
+  "_nota": "Precios de lista que se ven en Existencias. Clave: UPC exacto, o \"modelo exacto|capacidad\" para aplicar a todos los colores. Agrega aquí los demás.",
+  "MacBook Neo 13\" A18 Pro 8GB / CPU 6 / GPU 5|256 GB": 13999,
+  "MacBook Neo 13\" A18 Pro 8GB / CPU 6 / GPU 5|512 GB": 16499,
+  "Macbookpro 14\" M5 16GB CPU 10 / GPU 10|512 GB": 34999,
+  "Macbookpro 14\" M5 16GB CPU 10 / GPU 10|1 TB": 40999,
+  "195951078458": 57999,
+  "195951020990": 19999,
+  "195951021386": 24999,
+  "195951078861": 129999
+}
