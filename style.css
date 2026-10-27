@@ -1576,10 +1576,8 @@ html[data-mode="dark"] .bod-reporte{ background:#1c1c1e; }
 .bod-aviso{ font-size:14px; margin:10px 0 6px; }
 .bod-nuevos .docs-btn{ display:block; width:100%; margin-bottom:6px; }
 
-/* ---- Botón Registros de la pantalla principal: oculto (mismo lugar, sigue funcionando al tocar / mantener) ---- */
-.home-reg{ background:transparent !important; box-shadow:none !important; border:none; -webkit-tap-highlight-color:transparent; outline:none; }
-.home-reg > *{ opacity:0; }
-.home-reg:active{ transform:none; }
+/* ---- Botón Registros de la pantalla principal ---- */
+.home-reg{ -webkit-tap-highlight-color:transparent; outline:none; }
 
 /* =====================================================================
    CONTRASTE: letras de botones/pestañas sin seleccionar (Solo equipo, + AppleCare+, etc.)
@@ -1611,3 +1609,28 @@ html[data-mode="dark"]{ --text-secondary:#b4b4ba; }
 .ds-aplica{ position:relative; margin:12px auto 0; display:inline-flex; gap:6px; align-items:center; padding:7px 14px; border-radius:999px; background:rgba(255,255,255,.2); border:1px solid rgba(255,255,255,.5); color:#fff; font-size:14px; font-weight:700; }
 .ds-aplica b{ font-weight:800; }
 .mp-sub{ display:block; margin-top:3px; font-size:13px; font-weight:700; color:var(--accent); letter-spacing:0; }
+
+
+/* ---- Botón grande Existencias (pantalla principal, arriba de la cuadrícula) ---- */
+.home-exist{
+  width:100%; margin:0 0 14px; border:none; border-radius:26px; padding:24px 20px; min-height:104px; display:flex; align-items:center; gap:16px;
+  color:#fff; font:inherit; text-align:left; position:relative;
+  background:linear-gradient(120deg, #35b394, #1f8a93 55%, #1a6a82);
+  box-shadow:0 14px 28px rgba(31,138,147,.34), inset 0 1px 0 rgba(255,255,255,.28);
+  transition:transform .15s ease; -webkit-tap-highlight-color:transparent;
+}
+.home-exist:active{ transform:scale(.985); }
+.home-exist-icon{ width:62px; height:62px; border-radius:18px; background:rgba(255,255,255,.18); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.home-exist-icon svg{ width:34px; height:34px; }
+.home-exist-text{ flex:1; display:flex; flex-direction:column; gap:4px; }
+.home-exist-text strong{ font-size:25px; font-weight:780; letter-spacing:-0.02em; }
+.home-exist-text small{ font-size:14px; opacity:.82; }
+.home-exist .home-tile-chev{ width:10px; height:10px; border-width:2.5px; }
+
+/* ---- "daac" (mantener presionado 1 s abre Bodega) ---- */
+.ds-wm span{ pointer-events:auto; padding:12px 16px; margin:-12px -16px; -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
+
+/* ---- Registros: datos bloqueados, solo fotos ---- */
+.docs-bloq-nota{ margin:0 0 14px; padding:12px 14px; border-radius:14px; background:rgba(255,159,10,.16); color:#a65f00; font-size:15px; font-weight:650; line-height:1.35; }
+.docs-card.docs-bloq > :not(.docs-bloq-nota){ opacity:.45; pointer-events:none; -webkit-user-select:none; user-select:none; }
+.docs-card.docs-bloq canvas{ pointer-events:none; }

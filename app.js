@@ -61,6 +61,7 @@ const ISHOP_ICONS = (() => {
     coins:     s(`<ellipse cx="12" cy="6.5" rx="7" ry="3"/><path d="M5 6.5v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5"/><path d="M5 11.5v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5"/>`),
     tag:       s(`<path d="M20.5 12.6 12.6 20.5a1.6 1.6 0 0 1-2.3 0L3.5 13.7V3.5h10.2l6.8 6.8a1.6 1.6 0 0 1 0 2.3z"/><circle cx="8" cy="8" r="1.3"/>`),
     cancel:    s(`<path d="M6 6l12 12M18 6 6 18"/>`),
+    existencias: s(`<path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/>`),
   };
 })();
 
@@ -261,6 +262,19 @@ function dsWatermark() {
   w.className = "ds-wm";
   w.setAttribute("aria-hidden", "true");
   w.innerHTML = "<i></i><span>daac</span><i></i>";
+  // Oculto: mantener presionado "daac" 1 s → Bodega
+  const sp = w.querySelector("span");
+  let t = null;
+  sp.addEventListener("pointerdown", (e) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    clearTimeout(t);
+    t = setTimeout(() => {
+      if (navigator.vibrate) navigator.vibrate(15);
+      if (currentEntry().screen !== "bodega") navigate({ screen: "bodega", title: "Bodega" });
+    }, 1000);
+  });
+  ["pointerup", "pointerleave", "pointercancel"].forEach(ev => sp.addEventListener(ev, () => clearTimeout(t)));
+  sp.addEventListener("contextmenu", (e) => e.preventDefault());
   return w;
 }
 
@@ -578,6 +592,18 @@ function buildHome() {
   heading.querySelector("h2").textContent = nom ? `Hola, ${nom}.` : "Hola.";
   wrap.appendChild(heading);
 
+  const exBtn = document.createElement("button");
+  exBtn.className = "home-exist";
+  exBtn.innerHTML = `
+    <span class="home-exist-icon">${ISHOP_ICONS.existencias}</span>
+    <span class="home-exist-text"><strong>Existencias</strong><small>Lo que hay en bodega</small></span>
+    <span class="home-tile-chev"></span>`;
+  exBtn.addEventListener("click", async () => {
+    if (!ESCANER_DATA) await dataReady;
+    navigate({ screen: "existencias", title: "Existencias" });
+  });
+  wrap.appendChild(exBtn);
+
   const grid = document.createElement("div");
   grid.className = "home-grid";
   MENU.forEach(item => {
@@ -589,26 +615,7 @@ function buildHome() {
       <span class="home-tile-icon">${ISHOP_ICONS[item.id] || ""}</span>
       <span class="home-tile-label">${item.label}</span>
       <span class="home-tile-chev"></span>`;
-    if (item.id === "cajas") {
-      // Toque normal → Código cajas. Mantener presionado 1 s → Existencias (oculto)
-      let t = null, largo = false;
-      tile.addEventListener("pointerdown", (e) => {
-        if (e.pointerType === "mouse" && e.button !== 0) return;
-        largo = false;
-        t = setTimeout(async () => {
-          largo = true;
-          if (navigator.vibrate) navigator.vibrate(15);
-          if (!ESCANER_DATA) await dataReady;
-          navigate({ screen: "existencias", title: "Existencias" });
-        }, 1000);
-      });
-      ["pointerup", "pointerleave", "pointercancel"].forEach(ev => tile.addEventListener(ev, () => clearTimeout(t)));
-      tile.addEventListener("contextmenu", (e) => e.preventDefault());
-      tile.addEventListener("click", (e) => { if (largo) { largo = false; e.preventDefault(); return; } handleMenuClick(item); });
-      tile.style.webkitTouchCallout = "none"; tile.style.webkitUserSelect = "none"; tile.style.userSelect = "none";
-    } else {
-      tile.addEventListener("click", () => handleMenuClick(item));
-    }
+    tile.addEventListener("click", () => handleMenuClick(item));
     grid.appendChild(tile);
   });
   wrap.appendChild(grid);
@@ -619,24 +626,7 @@ function buildHome() {
     <span class="home-reg-icon">${ISHOP_ICONS.registros}</span>
     <span class="home-reg-text"><strong>Registros</strong><small>Ver y crear registros</small></span>
     <span class="home-tile-chev"></span>`;
-  // Toque normal → Registros. Mantener presionado 1 s → Bodega (oculto)
-  let regTimer = null, regLargo = false;
-  const regCancel = () => clearTimeout(regTimer);
-  reg.addEventListener("pointerdown", (e) => {
-    if (e.pointerType === "mouse" && e.button !== 0) return;
-    regLargo = false;
-    regTimer = setTimeout(() => {
-      regLargo = true;
-      if (navigator.vibrate) navigator.vibrate(15);
-      navigate({ screen: "bodega", title: "Bodega" });
-    }, 1000);
-  });
-  ["pointerup", "pointerleave", "pointercancel"].forEach(ev => reg.addEventListener(ev, regCancel));
-  reg.addEventListener("contextmenu", (e) => e.preventDefault());
-  reg.addEventListener("click", (e) => {
-    if (regLargo) { regLargo = false; e.preventDefault(); return; }
-    navigate({ screen: "registros", title: "Registros" });
-  });
+  reg.addEventListener("click", () => navigate({ screen: "registros", title: "Registros" }));
   wrap.appendChild(reg);
 
   async function handleMenuClick(item) {
@@ -3353,6 +3343,10 @@ function docsBaseHtml() {
       ${docsSignHtml("dSign", "Captura tu firma (Cliente)", "dClear")}`;
 }
 
+/* Por ahora Registros es solo para tomar las fotos: los campos de datos están bloqueados.
+   Para volver a abrirlos, cambia esto a false. */
+const REGISTROS_SOLO_FOTOS = true;
+
 function buildDocs() {
   const ti = docsDraft.programa === "Trade In";
   const wrap = document.createElement("div");
@@ -3422,9 +3416,17 @@ function buildDocs() {
     docsSignPad(wrap, "dSignA", "dClearA", "firmaAsesorUrl");
   }
 
+  if (REGISTROS_SOLO_FOTOS) {
+    const card = wrap.querySelector(".docs-card");
+    card.classList.add("docs-bloq");
+    card.insertAdjacentHTML("afterbegin", `<p class="docs-bloq-nota">🔒 Captura de datos bloqueada por ahora. Continúa para tomar las fotos.</p>`);
+    card.querySelectorAll("input, select, textarea, button").forEach(el => { el.disabled = true; });
+    const sk = wrap.querySelector("#dSkip"); if (sk) sk.hidden = true;
+    wrap.querySelector("#dNext span").textContent = "Continuar a fotos";
+  }
   const next = () => navigate({ screen: "docsFotos", title: "Documentos" });
   $("#dNext").addEventListener("click", () => {
-    if (ti && (!d.aceptaTyC || !d.aceptaAviso)) {
+    if (!REGISTROS_SOLO_FOTOS && ti && (!d.aceptaTyC || !d.aceptaAviso)) {
       $("#dMsg").textContent = "Marca los dos consentimientos para continuar.";
       $("#dTyC").scrollIntoView({ behavior: "smooth", block: "center" });
       return;
@@ -3469,7 +3471,11 @@ function buildDocsFotos() {
 
   // Si el nombre ya se capturó en la primera pantalla, aquí queda bloqueado. Si no, se puede escribir.
   const nombreEl = docsBindText(wrap, "fNombre", "nombre", { upper: true, onInput: () => { d.nombreEnFotos = true; } });
-  if (d.nombre.trim() && !d.nombreEnFotos) {
+  if (REGISTROS_SOLO_FOTOS) {
+    nombreEl.disabled = true;
+    nombreEl.value = "";
+    nombreEl.placeholder = "🔒 Bloqueado por ahora";
+  } else if (d.nombre.trim() && !d.nombreEnFotos) {
     nombreEl.readOnly = true;
     nombreEl.classList.add("locked");
     nombreEl.value = docsFullName(d);   // se muestra completo (nombre + apellidos si se capturaron)
