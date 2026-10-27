@@ -53,16 +53,17 @@ const MAX_HIST = 40;
     listo = true; estado(snap.metadata.fromCache ? "sin conexión" : "en línea");
   }, err => { console.warn(err); estado("sin sync"); });
 
-  /* ---- Historial (ventas, reportes): últimos 40, para "Ventas / Deshacer" en cualquier teléfono ---- */
-  F.onSnapshot(F.query(histCol, F.orderBy("ts", "desc"), F.limit(MAX_HIST)), snap => {
-    if (snap.metadata.hasPendingWrites) return;
+  /* ---- Historial (ventas): NO se escucha todo el día. Se baja una sola vez cuando alguien abre "Ventas". ---- */
+  window.ishopCargarHistorial = async function () {
+    const snap = await F.getDocs(F.query(histCol, F.orderBy("ts", "desc"), F.limit(MAX_HIST)));
     const rem = snap.docs.map(x => x.data());
     const l = leer();
     const minTs = rem.length >= MAX_HIST ? rem[rem.length - 1].ts : 0;
-    const viejos = (l.historial || []).filter(h => h.ts < minTs);   // lo anterior a lo que Firebase guarda
-    const nuevo = [...rem, ...viejos].sort((a, b) => b.ts - a.ts).slice(0, 100);
-    if (JSON.stringify(nuevo) !== JSON.stringify(l.historial)) { guardarLocal({ ...l, historial: nuevo }); aviso(); }
-  }, () => {});
+    const viejos = (l.historial || []).filter(h => h.ts < minTs);
+    const pend = (l.historial || []).filter(h => h.ts >= minTs && !rem.some(r => r.ts === h.ts) && Date.now() - h.ts < 60000);   // recién hechas, aún subiendo
+    const nuevo = [...rem, ...pend, ...viejos].sort((a, b) => b.ts - a.ts).slice(0, 100);
+    if (JSON.stringify(nuevo) !== JSON.stringify(l.historial)) guardarLocal({ ...l, historial: nuevo });
+  };
 
   /* ---- Subir cambios: bodegaSave(prev → d) ---- */
   window.ishopSyncPush = function (prev, d) {

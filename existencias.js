@@ -444,7 +444,8 @@ function buildExistencias() {
   }
 
   /* ---- Ventas recientes: deshacer una venta aunque ya pasó tiempo ---- */
-  wrap.querySelector("#exVentas").addEventListener("click", () => {
+  wrap.querySelector("#exVentas").addEventListener("click", async () => {
+    try { if (window.ishopCargarHistorial) await Promise.race([window.ishopCargarHistorial(), new Promise(r => setTimeout(r, 3500))]); } catch (_) {}
     const est = bodegaLoad();
     const ventas = (est.historial || []).filter(h => h.origen === "venta").slice(0, 40);
     const bg = document.createElement("div"); bg.className = "ex-sheet-bg";
