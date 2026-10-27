@@ -526,6 +526,8 @@ function buildScreen(entry) {
     el.appendChild(buildBodegaManual());
   } else if (entry.screen === "bodegaNoVend") {
     el.appendChild(buildBodegaNoVend());
+  } else if (entry.screen === "bodegaDemo") {
+    el.appendChild(buildBodegaDemo());
   } else if (entry.screen === "bodegaHist") {
     el.appendChild(buildBodegaHist());
   } else if (entry.screen === "bodegaDetalle") {
@@ -1107,9 +1109,9 @@ function buildScanner() {
       <div class="trade-banner"><span>${code}</span><strong>${info.modelo}</strong></div>
       <div class="finance-col">
         <div class="finance-row"><span>Color</span><strong>${info.color}</strong></div>
-        <div class="finance-row"><span>Capacidad</span><strong>${info.capacidad} GB</strong></div>
-        <div class="finance-row"><span>AppleCare+</span><strong>${money(info.applecare)}</strong></div>
-        <div class="finance-row total"><span>AppleCare+ R y P</span><strong>${money(info.applecare_robo_perdida)}</strong></div>
+        <div class="finance-row"><span>Capacidad</span><strong>${/^\d+$/.test(String(info.capacidad).trim()) ? info.capacidad + " GB" : info.capacidad}</strong></div>
+        <div class="finance-row${typeof info.applecare_robo_perdida === "number" ? "" : " total"}"><span>AppleCare+</span><strong>${money(info.applecare)}</strong></div>
+        ${typeof info.applecare_robo_perdida === "number" ? `<div class="finance-row total"><span>AppleCare+ R y P</span><strong>${money(info.applecare_robo_perdida)}</strong></div>` : ""}
       </div>
     `;
   }

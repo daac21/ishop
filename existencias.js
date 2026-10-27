@@ -186,6 +186,8 @@ function exEstilos() {
   .ex-upc{ display:block; margin-top:3px; font:14px ui-monospace,Menlo,monospace; color:var(--text-secondary); letter-spacing:.02em; }
   .ex-apa{ display:inline-flex; align-items:center; gap:4px; margin-top:6px; font-size:12px; font-weight:700; color:var(--bx-cap); background:rgba(10,132,255,.16); padding:3px 9px 3px 6px; border-radius:999px; }
   .ex-apa svg{ width:12px; height:12px; fill:currentColor; stroke:currentColor; stroke-width:1.4; stroke-linejoin:round; }
+  .ex-apa.demo{ color:#1c8da3; background:rgba(48,176,199,.2); margin-left:6px; }
+  html[data-mode="dark"] .ex-apa.demo{ color:#5fd0e4; }
   .ex-price{ font-size:19px; font-weight:800; letter-spacing:-.01em; white-space:nowrap; }
   .ex-ago-b{ margin:22px 4px 6px; }
   .ex-ago-b summary{ list-style:none; display:flex; align-items:center; justify-content:space-between; padding:14px 16px; border-radius:16px; background:var(--bx-redbg); color:var(--bx-red); font-weight:800; font-size:16px; }
@@ -232,6 +234,8 @@ function buildExistencias() {
   const bod = (typeof bodegaLoad === "function") ? bodegaLoad() : { stock: {}, fecha: "" };
   const stock = bod.stock || {};
   const apart = (typeof bodegaApartados === "function") ? bodegaApartados() : {};
+  let demo = (typeof bodegaDemo === "function") ? bodegaDemo() : {};   // piezas de demostración (dentro de la existencia de bodega)
+  const libre = k => Math.max(0, (stock[k] || 0) - (demo[k] || 0));    // lo que se muestra: bodega − demostración
 
   const todos = {};
   Object.keys(cat).forEach(k => { todos[k] = cat[k]; });
@@ -240,9 +244,10 @@ function buildExistencias() {
   let disp = [], agot = [];
   function calc() {
     disp = []; agot = [];
+    demo = (typeof bodegaDemo === "function") ? bodegaDemo() : {};
     Object.keys(todos).forEach(k => {
       const p = exParse(todos[k].modelo, todos[k].seccion);
-      const it = { upc: k, ...todos[k], titulo: p.titulo, spec: p.spec, qty: stock[k] || 0 };
+      const it = { upc: k, ...todos[k], titulo: p.titulo, spec: p.spec, qty: libre(k), demo: Math.min(demo[k] || 0, stock[k] || 0) };
       (it.qty > 0 ? disp : agot).push(it);
     });
   }
@@ -281,12 +286,13 @@ function buildExistencias() {
     return (i.titulo + " " + i.spec + " " + i.modelo + " " + i.color + " " + i.capacidad + " " + i.upc).toLowerCase().includes(t);
   };
   const apaHtml = (n) => n > 0 ? `<span class="ex-apa"><svg viewBox="0 0 24 24"><path d="M7 4h10v16l-5-3.5L7 20z"/></svg>${n} apartado${n === 1 ? "" : "s"}</span>` : "";
+  const demoHtml = (n) => n > 0 ? `<span class="ex-apa demo"><svg viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="11.5" rx="2" fill="none"/><path d="M8 20h8M12 16v4" fill="none"/></svg>${n} en demostración</span>` : "";
   const badge = (q) => q <= 0 ? `<div class="ex-badge zero">0<small>AGOTADO</small></div>` : q <= 3 ? `<div class="ex-badge low">${q}<small>POCAS</small></div>` : `<div class="ex-badge">${q}</div>`;
   const fila = (i) => {
     const pr = exPrecio(i);
     const row = `<div class="ex-row" data-u="${i.upc}">
       <div class="ex-dot" style="background:${exColor(i.color)}"></div>
-      <div class="ex-info"><span class="col">${exEsc(i.color || "Sin color")}</span><span class="ex-upc">${exEsc(i.upc)}</span>${i.qty > 0 ? apaHtml(apart[i.upc] || 0) : ""}</div>
+      <div class="ex-info"><span class="col">${exEsc(i.color || "Sin color")}</span><span class="ex-upc">${exEsc(i.upc)}</span>${i.qty > 0 ? apaHtml(apart[i.upc] || 0) : ""}${demoHtml(i.demo)}</div>
       ${pr != null ? `<span class="ex-price">${exMoney(pr)}</span>` : ""}
       ${badge(i.qty)}
     </div>`;
@@ -410,7 +416,7 @@ function buildExistencias() {
 
   /* ---- confirmar venta: descuenta 1 pieza de la bodega ---- */
   function pedirVenta(upc) {
-    const it = todos[upc], q = stock[upc] || 0; if (!it || q <= 0) return;
+    const it = todos[upc], q = libre(upc); if (!it || q <= 0) return;
     const bg = document.createElement("div"); bg.className = "ex-conf-bg";
     bg.innerHTML = `<div class="ex-conf"><h3>¿Vendiste este producto?</h3>
       <div class="ex-conf-it"><div class="ex-dot" style="background:${exColor(it.color)}"></div><div><b>${exEsc(it.modelo)}</b><small>${exEsc([it.color, it.capacidad && exCap(it.capacidad)].filter(Boolean).join(" · "))}</small><small style="font-family:ui-monospace,Menlo,monospace">UPC ${exEsc(upc)}</small></div></div>
@@ -423,7 +429,7 @@ function buildExistencias() {
   }
   function vender(upc) {
     if (typeof bodegaLoad !== "function" || typeof bodegaSave !== "function") return;
-    const est = bodegaLoad(), prev = { ...(est.stock || {}) }, q = prev[upc] || 0; if (q <= 0) return;
+    const est = bodegaLoad(), prev = { ...(est.stock || {}) }, q = prev[upc] || 0, dm = Math.min((bodegaDemo()[upc] || 0), q); if (q - dm <= 0) return;
     const nuevo = { ...prev, [upc]: q - 1 };
     let hist = est.historial || [];
     try { hist = bodegaRegistrar(est, prev, nuevo, bodegaCatalogoTodo(prev), "venta", est.fecha); } catch (_) {}
@@ -432,7 +438,7 @@ function buildExistencias() {
     const antesHist = est.historial || [];
     const old = document.querySelector(".ex-toast"); if (old) old.remove();
     const t = document.createElement("div"); t.className = "ex-toast";
-    t.innerHTML = `<span>Vendido · quedan ${q - 1}</span><button type="button">Deshacer</button>`;
+    t.innerHTML = `<span>Vendido · quedan ${Math.max(0, q - 1 - dm)}</span><button type="button">Deshacer</button>`;
     document.body.appendChild(t);
     const timer = setTimeout(() => t.remove(), 6000);
     t.querySelector("button").addEventListener("click", () => {

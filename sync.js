@@ -17,12 +17,15 @@ const CFG = {
 };
 const KEY = "ishop_bodega_v1";          // misma llave que usa bodega.js
 const MAX_HIST = 40;
+const DEMO_KEY = "ishop_bodega_demo_v1";   // misma llave que usa bodega.js (Demostración)
 
 (async function () {
   let F;   // funciones de firestore
   let db, invRef, histCol, remoto = null, listo = false;
   const leer = () => { try { const d = JSON.parse(localStorage.getItem(KEY)); if (d && d.stock) { if (!Array.isArray(d.historial)) d.historial = []; return d; } } catch (_) {} return { stock: {}, fecha: "", ultimoReporte: null, historial: [] }; };
   const guardarLocal = (d) => { try { localStorage.setItem(KEY, JSON.stringify(d)); } catch (_) {} };
+  const leerDemo = () => { try { const o = JSON.parse(localStorage.getItem(DEMO_KEY)); return o && typeof o === "object" ? o : {}; } catch (_) { return {}; } };
+  const demoTxt = () => JSON.stringify(leerDemo());
   const aviso = () => { try { window.dispatchEvent(new Event("ishop-remote")); } catch (_) {} };
   const estado = (t) => { window.ishopSyncEstado = t; try { window.dispatchEvent(new Event("ishop-sync-estado")); } catch (_) {} };
 
@@ -47,10 +50,12 @@ const MAX_HIST = 40;
     if (snap.metadata.hasPendingWrites) return;               // eco de mi propio cambio
     if (!snap.exists()) {                                      // primera vez: sube lo que hay en este dispositivo
       const l = leer();
-      if (Object.keys(l.stock).length) F.setDoc(invRef, { stock: l.stock, fecha: l.fecha || "", ts: Date.now() }).catch(() => {});
+      if (Object.keys(l.stock).length) F.setDoc(invRef, { stock: l.stock, fecha: l.fecha || "", demo: demoTxt(), ts: Date.now() }).catch(() => {});
       listo = true; estado("en línea"); return;
     }
     const d = snap.data();
+    // Demostración: si otro dispositivo la cambió, se copia aquí (si el documento aún no la trae, se deja la local)
+    if (typeof d.demo === "string" && d.demo !== demoTxt()) { try { localStorage.setItem(DEMO_KEY, d.demo); } catch (_) {} aviso(); }
     remoto = { ...(d.stock || {}) };
     const l = leer();
     const igual = JSON.stringify(Object.keys(remoto).sort().map(k => [k, remoto[k]])) === JSON.stringify(Object.keys(l.stock).sort().map(k => [k, l.stock[k]]));
@@ -75,11 +80,17 @@ const MAX_HIST = 40;
     if (apagar) { try { localStorage.setItem(PAUSA, String(Date.now())); } catch (_) {} estado("pausado (solo local)"); return; }
     const desde = pausaDesde(), l = leer();
     // Publica TODO lo local: reemplaza el inventario completo (lo agregado y lo borrado) y las entradas nuevas del historial.
-    await F.setDoc(invRef, { stock: l.stock, fecha: l.fecha || "", ts: Date.now() });
+    await F.setDoc(invRef, { stock: l.stock, fecha: l.fecha || "", demo: demoTxt(), ts: Date.now() });
     remoto = { ...l.stock };
     for (const h of (l.historial || [])) if (h.ts >= desde) await F.setDoc(F.doc(histCol, String(h.ts)), h);
     try { localStorage.removeItem(PAUSA); } catch (_) {}
     estado("en línea");
+  };
+
+  /* ---- Demostración: bodegaDemoSave() sube el mapa completo (texto JSON) ---- */
+  window.ishopSyncDemo = function (m) {
+    if (!F || !listo || pausaDesde()) return;
+    F.setDoc(invRef, { demo: JSON.stringify(m || {}), ts: Date.now() }, { merge: true }).catch(e => console.warn(e));
   };
 
   /* ---- Subir cambios: bodegaSave(prev → d) ---- */
