@@ -474,6 +474,16 @@ function buildExistencias() {
     });
   });
 
+  /* ---- cambios de otros dispositivos (Firebase): se repinta con la copia local, sin leer nada extra ---- */
+  const alRemoto = () => {
+    if (!wrap.isConnected) { window.removeEventListener("ishop-remote", alRemoto); window.removeEventListener("ishop-sync-estado", alEstado); return; }
+    const b = bodegaLoad();
+    Object.keys(stock).forEach(k => { delete stock[k]; }); Object.assign(stock, b.stock || {});
+    Object.keys(stock).forEach(k => { if (!todos[k]) todos[k] = { modelo: "Código nuevo", color: "", capacidad: "", seccion: "Otros" }; });
+    calc(); pintaCar(); pintaLista();
+  };
+  const alEstado = () => { const m = wrap.querySelector(".ex-meta"); if (m && window.ishopSyncEstado) m.textContent = m.textContent.replace(/ · (en línea|sin conexión|sin sync)$/, "") + " · " + window.ishopSyncEstado; };
+  window.addEventListener("ishop-remote", alRemoto); window.addEventListener("ishop-sync-estado", alEstado); alEstado();
   wrap.querySelector("#exBuscar").addEventListener("input", e => { texto = e.target.value.trim(); pintaCar(); pintaLista(); });
   pintaCar(); pintaLista();
   return wrap;

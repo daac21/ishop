@@ -62,7 +62,11 @@ function bodegaLoad() {
   try { const d = JSON.parse(localStorage.getItem(BODEGA_KEY)); if (d && d.stock) { if (!Array.isArray(d.historial)) d.historial = []; return d; } } catch (e) {}
   return { stock: {}, fecha: "", ultimoReporte: null, historial: [] };
 }
-function bodegaSave(d) { try { localStorage.setItem(BODEGA_KEY, JSON.stringify(d)); } catch (e) {} }
+function bodegaSave(d) {
+  let prev = null; try { prev = JSON.parse(localStorage.getItem(BODEGA_KEY)); } catch (e) {}
+  try { localStorage.setItem(BODEGA_KEY, JSON.stringify(d)); } catch (e) {}
+  try { if (typeof window.ishopSyncPush === "function") window.ishopSyncPush(prev, d); } catch (e) {}   // sync.js: sube el cambio a Firebase
+}
 
 /* ---------- UPC-A: dígito verificador ---------- */
 function bodegaUpcOk(c) {
