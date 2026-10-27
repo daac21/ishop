@@ -26,6 +26,10 @@ const MAX_HIST = 40;
   const aviso = () => { try { window.dispatchEvent(new Event("ishop-remote")); } catch (_) {} };
   const estado = (t) => { window.ishopSyncEstado = t; try { window.dispatchEvent(new Event("ishop-sync-estado")); } catch (_) {} };
 
+  const PAUSA = "ishop_sync_pausa";   // "ts" desde que se apagó; vacío = encendida
+  const pausaDesde = () => { try { return +localStorage.getItem(PAUSA) || 0; } catch (_) { return 0; } };
+  window.ishopSyncPausada = () => pausaDesde() > 0;
+
   try {
     const [A, Au, Fs] = await Promise.all([import(SDK + "firebase-app.js"), import(SDK + "firebase-auth.js"), import(SDK + "firebase-firestore.js")]);
     F = Fs;
@@ -39,6 +43,7 @@ const MAX_HIST = 40;
 
   /* ---- Inventario: un solo oyente ---- */
   F.onSnapshot(invRef, snap => {
+    if (pausaDesde()) { estado("pausado (solo local)"); return; }   // modo pruebas: no se pisa lo local
     if (snap.metadata.hasPendingWrites) return;               // eco de mi propio cambio
     if (!snap.exists()) {                                      // primera vez: sube lo que hay en este dispositivo
       const l = leer();
@@ -65,9 +70,21 @@ const MAX_HIST = 40;
     if (JSON.stringify(nuevo) !== JSON.stringify(l.historial)) guardarLocal({ ...l, historial: nuevo });
   };
 
+  /* ---- Modo pruebas: apagar / encender ---- */
+  window.ishopSyncPausa = async function (apagar) {
+    if (apagar) { try { localStorage.setItem(PAUSA, String(Date.now())); } catch (_) {} estado("pausado (solo local)"); return; }
+    const desde = pausaDesde(), l = leer();
+    // Publica TODO lo local: reemplaza el inventario completo (lo agregado y lo borrado) y las entradas nuevas del historial.
+    await F.setDoc(invRef, { stock: l.stock, fecha: l.fecha || "", ts: Date.now() });
+    remoto = { ...l.stock };
+    for (const h of (l.historial || [])) if (h.ts >= desde) await F.setDoc(F.doc(histCol, String(h.ts)), h);
+    try { localStorage.removeItem(PAUSA); } catch (_) {}
+    estado("en línea");
+  };
+
   /* ---- Subir cambios: bodegaSave(prev → d) ---- */
   window.ishopSyncPush = function (prev, d) {
-    if (!F || !listo) return;
+    if (!F || !listo || pausaDesde()) return;     // modo pruebas: no se sube nada
     const base = remoto || (prev && prev.stock) || {};
     const nuevo = d.stock || {};
     const delta = {};

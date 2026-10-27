@@ -1046,7 +1046,13 @@ function buildBodega() {
       ultimo = `<h3>Último reporte</h3><p class="bx-sub" style="margin:0">Todavía no hay reportes. Cuando apliques el primero, aquí verás qué cambió.</p>`;
     }
 
+    const sp = window.ishopSyncPausada ? window.ishopSyncPausada() : false, sd = typeof window.ishopSyncPausa === "function";
     wrap.innerHTML = `
+      ${sd ? `<div class="bx-card" style="${sp ? "outline:2px solid #ff9f0a" : ""}">
+        <h3>Sincronización con Firebase</h3>
+        <p class="bx-sub">${sp ? "<b>Modo pruebas:</b> tus cambios se quedan solo en este dispositivo. Nadie más los ve." : "Encendida: lo que hagas aquí le llega a todos los dispositivos."}</p>
+        <button class="bx-btn ${sp ? "pri" : ""}" id="bodSync"><span>${sp ? "Encender sincronización y publicar lo que hice" : "Apagar sincronización (modo pruebas)"}</span></button>
+      </div>` : ""}
       <div class="bx-card bx-s-azul">
         <h3>Actualizar existencias</h3>
         <p class="bx-sub">${n ? `Sube el reporte de hoy o captura un cambio manual.${estado.fecha ? " Última lista: " + bodegaEsc(estado.fecha) + "." : ""}` : "Sube el reporte de hoy o captura un cambio manual. Todavía no hay existencias guardadas."}</p>
@@ -1271,6 +1277,19 @@ function buildBodega() {
     });
   }
 
+  wrap.addEventListener("click", async (e) => {
+    const bt = e.target.closest("#bodSync"); if (!bt || !window.ishopSyncPausa) return;
+    const pausada = window.ishopSyncPausada();
+    if (!pausada) {
+      if (!confirm("¿Apagar la sincronización?\n\nLo que subas o cambies aquí se queda solo en este dispositivo y no verás los cambios de los demás hasta que la enciendas.")) return;
+      window.ishopSyncPausa(true); estado = bodegaLoad(); pintar();
+    } else {
+      if (!confirm("¿Encender la sincronización?\n\nTodo lo que dejaste en este dispositivo (lo agregado y lo borrado) se publicará y reemplazará lo que ven los demás.")) return;
+      bt.disabled = true; bt.querySelector("span").textContent = "Publicando…";
+      try { await window.ishopSyncPausa(false); } catch (_) { alert("No se pudo publicar. Revisa tu conexión e inténtalo de nuevo."); }
+      estado = bodegaLoad(); pintar();
+    }
+  });
   pintar();
   return wrap;
 }
