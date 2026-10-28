@@ -924,9 +924,15 @@ function bodegaEstilos() {
   .bx-nvi{ flex:1; min-width:0; } .bx-nvi b{ display:block; font-size:15px; } .bx-nvi span{ font-size:13px; color:var(--text-secondary); } .bx-nvi small{ display:block; font-size:12.5px; margin-top:2px; color:var(--text-secondary); font-style:italic; }
   .bx-tipo{ font-size:11px; font-weight:800; padding:4px 8px; border-radius:8px; color:var(--t); background:color-mix(in srgb,var(--t) 16%, transparent); white-space:nowrap; }
   .bx-nvq{ font-size:17px; min-width:30px; text-align:right; }
+  .bx-f2{ display:grid; grid-template-columns:1.4fr 1fr; gap:8px; margin-bottom:6px; } .bx-f2 .bx-nota{ margin:0; min-width:0; }
+  .bx-minus{ width:32px; height:32px; border:0; border-radius:50%; font-size:20px; line-height:1; background:var(--bx-fill); color:var(--text); padding:0; flex:0 0 auto; }
+  .bx-nvs{ width:100%; padding:11px 14px; border-radius:12px; border:0; font-size:15.5px; background:var(--bx-fill); color:var(--text); margin:2px 0 6px; }
+  .bx-nvi .meta{ display:block; font-size:12.5px; color:var(--text-secondary); margin-top:2px; font-style:normal; }
+  .bx-opt{ display:block; width:100%; text-align:left; border:1px solid var(--bx-line); background:var(--bx-card); color:var(--text); border-radius:14px; padding:14px 16px; margin-bottom:10px; font:inherit; }
+  .bx-opt b{ display:block; font-size:16px; } .bx-opt span{ display:block; margin-top:3px; font-size:13px; color:var(--text-secondary); }
   .bx-x{ border:0; background:none; padding:6px; color:var(--text-secondary); } .bx-x svg{ width:22px; height:22px; }
   .bx-sheet-bg{ position:fixed; inset:0; z-index:60; background:rgba(0,0,0,.5); display:flex; align-items:flex-end; justify-content:center; }
-  .bx-sheet{ width:100%; max-width:560px; background:var(--bx-card); color:var(--text); border-radius:22px 22px 0 0; padding:20px 18px calc(20px + var(--safe-bottom)); }
+  .bx-sheet{ max-height:92vh; overflow:auto; width:100%; max-width:560px; background:var(--bx-card); color:var(--text); border-radius:22px 22px 0 0; padding:20px 18px calc(20px + var(--safe-bottom)); }
   .bx-sheet h3{ margin:0; font-size:19px; } .bx-sheet p{ margin:4px 0 14px; font-size:14px; color:var(--text-secondary); }
   .bx-seg{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:14px; }
   .bx-seg{ background:var(--bx-fill); padding:6px; border-radius:16px; }
@@ -949,7 +955,7 @@ function bodegaEstilos() {
   .bod-small button.rojo{ color:#ff3b30; }
   .bod-textobox p{ font-size:14.5px; color:var(--text-secondary); line-height:1.4; margin:10px 4px; }
   /* contornos de color por sección: azul = actualizar, verde = reportes, naranja = no vendibles, morado = historial */
-  .bx-s-azul,.bx-t-azul{ --sc:#0a84ff; } .bx-s-verde,.bx-t-verde{ --sc:#30d158; } .bx-s-naranja,.bx-t-naranja{ --sc:#ff9f0a; } .bx-s-morado,.bx-t-morado{ --sc:#bf5af2; }
+  .bx-s-azul,.bx-t-azul{ --sc:#0a84ff; } .bx-s-verde,.bx-t-verde{ --sc:#30d158; } .bx-s-naranja{ --sc:#ff9f0a; } .bx-t-naranja{ --sc:#7d8fa9; } .bx-s-morado,.bx-t-morado{ --sc:#bf5af2; }
   .bx .bx-card[class*="bx-s-"], .bx[class*="bx-t-"] .bx-card, .bx[class*="bx-t-"] .bx-m, .bx[class*="bx-t-"] .bx-g{ border:2px solid color-mix(in srgb,var(--sc) 70%, transparent); background:color-mix(in srgb,var(--sc) 5%, var(--bx-card)); }
   .bx .bx-card[class*="bx-s-"] h3::before, .bx[class*="bx-t-"] .bx-card h3::before{ content:""; display:inline-block; width:10px; height:10px; border-radius:50%; background:var(--sc); margin-right:10px; vertical-align:middle; position:relative; top:-2px; }
   .bx-hist[class*="bx-s-"] svg{ color:var(--sc); }
@@ -957,7 +963,9 @@ function bodegaEstilos() {
   .bx-s-azul .bx-btn:not(.pri), .bx-t-azul .bx-btn:not(.pri){ box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--sc) 45%, transparent); }
   .bx-s-naranja .bx-inner{ border:1.5px solid color-mix(in srgb,var(--sc) 55%, transparent); }
   .bx-s-naranja .bx-inner-h > svg{ color:var(--sc); }
-  .bx-t-naranja .bx-mh{ color:var(--sc); }
+  .bx-t-naranja .bx-mh{ color:var(--text-secondary); }
+  .bx.bx-t-naranja .bx-card, .bx.bx-t-naranja .bx-m, .bx.bx-t-naranja .bx-g{ border:1px solid var(--bx-line); background:var(--bx-card); }
+  .bx.bx-t-naranja .bx-card h3::before{ background:var(--sc); opacity:.7; }
   .bx-t-azul .bx-mh{ color:var(--sc); }
   /* Demostración: contorno cian */
   .bx-s-cian,.bx-t-cian{ --sc:#30b0c7; }
@@ -1672,23 +1680,71 @@ function buildBodegaNoVend() {
   intro.innerHTML = `<h3>Equipos no vendibles</h3><p class="bx-sub" style="margin:0"><b>DOA, dañado y no vendible</b> no se ven en Existencias y no se restan del conteo físico. Un <b>apartado</b> sí aparece en Existencias como una etiqueta bajo el equipo.</p>`;
   const reg = document.createElement("div");
 
+  const lq = { t: "" };
+  const fechaTxt = ts => { try { return typeof bodegaFechaHora === "function" ? bodegaFechaHora(ts) : ""; } catch (_) { return ""; } };
+  function pintaLista() {
+    const l = reg.querySelector(".bx-nvlist"); if (!l) return;
+    const t = lq.t.toLowerCase();
+    const nv = bodegaNV().filter(r => {
+      if (!t) return true;
+      const e = cat[r.code] || {};
+      return [e.modelo, e.color, e.capacidad, r.code, r.tipo, r.cliente, r.folio, r.quien, r.nota].join(" ").toLowerCase().includes(t);
+    });
+    l.innerHTML = nv.map(r => {
+      const e = cat[r.code] || { modelo: "Código nuevo", color: "", capacidad: "" };
+      const l1 = [r.cliente && "Cliente: " + r.cliente, r.folio && "Folio: " + r.folio].filter(Boolean).join(" · ");
+      const l2 = [r.quien && "Registró: " + r.quien, r.ts && fechaTxt(r.ts)].filter(Boolean).join(" · ");
+      return `<div class="bx-nvr"><i class="bx-dot" style="background:${bodegaColor(e.color)}"></i>
+        <div class="bx-nvi"><b>${bodegaEsc(e.modelo)}</b><span>${bodegaEsc([e.color, bodegaCapTxt(e.capacidad)].filter(Boolean).join(" · ") || "UPC " + r.code)}</span>${l1 ? `<span class="meta">${bodegaEsc(l1)}</span>` : ""}${l2 ? `<span class="meta">${bodegaEsc(l2)}</span>` : ""}${r.nota ? `<small>${bodegaEsc(r.nota)}</small>` : ""}</div>
+        <span class="bx-tipo" style="--t:${tipoColor(r.tipo)}">${bodegaEsc(r.tipo)}</span>
+        <button class="bx-minus" data-minus="${r.id}" aria-label="Descontar una pieza">−</button><b class="bx-nvq">×${r.qty}</b>
+        <button class="bx-x" data-id="${r.id}" aria-label="Quitar registro">${BX_ICON.trash}</button></div>`;
+    }).join("") || `<div class="bx-vacio" style="padding:14px">Sin resultados.</div>`;
+  }
   function pintaReg() {
     const nv = bodegaNV();
     if (!nv.length) { reg.innerHTML = ""; return; }
-    reg.innerHTML = `<div class="bx-m"><div class="bx-mh">Registrados</div>${nv.map(r => {
-      const e = cat[r.code] || { modelo: "Código nuevo", color: "", capacidad: "" };
-      return `<div class="bx-nvr"><i class="bx-dot" style="background:${bodegaColor(e.color)}"></i>
-        <div class="bx-nvi"><b>${bodegaEsc(e.modelo)}</b><span>${bodegaEsc([e.color, bodegaCapTxt(e.capacidad)].filter(Boolean).join(" · ") || "UPC " + r.code)}</span>${r.nota ? `<small>${bodegaEsc(r.nota)}</small>` : ""}</div>
-        <span class="bx-tipo" style="--t:${tipoColor(r.tipo)}">${bodegaEsc(r.tipo)}</span><b class="bx-nvq">×${r.qty}</b>
-        <button class="bx-x" data-id="${r.id}" aria-label="Quitar registro">${BX_ICON.trash}</button></div>`;
-    }).join("")}</div>`;
+    reg.innerHTML = `<div class="bx-m"><div class="bx-mh">Registrados</div>
+      <div style="padding:0 12px"><input class="bx-nvs" type="search" placeholder="Buscar folio, cliente, quién registró, modelo…" value="${bodegaEsc(lq.t)}"></div>
+      <div class="bx-nvlist"></div></div>`;
+    pintaLista();
+  }
+  reg.addEventListener("input", e => { if (e.target.classList.contains("bx-nvs")) { lq.t = e.target.value.trim(); pintaLista(); } });
+
+  /* Descontar piezas de un registro: regresan al inventario o se eliminan de toda la bodega */
+  function quitar(id, n) {
+    const r = bodegaNV().find(x => x.id === id); if (!r) return;
+    n = Math.max(1, Math.min(n, +r.qty || 1));
+    const e = cat[r.code] || { modelo: "Código nuevo", color: "", capacidad: "" };
+    const bg = document.createElement("div"); bg.className = "bx-sheet-bg";
+    bg.innerHTML = `<div class="bx-sheet"><h3>Quitar ${n} pieza${n === 1 ? "" : "s"} de “${bodegaEsc(r.tipo)}”</h3>
+      <p>${bodegaEsc([e.modelo, e.color, bodegaCapTxt(e.capacidad)].filter(Boolean).join(" · "))}</p>
+      <button class="bx-opt" data-op="inv"><b>Ingresa al inventario</b><span>Vuelve a contar como equipo normal en bodega y Existencias.</span></button>
+      <button class="bx-opt" data-op="del"><b>Eliminar de todo el inventario</b><span>Se descuenta también de la bodega (ya no existe físicamente).</span></button>
+      <button class="bx-btn mid" data-no>Cancelar</button></div>`;
+    bg.addEventListener("click", ev => {
+      if (ev.target === bg || ev.target.closest("[data-no]")) { bg.remove(); return; }
+      const o = ev.target.closest("[data-op]"); if (!o) return;
+      let a = bodegaNV();
+      a = a.map(x => x.id === id ? { ...x, qty: (+x.qty || 0) - n } : x).filter(x => (+x.qty || 0) > 0);
+      if (o.dataset.op === "del") {
+        const est = bodegaLoad(), prev = { ...(est.stock || {}) }, nuevo = { ...prev, [r.code]: Math.max(0, (prev[r.code] || 0) - n) };
+        let hist = est.historial || [];
+        try { hist = bodegaRegistrar(est, prev, nuevo, bodegaCatalogoTodo(prev), "baja", est.fecha); } catch (_) {}
+        bodegaSave({ ...est, stock: nuevo, historial: hist });
+        stock[r.code] = nuevo[r.code];
+      }
+      bodegaNVSave(a); bg.remove(); pintaReg(); if (picker && picker.refresh) picker.refresh();
+    });
+    document.body.appendChild(bg);
   }
   reg.addEventListener("click", e => {
+    const m = e.target.closest("[data-minus]"); if (m) { quitar(m.dataset.minus, 1); return; }
     const b = e.target.closest(".bx-x"); if (!b) return;
-    if (!confirm("¿Quitar este registro? El equipo vuelve a contar como normal.")) return;
-    bodegaNVSave(bodegaNV().filter(r => r.id !== b.dataset.id)); pintaReg();
+    const r = bodegaNV().find(x => x.id === b.dataset.id); if (r) quitar(r.id, +r.qty || 1);
   });
 
+  const quienGuardado = () => { try { return localStorage.getItem("ishop_bodega_quien") || ""; } catch (_) { return ""; } };
   function hoja(code) {
     const e = cat[code], max = libre(code);
     if (max <= 0) { alert(`No hay piezas libres de ese equipo en bodega (existencia: ${stock[code] || 0}). Primero actualiza las existencias.`); return; }
@@ -1697,7 +1753,9 @@ function buildBodegaNoVend() {
     bg.innerHTML = `<div class="bx-sheet"><h3>${bodegaEsc(e.modelo)}</h3><p>${bodegaEsc([e.color, bodegaCapTxt(e.capacidad)].filter(Boolean).join(" · "))} · libres en bodega: ${max}</p>
       <div class="bx-seg">${BODEGA_TIPOS.map(t => `<button data-t="${t.id}" style="--t:${t.color}">${t.id}</button>`).join("")}</div>
       <div class="bx-qty"><button data-q="-1">−</button><b>1</b><button data-q="1">+</button></div>
-      <input class="bx-nota" placeholder="Nota (opcional): cliente, folio, motivo…" maxlength="80">
+      <div class="bx-f2"><input class="bx-nota" data-f="cliente" placeholder="Cliente o persona" maxlength="60"><input class="bx-nota" data-f="folio" placeholder="Folio" maxlength="30"></div>
+      <input class="bx-nota" data-f="quien" placeholder="Quién lo registra" maxlength="40" value="${bodegaEsc(quienGuardado())}">
+      <input class="bx-nota" data-f="nota" placeholder="Nota o motivo (opcional)" maxlength="80">
       <button class="bx-btn pri mid" data-ok>Guardar</button><button class="bx-btn mid" data-no>Cancelar</button></div>`;
     const pinta = () => { bg.querySelectorAll(".bx-seg button").forEach(b => b.classList.toggle("on", b.dataset.t === tipo)); bg.querySelector(".bx-qty b").textContent = qty; };
     bg.addEventListener("click", ev => {
@@ -1705,8 +1763,10 @@ function buildBodegaNoVend() {
       const t = ev.target.closest("[data-t]"); if (t) { tipo = t.dataset.t; pinta(); return; }
       const q = ev.target.closest("[data-q]"); if (q) { qty = Math.max(1, Math.min(max, qty + (+q.dataset.q))); pinta(); return; }
       if (ev.target.closest("[data-ok]")) {
+        const val = f => (bg.querySelector(`[data-f="${f}"]`).value || "").trim();
         const a = bodegaNV();
-        a.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), code, tipo, qty, nota: bg.querySelector(".bx-nota").value.trim(), ts: Date.now() });
+        a.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), code, tipo, qty, cliente: val("cliente"), folio: val("folio"), quien: val("quien"), nota: val("nota"), ts: Date.now() });
+        try { localStorage.setItem("ishop_bodega_quien", val("quien")); } catch (_) {}
         bodegaNVSave(a); bg.remove(); pintaReg();
       }
     });
@@ -1783,7 +1843,7 @@ function buildBodegaHist() {
   bodegaEstilos();
   const wrap = document.createElement("div"); wrap.className = "bod-wrap bx bx-t-morado";
   const estado = bodegaLoad(), hist = estado.historial || [], cat = bodegaCatalogoTodo(estado.stock);
-  const ORIGEN = { foto: "Foto", texto: "Texto", manual: "Manual", venta: "Venta", deshacer: "Venta deshecha" };
+  const ORIGEN = { foto: "Foto", texto: "Texto", manual: "Manual", venta: "Venta", deshacer: "Venta deshecha", baja: "Baja de inventario" };
   wrap.innerHTML = `<div class="bx-card" style="margin-top:4px"><h3>Historial de reportes</h3><p class="bx-sub" style="margin:0">${hist.length ? "Todo lo que fue subiendo, bajando, agregándose o quitándose. Toca un reporte para ver el detalle." : "Todavía no hay reportes. Aparecerán aquí cuando apliques cambios."}</p></div>`;
   hist.forEach(h => {
     const r = bodegaResumen(h.items), d = r.ahora - r.antes;
