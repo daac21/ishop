@@ -631,7 +631,10 @@ function bodegaOrdenModelo(m) { const i = BODEGA_ORDEN.indexOf(m); return i < 0 
 
 /* Equipos no vendibles / apartados (se guardan solo en este teléfono) */
 function bodegaNV() { try { const a = JSON.parse(localStorage.getItem(BODEGA_NV_KEY)); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
-function bodegaNVSave(a) { try { localStorage.setItem(BODEGA_NV_KEY, JSON.stringify(a)); } catch (e) {} }
+function bodegaNVSave(a) {
+  try { localStorage.setItem(BODEGA_NV_KEY, JSON.stringify(a)); } catch (e) {}
+  try { if (typeof window.ishopSyncNV === "function") window.ishopSyncNV(a); } catch (e) {}   // sync.js: los apartados le llegan a todos los dispositivos
+}
 function bodegaApartados() {
   const o = {};
   bodegaNV().forEach(r => { if (r.tipo === "Apartado") o[r.code] = (o[r.code] || 0) + (+r.qty || 0); });
