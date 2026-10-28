@@ -974,6 +974,24 @@ function bodegaEstilos() {
   .bx-dmr .bx-ret{ border:0; border-radius:10px; padding:9px 11px; font:inherit; font-size:13.5px; font-weight:700; background:rgba(255,69,58,.16); color:var(--bx-red); }
   .bx-dmpill{ display:inline-flex; align-items:center; min-width:34px; justify-content:center; padding:5px 9px; border-radius:9px; font-size:13px; font-weight:800; background:rgba(48,176,199,.2); color:#1c8da3; }
   html[data-mode="dark"] .bx-dmpill{ color:#5fd0e4; }
+  /* escáner de documento */
+  .bds{ position:fixed; inset:0; z-index:10000; background:#111; color:#fff; display:flex; flex-direction:column; padding-top:env(safe-area-inset-top); padding-bottom:env(safe-area-inset-bottom); }
+  .bds-h{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 14px; }
+  .bds-h b{ font-size:16px; } .bds-h button{ border:0; background:#3a3a3c; color:#fff; border-radius:10px; padding:10px 14px; font:inherit; font-weight:650; }
+  .bds-st{ flex:1; min-height:0; display:flex; align-items:center; justify-content:center; }
+  .bds-box{ position:relative; touch-action:none; }
+  .bds-box canvas{ display:block; border-radius:4px; }
+  .bds-box svg{ position:absolute; left:0; top:0; touch-action:none; overflow:visible; }
+  .bds-box polygon{ fill:rgba(10,132,255,.18); stroke:#0a84ff; stroke-width:2.5; stroke-linejoin:round; }
+  .bds-box circle{ fill:#0a84ff; stroke:#fff; stroke-width:3; cursor:grab; touch-action:none; }
+  .bds-box circle.on{ fill:#64b5ff; }
+  .bds-p{ margin:6px 16px; text-align:center; font-size:14px; color:#c7c7cc; min-height:20px; }
+  .bds-f{ display:flex; gap:10px; align-items:center; padding:8px 14px 16px; }
+  .bds-seg{ display:flex; background:#2c2c2e; border-radius:12px; padding:3px; }
+  .bds-seg button{ border:0; background:none; color:#c7c7cc; font:inherit; font-size:14px; font-weight:650; padding:10px 12px; border-radius:10px; }
+  .bds-seg button.on{ background:#48484a; color:#fff; }
+  .bds-ok{ flex:1; border:0; border-radius:14px; background:#0a84ff; color:#fff; font:inherit; font-size:17px; font-weight:750; padding:15px 10px; }
+  .bds-ok[disabled]{ opacity:.6; }
   `;
   document.head.appendChild(st);
 }
@@ -1016,6 +1034,213 @@ function bodegaSeccionesTxt(stock) {
   const n = {}; Object.keys(stock).forEach(c => { const sec = bodegaSeccionDe(c); n[sec] = (n[sec] || 0) + 1; });
   const t = Object.keys(n).map(k => `${k} (${n[k]} código${n[k] === 1 ? "" : "s"})`).join(", ");
   return t || "nada";
+}
+
+/* =====================================================================
+   ESCÁNER DE DOCUMENTO (como "Escanear documentos" de Notas)
+   Foto → detecta la hoja → tú ajustas las 4 esquinas → la endereza (perspectiva),
+   quita sombras y entrega una imagen plana al lector de Bodega (el de siempre).
+   Todo se hace en el teléfono, sin internet.
+   ===================================================================== */
+function bdsBlur(a, w, h, r, n) {
+  let src = a; const cnt = 2 * r + 1;
+  for (let p = 0; p < n; p++) {
+    const tmp = new Float32Array(w * h), out = new Float32Array(w * h);
+    for (let y = 0; y < h; y++) {
+      const o = y * w; let sum = 0;
+      for (let k = -r; k <= r; k++) sum += src[o + Math.min(w - 1, Math.max(0, k))];
+      for (let x = 0; x < w; x++) { tmp[o + x] = sum / cnt; sum += src[o + Math.min(w - 1, x + r + 1)] - src[o + Math.max(0, x - r)]; }
+    }
+    for (let x = 0; x < w; x++) {
+      let sum = 0;
+      for (let k = -r; k <= r; k++) sum += tmp[Math.min(h - 1, Math.max(0, k)) * w + x];
+      for (let y = 0; y < h; y++) { out[y * w + x] = sum / cnt; sum += tmp[Math.min(h - 1, y + r + 1) * w + x] - tmp[Math.max(0, y - r) * w + x]; }
+    }
+    src = out;
+  }
+  return src;
+}
+async function bdsImagen(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const im = new Image();
+    await new Promise((ok, bad) => { im.onload = ok; im.onerror = () => bad(new Error("No pude abrir la foto.")); im.src = url; });
+    const k = Math.min(1, 3600 / Math.max(im.naturalWidth, im.naturalHeight));
+    const c = document.createElement("canvas"); c.width = Math.round(im.naturalWidth * k); c.height = Math.round(im.naturalHeight * k);
+    c.getContext("2d").drawImage(im, 0, 0, c.width, c.height);
+    return c;
+  } finally { URL.revokeObjectURL(url); }
+}
+/* Ordena 4 puntos como [arriba-izq, arriba-der, abajo-der, abajo-izq] */
+function bdsOrdenar(p) {
+  const s = q => q.x + q.y, d = q => q.x - q.y;
+  return [p.reduce((a, b) => s(b) < s(a) ? b : a), p.reduce((a, b) => d(b) > d(a) ? b : a), p.reduce((a, b) => s(b) > s(a) ? b : a), p.reduce((a, b) => d(b) < d(a) ? b : a)];
+}
+/* Busca la hoja (la zona clara más grande) y devuelve sus 4 esquinas, o null si no la encuentra */
+function bdsDetectar(c) {
+  const sc = Math.min(1, 320 / Math.max(c.width, c.height)), w = Math.max(8, Math.round(c.width * sc)), h = Math.max(8, Math.round(c.height * sc));
+  const t = document.createElement("canvas"); t.width = w; t.height = h;
+  const x = t.getContext("2d", { willReadFrequently: true }); x.drawImage(c, 0, 0, w, h);
+  const d = x.getImageData(0, 0, w, h).data, n = w * h;
+  let g = new Float32Array(n);
+  for (let i = 0; i < n; i++) g[i] = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2];
+  g = bdsBlur(g, w, h, 3, 2);
+  const hist = new Array(256).fill(0); for (let i = 0; i < n; i++) hist[Math.max(0, Math.min(255, g[i] | 0))]++;
+  let sumAll = 0; for (let i = 0; i < 256; i++) sumAll += i * hist[i];
+  let wB = 0, sumB = 0, best = -1, thr = 128;
+  for (let i = 0; i < 256; i++) {
+    wB += hist[i]; if (!wB) continue; const wF = n - wB; if (!wF) break;
+    sumB += i * hist[i]; const mB = sumB / wB, mF = (sumAll - sumB) / wF, v = wB * wF * (mB - mF) * (mB - mF);
+    if (v > best) { best = v; thr = i; }
+  }
+  const lab = new Int32Array(n), stack = new Int32Array(n);
+  let mejor = null, mejorN = 0, id = 0;
+  for (let s0 = 0; s0 < n; s0++) {
+    if (lab[s0] || g[s0] <= thr) continue;
+    id++; let sp = 0, cnt = 0; stack[sp++] = s0; lab[s0] = id;
+    let a = { x: 1e9, y: 1e9, v: 1e9 }, b = { x: -1e9, y: -1e9, v: -1e9 }, cTR = { x: 0, y: 0, v: -1e9 }, cBL = { x: 0, y: 0, v: 1e9 };
+    let tl = null, br = null, tr = null, bl = null, mn = 1e9, mx = -1e9, dmx = -1e9, dmn = 1e9;
+    while (sp) {
+      const p = stack[--sp], px = p % w, py = (p / w) | 0; cnt++;
+      const sS = px + py, dD = px - py;
+      if (sS < mn) { mn = sS; tl = { x: px, y: py }; } if (sS > mx) { mx = sS; br = { x: px, y: py }; }
+      if (dD > dmx) { dmx = dD; tr = { x: px, y: py }; } if (dD < dmn) { dmn = dD; bl = { x: px, y: py }; }
+      if (px > 0 && !lab[p - 1] && g[p - 1] > thr) { lab[p - 1] = id; stack[sp++] = p - 1; }
+      if (px < w - 1 && !lab[p + 1] && g[p + 1] > thr) { lab[p + 1] = id; stack[sp++] = p + 1; }
+      if (py > 0 && !lab[p - w] && g[p - w] > thr) { lab[p - w] = id; stack[sp++] = p - w; }
+      if (py < h - 1 && !lab[p + w] && g[p + w] > thr) { lab[p + w] = id; stack[sp++] = p + w; }
+    }
+    if (cnt > mejorN) { mejorN = cnt; mejor = [tl, tr, br, bl]; }
+  }
+  if (!mejor || mejorN < n * 0.12 || mejorN > n * 0.97) return null;
+  const area = mejor.reduce((s, p, i) => { const q = mejor[(i + 1) % 4]; return s + (p.x * q.y - q.x * p.y); }, 0) / 2;
+  if (Math.abs(area) < n * 0.15) return null;
+  return mejor.map(p => ({ x: p.x / sc, y: p.y / sc }));
+}
+/* Homografía: rectángulo (0,0)-(W,H) → esquinas de la foto */
+function bdsHomografia(W, H, q) {
+  const u = [[0, 0], [W, 0], [W, H], [0, H]], A = [], B = [];
+  for (let i = 0; i < 4; i++) {
+    const [a, b] = u[i], X = q[i].x, Y = q[i].y;
+    A.push([a, b, 1, 0, 0, 0, -a * X, -b * X]); B.push(X);
+    A.push([0, 0, 0, a, b, 1, -a * Y, -b * Y]); B.push(Y);
+  }
+  const m = A.map((r, i) => r.concat(B[i]));
+  for (let i = 0; i < 8; i++) {
+    let p = i; for (let r = i + 1; r < 8; r++) if (Math.abs(m[r][i]) > Math.abs(m[p][i])) p = r;
+    [m[i], m[p]] = [m[p], m[i]];
+    for (let r = i + 1; r < 8; r++) { const f = m[r][i] / m[i][i]; for (let k = i; k < 9; k++) m[r][k] -= f * m[i][k]; }
+  }
+  const x = new Array(8).fill(0);
+  for (let i = 7; i >= 0; i--) { let s = m[i][8]; for (let k = i + 1; k < 8; k++) s -= m[i][k] * x[k]; x[i] = s / m[i][i]; }
+  return x;
+}
+/* Endereza la hoja y (modo "bn") quita sombras y deja fondo blanco con letras negras */
+function bdsEscanear(src, q, modo) {
+  const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  let W = Math.max(dist(q[0], q[1]), dist(q[3], q[2])), H = Math.max(dist(q[0], q[3]), dist(q[1], q[2]));
+  const k = Math.min(1, 3200 / Math.max(W, H)); W = Math.max(200, Math.round(W * k)); H = Math.max(200, Math.round(H * k));
+  const hm = bdsHomografia(W, H, q), sw = src.width, sh = src.height;
+  const sd = src.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, sw, sh).data;
+  const out = document.createElement("canvas"); out.width = W; out.height = H;
+  const ox = out.getContext("2d"), od = ox.createImageData(W, H), o = od.data;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const den = hm[6] * x + hm[7] * y + 1, fx = (hm[0] * x + hm[1] * y + hm[2]) / den, fy = (hm[3] * x + hm[4] * y + hm[5]) / den;
+    const x0 = Math.floor(fx), y0 = Math.floor(fy), i = (y * W + x) * 4;
+    if (x0 < 0 || y0 < 0 || x0 >= sw - 1 || y0 >= sh - 1) { o[i] = o[i + 1] = o[i + 2] = 255; o[i + 3] = 255; continue; }
+    const ax = fx - x0, ay = fy - y0, p = (y0 * sw + x0) * 4, p2 = p + sw * 4;
+    for (let c = 0; c < 3; c++) o[i + c] = (sd[p + c] * (1 - ax) + sd[p + 4 + c] * ax) * (1 - ay) + (sd[p2 + c] * (1 - ax) + sd[p2 + 4 + c] * ax) * ay;
+    o[i + 3] = 255;
+  }
+  if (modo === "bn") {
+    const B = 24, gw = Math.max(2, Math.ceil(W / B)), gh = Math.max(2, Math.ceil(H / B));
+    let bg = new Float32Array(gw * gh);
+    for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) {
+      let mx = 0; // el fondo = lo más claro de cada cuadrito (el papel), así las letras no lo oscurecen
+      const ys = j * B, ye = Math.min(H, ys + B), xs = i * B, xe = Math.min(W, xs + B);
+      const vals = [];
+      for (let y = ys; y < ye; y += 2) for (let x = xs; x < xe; x += 2) { const p = (y * W + x) * 4; vals.push(0.299 * o[p] + 0.587 * o[p + 1] + 0.114 * o[p + 2]); }
+      vals.sort((a, b) => a - b); mx = vals[Math.floor(vals.length * 0.9)] || 255;
+      bg[j * gw + i] = Math.max(mx, 40);
+    }
+    bg = bdsBlur(bg, gw, gh, 1, 2);
+    for (let y = 0; y < H; y++) {
+      const fy = Math.min(gh - 1.001, Math.max(0, y / B - 0.5)), j = Math.floor(fy), ty = fy - j;
+      for (let x = 0; x < W; x++) {
+        const fx = Math.min(gw - 1.001, Math.max(0, x / B - 0.5)), i = Math.floor(fx), tx = fx - i;
+        const b = (bg[j * gw + i] * (1 - tx) + bg[j * gw + i + 1] * tx) * (1 - ty) + (bg[(j + 1) * gw + i] * (1 - tx) + bg[(j + 1) * gw + i + 1] * tx) * ty;
+        const p = (y * W + x) * 4, gr = 0.299 * o[p] + 0.587 * o[p + 1] + 0.114 * o[p + 2];
+        let v = (gr / b) * 255; v = (v - 75) * (255 / (232 - 75)); v = v < 0 ? 0 : v > 255 ? 255 : v;
+        o[p] = o[p + 1] = o[p + 2] = v;
+      }
+    }
+  }
+  ox.putImageData(od, 0, 0);
+  return new Promise(r => out.toBlob(r, "image/jpeg", 0.92));
+}
+/* Pantalla de ajuste de esquinas. Devuelve un File (imagen plana) o null si cancelan */
+async function bodegaEscanerDoc(file) {
+  let src;
+  try { src = await bdsImagen(file); } catch (e) { alert(e.message || "No pude abrir la foto."); return null; }
+  return new Promise(resolve => {
+    const o = document.createElement("div"); o.className = "bds";
+    o.innerHTML = `<div class="bds-h"><button type="button" data-x>Cancelar</button><b>Escanear documento</b><button type="button" data-auto>Auto</button></div>
+      <div class="bds-st"><div class="bds-box"><canvas></canvas><svg></svg></div></div>
+      <p class="bds-p"></p>
+      <div class="bds-f"><div class="bds-seg"><button type="button" data-m="bn" class="on">Blanco y negro</button><button type="button" data-m="color">Color</button></div><button type="button" class="bds-ok" data-ok>Escanear</button></div>`;
+    document.body.appendChild(o);
+    const st = o.querySelector(".bds-st"), box = o.querySelector(".bds-box"), cv = box.querySelector("canvas"), sv = box.querySelector("svg"), msg = o.querySelector(".bds-p");
+    let pts = null, sc = 1, modo = "bn";
+    const NS = "http://www.w3.org/2000/svg";
+    const poly = document.createElementNS(NS, "polygon"); sv.appendChild(poly);
+    const hs = [0, 1, 2, 3].map(() => { const c = document.createElementNS(NS, "circle"); c.setAttribute("r", 15); sv.appendChild(c); return c; });
+    function dibuja() {
+      poly.setAttribute("points", pts.map(p => `${p.x * sc},${p.y * sc}`).join(" "));
+      hs.forEach((c, i) => { c.setAttribute("cx", pts[i].x * sc); c.setAttribute("cy", pts[i].y * sc); });
+    }
+    function layout() {
+      const r = st.getBoundingClientRect(), s = Math.min((r.width - 20) / src.width, (r.height - 20) / src.height);
+      sc = s; const dw = Math.round(src.width * s), dh = Math.round(src.height * s), dpr = Math.min(2, window.devicePixelRatio || 1);
+      box.style.width = dw + "px"; box.style.height = dh + "px";
+      cv.width = Math.round(dw * dpr); cv.height = Math.round(dh * dpr); cv.style.width = dw + "px"; cv.style.height = dh + "px";
+      cv.getContext("2d").drawImage(src, 0, 0, cv.width, cv.height);
+      sv.setAttribute("width", dw); sv.setAttribute("height", dh);
+      if (pts) dibuja();
+    }
+    function auto() {
+      const d = bdsDetectar(src);
+      pts = d ? bdsOrdenar(d) : [{ x: src.width * .08, y: src.height * .08 }, { x: src.width * .92, y: src.height * .08 }, { x: src.width * .92, y: src.height * .92 }, { x: src.width * .08, y: src.height * .92 }];
+      msg.textContent = d ? "Arrastra los puntos azules si alguna esquina no quedó bien." : "No encontré la hoja sola. Arrastra los 4 puntos a las esquinas.";
+      dibuja();
+    }
+    hs.forEach((c, i) => {
+      c.addEventListener("pointerdown", e => { e.preventDefault(); c.setPointerCapture(e.pointerId); c.classList.add("on"); });
+      c.addEventListener("pointermove", e => {
+        if (!c.classList.contains("on")) return;
+        const r = box.getBoundingClientRect();
+        pts[i] = { x: Math.max(0, Math.min(src.width, (e.clientX - r.left) / sc)), y: Math.max(0, Math.min(src.height, (e.clientY - r.top) / sc)) };
+        dibuja();
+      });
+      ["pointerup", "pointercancel"].forEach(ev => c.addEventListener(ev, () => c.classList.remove("on")));
+    });
+    const cierra = (res) => { window.removeEventListener("resize", layout); o.remove(); src.width = src.height = 0; resolve(res); };
+    o.addEventListener("click", async e => {
+      const b = e.target.closest("button"); if (!b) return;
+      if (b.hasAttribute("data-x")) cierra(null);
+      else if (b.hasAttribute("data-auto")) auto();
+      else if (b.dataset.m) { modo = b.dataset.m; o.querySelectorAll(".bds-seg button").forEach(x => x.classList.toggle("on", x === b)); }
+      else if (b.hasAttribute("data-ok")) {
+        b.disabled = true; b.textContent = "Escaneando…";
+        await new Promise(r => setTimeout(r, 60));
+        try {
+          const blob = await bdsEscanear(src, pts, modo);
+          cierra(new File([blob], "escaneo.jpg", { type: "image/jpeg" }));
+        } catch (err) { b.disabled = false; b.textContent = "Escanear"; alert("No pude procesar el documento. Intenta de nuevo."); }
+      }
+    });
+    window.addEventListener("resize", layout);
+    layout(); auto();
+  });
 }
 
 /* ---------- Pantalla principal de Bodega ---------- */
@@ -1095,7 +1320,9 @@ function buildBodega() {
       <div class="bx-card bx-s-azul">
         <h3>Actualizar existencias</h3>
         <p class="bx-sub">${n ? `Sube el reporte de hoy o captura un cambio manual.${estado.fecha ? " Última lista: " + bodegaEsc(estado.fecha) + "." : ""}` : "Sube el reporte de hoy o captura un cambio manual. Todavía no hay existencias guardadas."}</p>
-        <label class="bx-btn pri">${BX_ICON.cam}<span>Escanear / subir reporte</span>
+        <label class="bx-btn pri">${BX_ICON.doc}<span>Escanear documento</span>
+          <input type="file" accept="image/*" capture="environment" id="bodDocFoto" hidden></label>
+        <label class="bx-btn">${BX_ICON.cam}<span>Subir foto o captura</span>
           <input type="file" accept="image/*" id="bodFoto" hidden></label>
         <button class="bx-btn" id="bodVerTexto">${BX_ICON.doc}<span>Pegar o escanear texto</span></button>
         <div id="bodTextoBox" class="bod-textobox" hidden>
@@ -1135,6 +1362,10 @@ function buildBodega() {
       <div class="bod-small"><button id="bodPrueba">Cargar datos de prueba</button><button id="bodSeed">Cargar lista del 21-10</button><button class="rojo" id="bodBorrar">Borrar todo</button></div>`;
 
     wrap.querySelector("#bodFoto").addEventListener("change", e => procesar(e.target.files[0]));
+    wrap.querySelector("#bodDocFoto").addEventListener("change", async e => {
+      const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+      const plano = await bodegaEscanerDoc(f); if (plano) procesar(plano);
+    });
     wrap.querySelector("#bodVerTexto").addEventListener("click", () => { const b = wrap.querySelector("#bodTextoBox"); b.hidden = !b.hidden; if (!b.hidden) wrap.querySelector("#bodTexto").focus(); });
     wrap.querySelector("#bodLeerTexto").addEventListener("click", () => {
       const t = wrap.querySelector("#bodTexto").value, est = wrap.querySelector("#bodEstado"), prev = wrap.querySelector("#bodPreview");
