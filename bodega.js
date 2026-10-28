@@ -782,8 +782,8 @@ function bodegaEstilos() {
   if (document.getElementById("bodEstilos")) return;
   const st = document.createElement("style"); st.id = "bodEstilos";
   st.textContent = `
-  .bx,.ex-wrap{ --bx-card:#fff; --bx-fill:#e8e8ed; --bx-line:rgba(120,120,128,.2); --bx-green:#1f9d46; --bx-orange:#c77700; --bx-cap:#0a6fd8; --bx-red:#e0342b; }
-  html[data-mode="dark"] .bx, html[data-mode="dark"] .ex-wrap{ --bx-card:#1c1c1e; --bx-fill:#2c2c2e; --bx-line:rgba(255,255,255,.12); --bx-green:#30d158; --bx-orange:#ffb340; --bx-cap:#64b5ff; --bx-red:#ff6259; }
+  .bx,.ex-wrap,.bx-sheet{ --bx-card:#fff; --bx-fill:#e8e8ed; --bx-line:rgba(120,120,128,.2); --bx-green:#1f9d46; --bx-orange:#c77700; --bx-cap:#0a6fd8; --bx-red:#e0342b; }
+  html[data-mode="dark"] .bx, html[data-mode="dark"] .ex-wrap, html[data-mode="dark"] .bx-sheet{ --bx-card:#1c1c1e; --bx-fill:#2c2c2e; --bx-line:rgba(255,255,255,.12); --bx-green:#30d158; --bx-orange:#ffb340; --bx-cap:#64b5ff; --bx-red:#ff6259; }
   .bx{ padding-bottom:40px; }
   .bx svg{ fill:none; stroke:currentColor; stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; }
   .bx-card{ display:block; width:100%; text-align:left; border:0; color:var(--text); font:inherit; background:var(--bx-card); border-radius:20px; padding:18px 14px; margin:12px 0; }
@@ -929,8 +929,10 @@ function bodegaEstilos() {
   .bx-sheet{ width:100%; max-width:560px; background:var(--bx-card); color:var(--text); border-radius:22px 22px 0 0; padding:20px 18px calc(20px + var(--safe-bottom)); }
   .bx-sheet h3{ margin:0; font-size:19px; } .bx-sheet p{ margin:4px 0 14px; font-size:14px; color:var(--text-secondary); }
   .bx-seg{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:14px; }
-  .bx-seg button{ padding:13px 8px; border-radius:12px; border:2px solid transparent; font:inherit; font-size:15.5px; font-weight:700; background:var(--bx-fill); color:var(--text); }
-  .bx-seg button.on{ border-color:var(--t); color:var(--t); background:color-mix(in srgb,var(--t) 14%, transparent); }
+  .bx-seg{ background:var(--bx-fill); padding:6px; border-radius:16px; }
+  .bx-seg button{ padding:13px 8px; border-radius:12px; border:2px solid var(--bx-line); font:inherit; font-size:15.5px; font-weight:700; background:var(--bx-card); color:var(--text); transition:transform .12s; }
+  .bx-seg button:active{ transform:scale(.97); }
+  .bx-seg button.on{ border-color:var(--t); color:#fff; background:var(--t); box-shadow:0 4px 12px color-mix(in srgb,var(--t) 45%, transparent); }
   .bx-qty{ display:flex; align-items:center; justify-content:center; gap:16px; margin-bottom:14px; }
   .bx-qty button{ width:48px; height:48px; border:0; border-radius:14px; font-size:26px; background:var(--bx-fill); color:var(--text); }
   .bx-qty b{ font-size:30px; min-width:50px; text-align:center; }

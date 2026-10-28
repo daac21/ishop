@@ -198,27 +198,25 @@ function exEstilos() {
   .ex-tile.on{ background:linear-gradient(160deg,var(--c1),var(--c2)); box-shadow:0 12px 26px color-mix(in srgb,var(--c2) 48%, transparent), inset 0 1px 0 rgba(255,255,255,.4); transform:translateY(-3px); }
   .ex-tile.on .ex-ti{ background:rgba(255,255,255,.2); }
   .ex-tile.on small{ opacity:.9; }
-  .ex-sec{ margin:26px 4px 14px; padding-left:14px; border-left:6px solid var(--c1); border-image:linear-gradient(180deg,var(--c1),var(--c2)) 1; }
+  .ex-sec{ margin:26px 4px 14px; }
   .ex-sec h3{ font-size:36px; font-weight:850; }
-  .ex-model{ border-radius:28px; border:1.5px solid color-mix(in srgb,var(--c1) 34%, var(--bx-line)); margin:16px 0; position:relative;
-    background:linear-gradient(180deg, color-mix(in srgb,var(--c1) 8%, var(--bx-card)), var(--bx-card) 70%);
-    box-shadow:0 10px 24px color-mix(in srgb,var(--c2) 14%, transparent); }
-  .ex-model::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:7px; background:linear-gradient(180deg,var(--c1),var(--c2)); z-index:2; pointer-events:none; }
-  .ex-mh{ padding:18px 16px 18px 22px; }
-  .ex-pic{ flex:0 0 72px; width:72px; height:72px; border-radius:20px; background:linear-gradient(145deg, color-mix(in srgb,var(--c1) 24%, var(--bx-fill)), color-mix(in srgb,var(--c2) 10%, var(--bx-fill))); color:var(--c2); box-shadow:inset 0 1px 0 rgba(255,255,255,.4); }
+  .ex-model{ border-radius:24px; border:1px solid var(--bx-line); margin:16px 0; position:relative; background:var(--bx-card);
+    box-shadow:0 1px 2px rgba(0,0,0,.06), 0 6px 18px rgba(0,0,0,.07); }
+  html[data-mode="dark"] .ex-model{ box-shadow:0 1px 2px rgba(0,0,0,.4), 0 6px 18px rgba(0,0,0,.35); }
+  .ex-mh{ padding:18px 16px; }
+  .ex-pic{ flex:0 0 72px; width:72px; height:72px; border-radius:20px; background:var(--bx-fill); color:var(--text); }
   .ex-pic > svg{ width:38px; height:38px; }
   .ex-mt strong{ font-size:23px; font-weight:850; }
   .ex-mt .spec{ font-size:14.5px; font-weight:650; }
   .ex-badge.hid{ background:var(--bx-fill); color:var(--text-secondary); padding:13px 16px; min-width:58px; }
   .ex-badge svg{ width:28px; height:28px; display:block; margin:0 auto; }
   .ex-badge[data-eye]{ cursor:pointer; -webkit-tap-highlight-color:transparent; }
-  .ex-ojo{ border:0; background:var(--bx-fill); color:var(--text); width:42px; height:34px; border-radius:999px; display:grid; place-items:center; padding:0; }
-  .ex-ojo svg{ width:22px; height:22px; }
+  .ex-ojo{ border:0; background:var(--bx-fill); color:var(--text); width:44px; height:34px; border-radius:999px; display:grid; place-items:center; padding:0; }
+  .ex-ojo svg{ width:23px; height:23px; }
   .ex-ojo.on{ background:var(--accent); color:#fff; }
   /* franjas de capacidad: negras, con acento de color */
-  .ex-capbar{ background:linear-gradient(90deg,#141416,#2a2a2f 70%,#1d1d20); border-top:0; border-bottom:0; padding:16px 18px 16px 22px; box-shadow:inset 5px 0 0 var(--c1); }
+  .ex-capbar{ background:linear-gradient(90deg,#141416,#2a2a2f 70%,#1d1d20); border-top:0; border-bottom:0; padding:16px 18px; }
   .ex-capbar b{ color:#fff; font-size:22px; font-weight:850; letter-spacing:-.01em; display:flex; align-items:center; gap:10px; }
-  .ex-capbar b::after{ content:""; width:34px; height:3px; border-radius:2px; background:linear-gradient(90deg,var(--c1),var(--c2)); }
   .ex-capbar span{ color:rgba(255,255,255,.72); font-size:14.5px; font-weight:650; }
   html[data-mode="dark"] .ex-capbar{ background:linear-gradient(90deg,#000,#242428 70%,#101012); }
   .ex-apa.demo{ color:#1c8da3; background:rgba(48,176,199,.2); margin-left:6px; }
@@ -259,8 +257,9 @@ function exEstilos() {
   document.head.appendChild(st);
 }
 
-const EX_EYE_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12.5c2.2 3.6 5.4 5.4 9 5.4s6.8-1.8 9-5.4"/><path d="M5.2 15.3 3.6 17.4M9.3 17.4l-.8 2.5M14.7 17.4l.8 2.5M18.8 15.3l1.6 2.1"/></svg>';
-const EX_EYE_ON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12S6 5.8 12 5.8 21.5 12 21.5 12 18 18.2 12 18.2 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+/* Ojo estilo SF Symbols (iOS): "eye.slash" = oculto, "eye" = visible */
+const EX_EYE_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.8 12S6.2 6.2 12 6.2 21.2 12 21.2 12 17.8 17.8 12 17.8 2.8 12 2.8 12z"/><circle cx="12" cy="12" r="2.9"/><path d="M4.6 20 19.4 4"/></svg>';
+const EX_EYE_ON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.8 12S6.2 6.2 12 6.2 21.2 12 21.2 12 17.8 17.8 12 17.8 2.8 12 2.8 12z"/><circle cx="12" cy="12" r="2.9" fill="currentColor" stroke="none"/></svg>';
 const EX_CHECK = '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 
 function buildExistencias() {
@@ -299,7 +298,9 @@ function buildExistencias() {
   const abiertos = new Set();
   /* Las piezas se esconden (ojo cerrado). Un toque en cualquier ojo las muestra 12 s y se vuelven a esconder solas. */
   let ver = false, verT = null;
-  const piezasSec = id => disp.filter(i => i.seccion === id).reduce((s, i) => s + i.qty, 0);
+  const rev = new Set(), revT = {};   // ojos individuales: "u:<upc>" (color) o "m:<configuración>" (tarjeta)
+  const visto = k => ver || rev.has(k);
+  const piezasSec = id => disp.filter(i => i.seccion === id).reduce((s, i) => s + i.qty, 0);   // solo se usa en el encabezado de la lista
 
   wrap.innerHTML = `
     <div class="ex-car" id="exCar"></div>
@@ -310,8 +311,8 @@ function buildExistencias() {
 
   const car = wrap.querySelector("#exCar"), lista = wrap.querySelector("#exLista");
   function pintaCar() {
-    car.innerHTML = secs.map(s => { const nm = new Set(disp.filter(i => i.seccion === s.id).map(i => i.titulo + "||" + i.spec)).size;
-      return `<button class="ex-tile${s.id === filtro && !texto ? " on" : ""}" data-f="${exEsc(s.id)}" style="--c1:${s.c1};--c2:${s.c2}"><span class="ex-ti">${exIcono(s.id)}${exImg(s.id)}</span><b>${exEsc(s.label || s.id)}</b><small>${ver ? piezasSec(s.id) + " pzas" : nm + " modelo" + (nm === 1 ? "" : "s")}</small></button>`; }).join("");
+    car.innerHTML = secs.map(s => {
+      return `<button class="ex-tile${s.id === filtro && !texto ? " on" : ""}" data-f="${exEsc(s.id)}" style="--c1:${s.c1};--c2:${s.c2}"><span class="ex-ti">${exIcono(s.id)}${exImg(s.id)}</span><b>${exEsc(s.label || s.id)}</b></button>`; }).join("");
     car.classList.toggle("off", !!texto);
   }
   car.addEventListener("click", e => {
@@ -328,16 +329,16 @@ function buildExistencias() {
   };
   const apaHtml = (n) => n > 0 ? `<span class="ex-apa"><svg viewBox="0 0 24 24"><path d="M7 4h10v16l-5-3.5L7 20z"/></svg>${n} apartado${n === 1 ? "" : "s"}</span>` : "";
   const demoHtml = (n) => n > 0 ? `<span class="ex-apa demo"><svg viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="11.5" rx="2" fill="none"/><path d="M8 20h8M12 16v4" fill="none"/></svg>${n} en demostración</span>` : "";
-  const badge = (q) => q <= 0 ? `<div class="ex-badge zero">${ver ? "0" : ""}<small>AGOTADO</small></div>`
-    : !ver ? `<div class="ex-badge hid" data-eye role="button" aria-label="Mostrar piezas">${EX_EYE_OFF}</div>`
-    : q <= 3 ? `<div class="ex-badge low" data-eye role="button">${q}<small>POCAS</small></div>` : `<div class="ex-badge" data-eye role="button">${q}</div>`;
+  const badge = (q, k) => q <= 0 ? `<div class="ex-badge zero"><small>AGOTADO</small></div>`
+    : !visto(k) ? `<div class="ex-badge hid" data-eye="${exEsc(k)}" role="button" aria-label="Mostrar piezas">${EX_EYE_OFF}</div>`
+    : q <= 3 ? `<div class="ex-badge low" data-eye="${exEsc(k)}" role="button">${q}<small>POCAS</small></div>` : `<div class="ex-badge" data-eye="${exEsc(k)}" role="button">${q}</div>`;
   const fila = (i) => {
     const pr = exPrecio(i);
     const row = `<div class="ex-row" data-u="${i.upc}">
       <div class="ex-dot" style="background:${exColor(i.color)}"></div>
       <div class="ex-info"><span class="col">${exEsc(i.color || "Sin color")}</span><span class="ex-upc">${exEsc(i.upc)}</span>${i.qty > 0 ? apaHtml(apart[i.upc] || 0) : ""}${demoHtml(i.demo)}</div>
       ${pr != null ? `<span class="ex-price">${exMoney(pr)}</span>` : ""}
-      ${badge(i.qty)}
+      ${badge(i.qty, "u:" + i.upc)}
     </div>`;
     return i.qty > 0 ? `<div class="ex-sw"><button class="ex-sell" type="button" data-u="${i.upc}" tabindex="-1">${EX_CHECK}Vendido</button>${row}</div>` : row;
   };
@@ -358,7 +359,7 @@ function buildExistencias() {
     return `<div class="ex-model${abierto ? " open" : ""}" data-m="${exEsc(clave)}" style="--c1:${sec.c1};--c2:${sec.c2}">
       <button class="ex-mh" type="button"><div class="ex-pic">${exIcono(sec.id)}${exImg(p.titulo)}</div>
         <div class="ex-mt"><strong>${exEsc(p.titulo)}</strong>${p.spec ? `<span class="spec">${exEsc(p.spec)}</span>` : ""}<div class="sub"><span class="ex-sws">${colores.slice(0, 6).map(c => `<i style="background:${exColor(c)}"></i>`).join("")}</span><span>${colores.length} color${colores.length === 1 ? "" : "es"}</span></div></div>
-        ${badge(tot)}<i class="ex-chev"></i></button>
+        ${badge(tot, "m:" + clave)}<i class="ex-chev"></i></button>
       <div class="ex-rows">${bloques(items)}</div></div>`;
   };
   const agrupa = (lista) => {
@@ -411,9 +412,19 @@ function buildExistencias() {
     const o = wrap.querySelector("#exOjo"); if (o) { o.innerHTML = v ? EX_EYE_ON : EX_EYE_OFF; o.classList.toggle("on", v); }
     pintaCar(); pintaLista();
   };
-  wrap.querySelector("#exOjo").addEventListener("click", () => setVer(!ver));
+  wrap.querySelector("#exOjo").addEventListener("click", () => { rev.clear(); Object.keys(revT).forEach(k => { clearTimeout(revT[k]); delete revT[k]; }); setVer(!ver); });
+  /* ojo individual: solo muestra/oculta ese color o esa tarjeta */
+  const toggleRev = k => {
+    if (ver) {   // venía de "ver todo": se apaga y se conservan visibles los demás
+      const otros = [...lista.querySelectorAll("[data-eye]")].map(n => n.dataset.eye).filter(x => x !== k);
+      setVer(false); otros.forEach(x => rev.add(x)); rev.delete(k);
+    } else if (rev.has(k)) rev.delete(k); else rev.add(k);
+    clearTimeout(revT[k]); delete revT[k];
+    if (rev.has(k)) revT[k] = setTimeout(() => { rev.delete(k); delete revT[k]; if (wrap.isConnected) pintaLista(); }, 12000);
+    pintaLista();
+  };
   lista.addEventListener("click", e => {
-    if (e.target.closest("[data-eye]")) { setVer(!ver); return; }
+    const ey = e.target.closest("[data-eye]"); if (ey) { e.stopPropagation(); toggleRev(ey.dataset.eye); return; }
     const h = e.target.closest(".ex-mh"); if (!h) return;
     const card = h.parentNode, m = card.dataset.m;
     card.classList.toggle("open");
