@@ -2664,7 +2664,7 @@ const DOCS_HOLD_MS = 3000;
 /* ---------- Borrador compartido entre pantallas ---------- */
 function docsNewDraft() {
   return {
-    email: "", nombre: "", paterno: "", materno: "", telefono: "", serie: "", fechaCompra: "",
+    email: "", nombre: "", paterno: "", materno: "", telefono: "", serie: "", fechaCompra: "", dispositivo: "iPhone",
     firmaUrl: "", firmaAsesorUrl: "",
     // Trade In (contrato completo)
     estado: "", asesor: "", rfc: "", calle: "", cp: "", numExt: "", numInt: "", colonia: "",
@@ -2800,7 +2800,7 @@ const DOCS_CAMPOS_TI = [
 ];
 const DOCS_CAMPOS_TC = [
   ["nombre", "Nombre"], ["paterno", "Apellido paterno"], ["materno", "Apellido materno"],
-  ["telefono", "Teléfono"], ["email", "Correo"], ["serie", "# Serie"], ["fechaCompra", "Fecha de compra"],
+  ["telefono", "Teléfono"], ["email", "Correo"], ["serie", "# Serie"], ["fechaCompra", "Fecha de compra"], ["dispositivo", "Programa for Life"],
 ];
 const docsCampos = (prog) => prog === "Trade In" ? DOCS_CAMPOS_TI : prog === DOCS_TC ? DOCS_CAMPOS_TC : DOCS_CAMPOS;
 const docsNb = (t) => String(t == null ? "" : t).replace(/\u00a0/g, " ");
@@ -2849,8 +2849,11 @@ const DOCS_PDF_TEMPLATES = {
   "Switch Up": "contrato/switch_up.pdf",
   "Trade In": "contrato/trade_in.pdf",
   "Cancelación For Life": "contrato/cancelacion.pdf",
-  "Trade In Cancelación": "contrato/trade_in_cancelacion.pdf",
+  "Trade In Cancelación": "contrato/trade_in_cancelacion_iphone.pdf",   // la hoja real depende del dispositivo (ver docsMakePdf)
 };
+const docsPlantilla = (rec) => rec.programa === DOCS_TC
+  ? `contrato/trade_in_cancelacion_${String((rec.datos && rec.datos.dispositivo) || "iPhone").toLowerCase()}.pdf`
+  : DOCS_PDF_TEMPLATES[rec.programa];
 let docsPdfLibP = null;
 function docsLoadPdfLib() {
   if (window.PDFLib) return Promise.resolve(window.PDFLib);
@@ -2904,7 +2907,7 @@ const docsFechaLarga = (dt, cap) => { const m = DOCS_MESES[dt.getMonth()]; retur
 async function docsMakePdf(rec) {
   const PDFLib = await docsLoadPdfLib();
   const { PDFDocument, StandardFonts, rgb } = PDFLib;
-  const tplUrl = DOCS_PDF_TEMPLATES[rec.programa];
+  const tplUrl = docsPlantilla(rec);
   if (!tplUrl) throw new Error("no hay plantilla");
   const resp = await fetch(tplUrl);
   if (!resp.ok) throw new Error("no hay plantilla");
@@ -3343,6 +3346,8 @@ function docsTiHtml() {
 function docsBaseHtml(tc) {
   return `
       <h3>Datos del cliente</h3>
+      ${tc ? `<div class="docs-field"><label>Programa for Life :</label>
+        <div class="docs-seg3" id="dDisp">${["iPhone", "iPad", "Mac"].map(v => `<button type="button" data-v="${v}">${v}</button>`).join("")}</div></div>` : ""}
       <div class="docs-field"><label for="dEmail">Email :</label>
         <input id="dEmail" class="docs-input" type="email" inputmode="email" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false"></div>
       <div class="docs-field"><label for="dNombre">Nombre :</label>
@@ -3393,7 +3398,13 @@ function buildDocs() {
   docsBindText(wrap, "dMaterno", "materno", { upper: true });
   docsBindText(wrap, "dTel", "telefono");
   docsBindText(wrap, "dSerie", "serie", { upper: true });
-  if (tc) docsBindText(wrap, "dCompra", "fechaCompra");
+  if (tc) {
+    docsBindText(wrap, "dCompra", "fechaCompra");
+    const seg = wrap.querySelector("#dDisp"), pinta = () => seg.querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.v === (d.dispositivo || "iPhone")));
+    seg.addEventListener("click", e => { const b = e.target.closest("button[data-v]"); if (!b) return; d.dispositivo = b.dataset.v; pinta(); });
+    if (!d.dispositivo) d.dispositivo = "iPhone";
+    pinta();
+  }
   $("#dFecha").textContent = docsFechaHoy();
   $("#dSuc").textContent = DOCS_SUCURSAL;
   docsSignPad(wrap, "dSign", "dClear", "firmaUrl");

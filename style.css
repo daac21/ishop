@@ -1633,3 +1633,8 @@ html[data-mode="dark"]{ --text-secondary:#b4b4ba; }
 /* ---- Registros: datos bloqueados, solo fotos ---- */
 .docs-card.docs-bloq > *{ opacity:.45; pointer-events:none; -webkit-user-select:none; user-select:none; }
 .docs-card.docs-bloq canvas{ pointer-events:none; }
+
+/* ---- Selector iPhone / iPad / Mac (Trade In · Cancelación For Life) ---- */
+.docs-seg3{ display:grid; grid-template-columns:repeat(3,1fr); gap:6px; background:rgba(120,120,128,.14); border-radius:14px; padding:4px; }
+.docs-seg3 button{ border:0; background:none; color:var(--text); font:inherit; font-size:14px; font-weight:700; padding:12px 4px; border-radius:11px; }
+.docs-seg3 button.on{ background:#2f6fe4; color:#fff; box-shadow:0 3px 10px rgba(47,111,228,.35); }
