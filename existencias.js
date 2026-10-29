@@ -276,14 +276,16 @@ function exEstilos() {
   .ex-wsub{ flex-wrap:wrap; align-items:flex-start; line-height:1.3; }
   .ex-wsub .ex-sws{ margin-top:2px; }
   .ex-thumb{ position:relative; display:grid; place-items:center; }
-  .ex-thumb.has{ width:64px; height:64px; border-radius:16px; background:#fff !important; border:1px solid rgba(120,120,128,.3); box-shadow:none; cursor:zoom-in; overflow:hidden; }
+  .ex-thumb.has{ width:72px; height:72px; border-radius:0; background:transparent !important; border:0; box-shadow:none; cursor:zoom-in; overflow:visible; }
+  .ex-pic.wpic{ flex:0 0 96px; width:96px; height:96px; background:transparent; border-radius:0; }
+  .ex-pic.wpic.has img{ inset:0; width:100%; height:100%; }
   .ex-thumb img{ width:100%; height:100%; object-fit:contain; display:block; }
   .ex-foto-bg{ position:fixed; inset:0; z-index:99; background:rgba(0,0,0,.82); display:flex; align-items:center; justify-content:center; padding:18px; }
-  .ex-foto{ position:relative; width:100%; max-width:520px; background:#fff; border-radius:26px; padding:14px 14px 18px; text-align:center; color:#1c1c1e; }
+  .ex-foto{ position:relative; width:100%; max-width:520px; background:var(--bx-card,#fff); border-radius:26px; padding:14px 14px 18px; text-align:center; color:var(--text,#1c1c1e); }
   .ex-foto img{ width:100%; aspect-ratio:1; object-fit:contain; display:block; filter:blur(2px); transition:filter .2s; }
   .ex-foto img.hd{ filter:none; }
   .ex-foto p{ margin:6px 8px 0; font-size:16px; font-weight:700; line-height:1.3; }
-  .ex-foto-x{ position:absolute; top:8px; right:10px; width:36px; height:36px; border:0; border-radius:50%; background:rgba(120,120,128,.18); font-size:24px; line-height:1; color:#1c1c1e; z-index:1; }
+  .ex-foto-x{ position:absolute; top:8px; right:10px; width:36px; height:36px; border:0; border-radius:50%; background:rgba(120,120,128,.25); font-size:24px; line-height:1; color:inherit; z-index:1; }
   .ex-apa.demo{ color:#1c8da3; background:rgba(48,176,199,.2); margin-left:6px; }
   html[data-mode="dark"] .ex-apa.demo{ color:#5fd0e4; }
   .ex-price{ font-size:19px; font-weight:800; letter-spacing:-.01em; white-space:nowrap; }
@@ -430,7 +432,7 @@ function buildExistencias() {
     const abierto = texto || abiertos.has(clave);
     const p = items[0];
     return `<div class="ex-model${abierto ? " open" : ""}" data-m="${exEsc(clave)}" style="--c1:${sec.c1};--c2:${sec.c2}">
-      <button class="ex-mh" type="button"><div class="ex-pic">${exIcono(sec.id)}${p.orden && exFotoBase(p) ? exFotoImg(exFotoBase(p)) : exImg(p.titulo)}</div>
+      <button class="ex-mh" type="button"><div class="ex-pic${p.orden && exFotoBase(p) ? " wpic" : ""}">${exIcono(sec.id)}${p.orden && exFotoBase(p) ? exFotoImg(exFotoBase(p)) : exImg(p.titulo)}</div>
         <div class="ex-mt"><strong>${exEsc(p.titulo)}</strong>${p.spec ? `<span class="spec">${exEsc(p.spec)}</span>` : ""}${p.orden ? `<div class="sub ex-wsub"><span class="ex-sws"><i style="background:${exColor(p.color, p.modelo)}"></i></span><span>${[...new Set(items.map(i => (i.corr || "").replace(/^Correa\s+/i, "")).filter(Boolean))].join(" · ")}</span></div>`
         : `<div class="sub"><span class="ex-sws">${colores.slice(0, 6).map(c => `<i style="background:${exColor(c)}"></i>`).join("")}</span><span>${colores.length} color${colores.length === 1 ? "" : "es"}</span></div>`}</div>
         ${badge(tot, "m:" + clave, sec.id)}<i class="ex-chev"></i></button>
