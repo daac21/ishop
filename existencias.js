@@ -282,7 +282,9 @@ function buildExistencias() {
   const stock = bod.stock || {};
   let apart = (typeof bodegaApartados === "function") ? bodegaApartados() : {};
   let demo = (typeof bodegaDemo === "function") ? bodegaDemo() : {};   // piezas de demostración (dentro de la existencia de bodega)
-  const libre = k => Math.max(0, (stock[k] || 0) - (demo[k] || 0));    // lo que se muestra: bodega − demostración
+  /* Lo que se muestra: bodega − demostración − apartados (solo es visual; la bodega guardada no cambia).
+     Si los apartados igualan o superan la existencia, ese equipo pasa a Agotados hasta que haya más piezas que apartados. */
+  const libre = k => Math.max(0, (stock[k] || 0) - (demo[k] || 0) - (apart[k] || 0));
 
   const todos = {};
   Object.keys(cat).forEach(k => { todos[k] = cat[k]; });
@@ -350,7 +352,7 @@ function buildExistencias() {
     const pr = exPrecio(i);
     const row = `<div class="ex-row" data-u="${i.upc}">
       <div class="ex-dot" style="background:${exColor(i.color)}"></div>
-      <div class="ex-info"><span class="col">${exEsc(i.color || "Sin color")}</span><span class="ex-upc">${exEsc(i.upc)}</span>${i.qty > 0 ? apaHtml(apart[i.upc] || 0, i.upc) : ""}${demoHtml(i.demo)}</div>
+      <div class="ex-info"><span class="col">${exEsc(i.color || "Sin color")}</span><span class="ex-upc">${exEsc(i.upc)}</span>${apaHtml(apart[i.upc] || 0, i.upc)}${demoHtml(i.demo)}</div>
       ${pr != null ? `<span class="ex-price">${exMoney(pr)}</span>` : ""}
       ${badge(i.qty, "u:" + i.upc, i.seccion)}
     </div>`;
@@ -506,7 +508,7 @@ function buildExistencias() {
   }
   function vender(upc) {
     if (typeof bodegaLoad !== "function" || typeof bodegaSave !== "function") return;
-    const est = bodegaLoad(), prev = { ...(est.stock || {}) }, q = prev[upc] || 0, dm = Math.min((bodegaDemo()[upc] || 0), q); if (q - dm <= 0) return;
+    const est = bodegaLoad(), prev = { ...(est.stock || {}) }, q = prev[upc] || 0, dm = Math.min((bodegaDemo()[upc] || 0), q), ap = (typeof bodegaApartados === "function" ? bodegaApartados()[upc] || 0 : 0); if (q - dm - ap <= 0) return;
     const nuevo = { ...prev, [upc]: q - 1 };
     let hist = est.historial || [];
     try { hist = bodegaRegistrar(est, prev, nuevo, bodegaCatalogoTodo(prev), "venta", est.fecha); } catch (_) {}
@@ -515,7 +517,7 @@ function buildExistencias() {
     const antesHist = est.historial || [];
     const old = document.querySelector(".ex-toast"); if (old) old.remove();
     const t = document.createElement("div"); t.className = "ex-toast";
-    t.innerHTML = `<span>Vendido · quedan ${Math.max(0, q - 1 - dm)}</span><button type="button">Deshacer</button>`;
+    t.innerHTML = `<span>Vendido · quedan ${Math.max(0, q - 1 - dm - ap)}</span><button type="button">Deshacer</button>`;
     document.body.appendChild(t);
     const timer = setTimeout(() => t.remove(), 6000);
     t.querySelector("button").addEventListener("click", () => {
