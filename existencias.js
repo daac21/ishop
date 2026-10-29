@@ -29,6 +29,21 @@ function exIcono(id) { return `<svg viewBox="0 0 24 24" fill="none" stroke="curr
 /* Imagen opcional: imágenes/existencias/<nombre-en-minúsculas-con-guiones>.png (si no existe se queda el icono) */
 function exSlug(t) { return String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""); }
 function exImg(nombre) { return `<img src="imágenes/existencias/${exSlug(nombre)}.png" alt="" loading="lazy" onload="this.parentNode.classList.add('has')" onerror="this.remove()">`; }
+/* Fotos de Watch: imágenes/existencias/watch/<modelo>-<acabado>-<correa>.webp (miniatura ~3 KB) y ...-grande.webp (solo se baja al tocar) */
+function exFotoBase(i) {
+  if (!i || !i.orden) return "";
+  const w = exWatchParse(i.modelo); if (!w) return "";
+  return "imágenes/existencias/watch/" + [exSlug(w.familia.replace(/^Apple Watch\s+/i, "")), exSlug(w.acabado), exSlug(String(i.corr || "").replace(/^Correa\s+(Estilo\s+)?/i, ""))].join("-");
+}
+function exFotoImg(base) { return base ? `<img src="${base}.webp" alt="" decoding="async" onload="this.parentNode.classList.add('has')" onerror="this.remove()">` : ""; }
+function exAbreFoto(base, nombre) {
+  const bg = document.createElement("div"); bg.className = "ex-foto-bg";
+  bg.innerHTML = `<div class="ex-foto"><button type="button" class="ex-foto-x" aria-label="Cerrar">×</button><img src="${base}.webp" alt=""><p>${exEsc(nombre)}</p></div>`;
+  const img = bg.querySelector("img"), grande = new Image();
+  grande.onload = () => { img.src = grande.src; img.classList.add("hd"); }; grande.src = base + "-grande.webp";
+  bg.addEventListener("click", () => bg.remove());
+  document.body.appendChild(bg);
+}
 const EX_COLORES = [
   [/bronce|bronze/i, "#8a6a4d"],
   [/azul noche|midnight blue/i, "#1f2a44"],
@@ -260,6 +275,15 @@ function exEstilos() {
   .ex-info .col{ overflow-wrap:anywhere; }
   .ex-wsub{ flex-wrap:wrap; align-items:flex-start; line-height:1.3; }
   .ex-wsub .ex-sws{ margin-top:2px; }
+  .ex-thumb{ position:relative; display:grid; place-items:center; }
+  .ex-thumb.has{ width:64px; height:64px; border-radius:16px; background:#fff !important; border:1px solid rgba(120,120,128,.3); box-shadow:none; cursor:zoom-in; overflow:hidden; }
+  .ex-thumb img{ width:100%; height:100%; object-fit:contain; display:block; }
+  .ex-foto-bg{ position:fixed; inset:0; z-index:99; background:rgba(0,0,0,.82); display:flex; align-items:center; justify-content:center; padding:18px; }
+  .ex-foto{ position:relative; width:100%; max-width:520px; background:#fff; border-radius:26px; padding:14px 14px 18px; text-align:center; color:#1c1c1e; }
+  .ex-foto img{ width:100%; aspect-ratio:1; object-fit:contain; display:block; filter:blur(2px); transition:filter .2s; }
+  .ex-foto img.hd{ filter:none; }
+  .ex-foto p{ margin:6px 8px 0; font-size:16px; font-weight:700; line-height:1.3; }
+  .ex-foto-x{ position:absolute; top:8px; right:10px; width:36px; height:36px; border:0; border-radius:50%; background:rgba(120,120,128,.18); font-size:24px; line-height:1; color:#1c1c1e; z-index:1; }
   .ex-apa.demo{ color:#1c8da3; background:rgba(48,176,199,.2); margin-left:6px; }
   html[data-mode="dark"] .ex-apa.demo{ color:#5fd0e4; }
   .ex-price{ font-size:19px; font-weight:800; letter-spacing:-.01em; white-space:nowrap; }
@@ -383,7 +407,7 @@ function buildExistencias() {
   const fila = (i) => {
     const pr = exPrecio(i);
     const row = `<div class="ex-row" data-u="${i.upc}">
-      <div class="ex-dot" style="background:${exColor(i.color, i.modelo)}"></div>
+      ${i.orden ? `<div class="ex-dot ex-thumb" data-foto="${exEsc(exFotoBase(i))}" data-n="${exEsc(i.modelo + " · " + i.color)}" style="background:${exColor(i.color, i.modelo)}">${exFotoImg(exFotoBase(i))}</div>` : `<div class="ex-dot" style="background:${exColor(i.color, i.modelo)}"></div>`}
       ${i.orden ? `<div class="ex-info"><span class="col">${exEsc(i.corr || "Sin correa")}</span><span class="ex-wl">${i.talla ? `<b class="ex-talla">${exEsc(i.talla)}</b>` : ""}<span class="ex-upc">${exEsc(i.upc)}</span></span>${apaHtml(apart[i.upc] || 0, i.upc)}${demoHtml(i.demo)}</div>`
       : `<div class="ex-info"><span class="col">${exEsc(i.color || "Sin color")}</span><span class="ex-upc">${exEsc(i.upc)}</span>${apaHtml(apart[i.upc] || 0, i.upc)}${demoHtml(i.demo)}</div>`}
       ${pr != null ? `<span class="ex-price">${exMoney(pr)}</span>` : ""}
@@ -406,7 +430,7 @@ function buildExistencias() {
     const abierto = texto || abiertos.has(clave);
     const p = items[0];
     return `<div class="ex-model${abierto ? " open" : ""}" data-m="${exEsc(clave)}" style="--c1:${sec.c1};--c2:${sec.c2}">
-      <button class="ex-mh" type="button"><div class="ex-pic">${exIcono(sec.id)}${exImg(p.titulo)}</div>
+      <button class="ex-mh" type="button"><div class="ex-pic">${exIcono(sec.id)}${p.orden && exFotoBase(p) ? exFotoImg(exFotoBase(p)) : exImg(p.titulo)}</div>
         <div class="ex-mt"><strong>${exEsc(p.titulo)}</strong>${p.spec ? `<span class="spec">${exEsc(p.spec)}</span>` : ""}${p.orden ? `<div class="sub ex-wsub"><span class="ex-sws"><i style="background:${exColor(p.color, p.modelo)}"></i></span><span>${[...new Set(items.map(i => (i.corr || "").replace(/^Correa\s+/i, "")).filter(Boolean))].join(" · ")}</span></div>`
         : `<div class="sub"><span class="ex-sws">${colores.slice(0, 6).map(c => `<i style="background:${exColor(c)}"></i>`).join("")}</span><span>${colores.length} color${colores.length === 1 ? "" : "es"}</span></div>`}</div>
         ${badge(tot, "m:" + clave, sec.id)}<i class="ex-chev"></i></button>
@@ -474,6 +498,7 @@ function buildExistencias() {
     pintaLista();
   };
   lista.addEventListener("click", e => {
+    const th = e.target.closest(".ex-thumb.has"); if (th && th.dataset.foto) { e.stopPropagation(); exAbreFoto(th.dataset.foto, th.dataset.n); return; }
     const ap = e.target.closest("[data-ap]"); if (ap) { e.stopPropagation(); abreApart(ap.dataset.ap); return; }
     const ey = e.target.closest("[data-eye]"); if (ey) { e.stopPropagation(); toggleRev(ey.dataset.eye); return; }
     const h = e.target.closest(".ex-mh"); if (!h) return;
@@ -493,6 +518,7 @@ function buildExistencias() {
   const W = 104;
   let abierto = null, g = null;
   const cerrar = r => { if (!r) return; r.style.transform = ""; r.classList.remove("drag"); if (abierto === r) abierto = null; };
+  lista.addEventListener("pointerdown", e => { const th = e.target.closest(".ex-thumb.has"); if (th && th.dataset.foto) new Image().src = th.dataset.foto + "-grande.webp"; });
   lista.addEventListener("pointerdown", e => {
     const r = e.target.closest(".ex-sw .ex-row");
     if (abierto && abierto !== r) cerrar(abierto);

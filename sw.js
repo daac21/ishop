@@ -1,4 +1,4 @@
-const CACHE_NAME = "ishop-tools-v37";
+const CACHE_NAME = "ishop-tools-v38";
 const ASSETS = [
   "./index.html",
   "./style.css",
@@ -47,6 +47,16 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
+  // Fotos (.webp): primero la copia guardada → abren al instante; si no existe, se bajan una sola vez
+  if (event.request.method === "GET" && /\.webp$/i.test(new URL(event.request.url).pathname)) {
+    event.respondWith(
+      caches.match(event.request).then(hit => hit || fetch(event.request).then(response => {
+        if (response.ok) { const copy = response.clone(); caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy)); }
+        return response;
+      }))
+    );
+    return;
+  }
   // Red primero: si hay internet, siempre trae la versión más nueva
   // (precios, modelos, etc.) y actualiza la copia guardada en el celular.
   // Si no hay internet, usa esa copia guardada como respaldo.
