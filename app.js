@@ -544,6 +544,10 @@ function buildScreen(entry) {
     el.appendChild(buildBodegaDemo());
   } else if (entry.screen === "bodegaHist") {
     el.appendChild(buildBodegaHist());
+  } else if (entry.screen === "bodegaEscaneos") {
+    el.appendChild(buildBodegaEscaneos());
+  } else if (entry.screen === "bodegaEscaneo") {
+    el.appendChild(buildBodegaEscaneo(entry.ts));
   } else if (entry.screen === "bodegaDetalle") {
     el.appendChild(buildBodegaDetalle(entry.ts));
   } else if (entry.screen === "existencias") {

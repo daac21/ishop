@@ -22,8 +22,6 @@ const BODEGA_SEED = {
   "195950621419":11,"195950621297":1,"195951405650":40,"195951405612":40
 };
 
-/* DATOS DE PRUEBA (erróneos a propósito): escanea la foto del 21-10-2026 y el reporte debe corregirlos */
-const BODEGA_PRUEBA = {"195949035180":1,"195950643015":70,"195950643213":1,"195950643138":120,"195950643336":2,"195950643091":43,"195950643299":1,"195950643176":27,"195950643374":1,"195950643053":39,"195950643251":1,"195950626438":3,"195950626513":5,"195950626759":1,"195950626353":14,"195950638288":26,"195950638325":15,"195950638240":32,"195951030197":20,"195951030272":5,"195951030234":7,"195951415505":37,"195951415529":150,"195951415611":1,"195951415536":64,"195951415550":10,"195951409948":10,"195951409863":12,"195951409887":55,"195951409924":29,"195951409979":5,"195951410012":2,"195951409955":1,"195951409870":8,"195950621419":11,"195951405650":25,"195951405612":40,"195949821257":6};
 
 /* ---------- Catálogo ---------- */
 function bodegaExtra() { try { return JSON.parse(localStorage.getItem(BODEGA_EXTRA_KEY)) || {}; } catch (e) { return {}; } }
@@ -1297,8 +1295,18 @@ function bodegaEditor(cat, code, qty, onSave) {
   document.body.appendChild(o); act(); u.focus();
 }
 
+/* Quita los datos de prueba que quedaron cargados (solo si siguen siendo los de prueba: fecha "datos de prueba") */
+function bodegaLimpiarPrueba() {
+  const e = bodegaLoad();
+  if (e.fecha !== "datos de prueba") return;
+  const sync = typeof window.ishopSyncPausa === "function";
+  if (sync && !window.ishopSyncPausada() && window.ishopSyncEstado !== "en línea") return;   // espera a estar en línea para que el borrado llegue a todos
+  bodegaSave({ stock: {}, fecha: "", ultimoReporte: null, historial: e.historial || [] });
+}
+
 function buildBodega() {
   bodegaEstilos();
+  bodegaLimpiarPrueba();
   const wrap = document.createElement("div");
   wrap.className = "bod-wrap bx";
   let estado = bodegaLoad();
@@ -1372,7 +1380,7 @@ function buildBodega() {
 
       <button class="bx-card bx-hist bx-s-morado" id="bodHist">${BX_ICON.clock}<span>Historial de reportes</span><i class="bx-ch">${BX_ICON.chev}</i></button>
 
-      <div class="bod-small"><button id="bodPrueba">Cargar datos de prueba</button><button id="bodSeed">Cargar lista del 21-10</button><button class="rojo" id="bodBorrar">Borrar todo</button></div>`;
+      <div class="bod-small"><button class="rojo" id="bodBorrar">Borrar todo</button></div>`;
 
     wrap.querySelector("#bodFoto").addEventListener("change", e => procesar(e.target.files[0]));
     wrap.querySelector("#bodDocFoto").addEventListener("change", async e => {
@@ -1384,23 +1392,24 @@ function buildBodega() {
       const t = wrap.querySelector("#bodTexto").value, est = wrap.querySelector("#bodEstado"), prev = wrap.querySelector("#bodPreview");
       const esc = bodegaLeerTexto(t); est.hidden = false; prev.innerHTML = "";
       if (!esc.leidos) { est.textContent = "No encontré renglones con código y existencia en ese texto."; return; }
-      pendiente = { esc, origen: "texto" }; est.textContent = `Leí ${esc.leidos} códigos.`; mostrarReporte(prev, cat());
+      pendiente = { esc, origen: "texto", texto: t }; est.textContent = `Leí ${esc.leidos} códigos.`; mostrarReporte(prev, cat());
     });
     wrap.querySelector("#bodManual").addEventListener("click", () => navigate({ screen: "bodegaManual", title: "Capturar cantidades" }));
     wrap.querySelector("#bodNV").addEventListener("click", () => navigate({ screen: "bodegaNoVend", title: "Equipos no vendibles" }));
     wrap.querySelector("#bodDemo").addEventListener("click", () => navigate({ screen: "bodegaDemo", title: "Demostración" }));
-    wrap.querySelector("#bodHist").addEventListener("click", () => navigate({ screen: "bodegaHist", title: "Historial de reportes" }));
+    { /* toque normal = Historial de reportes · mantener presionado = Escaneos guardados (oculto) */
+      const hb = wrap.querySelector("#bodHist"); let t = null, largo = false;
+      const stop = () => { clearTimeout(t); t = null; };
+      hb.addEventListener("pointerdown", () => { largo = false; stop(); t = setTimeout(() => { largo = true; navigate({ screen: "bodegaEscaneos", title: "Escaneos guardados" }); }, 700); });
+      ["pointerup", "pointerleave", "pointercancel"].forEach(ev => hb.addEventListener(ev, stop));
+      hb.addEventListener("contextmenu", e => e.preventDefault());
+      hb.addEventListener("click", () => { if (largo) { largo = false; return; } navigate({ screen: "bodegaHist", title: "Historial de reportes" }); });
+    }
     const vc = wrap.querySelector("#bodVerCambios");
     if (vc) vc.addEventListener("click", () => navigate({ screen: "bodegaDetalle", title: "Cambios del reporte", ts: ult.ts }));
 
-    const poner = (stock, fecha, msg) => {
-      if (Object.keys(estado.stock).length && !confirm(msg)) return;
-      estado = { stock: { ...stock }, fecha, ultimoReporte: null, historial: estado.historial || [] }; bodegaSave(estado); pintar();
-    };
-    wrap.querySelector("#bodPrueba").addEventListener("click", () => poner(BODEGA_PRUEBA, "datos de prueba", "Esto reemplaza tus existencias por datos de prueba (con errores a propósito). ¿Seguir?"));
-    wrap.querySelector("#bodSeed").addEventListener("click", () => poner(BODEGA_SEED, "21-10-2026", "Esto reemplaza tus existencias por la lista del 21-10-2026. ¿Seguir?"));
     wrap.querySelector("#bodBorrar").addEventListener("click", () => {
-      if (!confirm("¿Borrar las existencias, el historial y los registros de equipos no vendibles / apartados y de demostración de este teléfono?")) return;
+      if (!confirm("¿Seguro que quieres BORRAR TODO?\n\nSe borran las existencias, el historial y los registros de no vendibles, apartados y demostración. Si la sincronización está encendida, también se borra en los demás dispositivos.")) return;
       estado = { stock: {}, fecha: "", ultimoReporte: null, historial: [] }; bodegaSave(estado); bodegaNVSave([]); bodegaDemoSave({}); pintar();
     });
   }
@@ -1417,7 +1426,7 @@ function buildBodega() {
         p => { barra.style.width = Math.round(p * 100) + "%"; linea.style.top = Math.round(p * 100) + "%"; });
       barra.style.width = "100%"; linea.style.display = "none";
       if (!esc.leidos) { est.textContent = "No logré leer renglones de esa foto. Prueba con “Pegar o escanear texto”, que es más tolerante."; return; }
-      pendiente = { esc, origen: "foto" };
+      pendiente = { esc, origen: "foto", file };
       est.textContent = `Leí ${esc.leidos} códigos. Revisa lo marcado abajo antes de guardar.`;
       mostrarReporte(prev, cat(), true);
     } catch (e) { linea.style.display = "none"; est.textContent = "No pude leer esa foto (" + (e.message || e) + "). Prueba con otra foto o con “Pegar o escanear texto”."; }
@@ -1574,6 +1583,7 @@ function buildBodega() {
       const dm = bodegaDemo(); let dmCambio = false;
       Object.keys(esc.demoSel || {}).forEach(c => { if (esc.demoSel[c] && !(dm[c] > 0)) { dm[c] = 1; dmCambio = true; } });
       if (dmCambio) bodegaDemoSave(dm);
+      bxEscGuardar({ origen, fecha, stock: esc.stock, file: pendiente && pendiente.file, texto: pendiente && pendiente.texto });
       pendiente = null; pintar();
     });
   }
@@ -1827,6 +1837,132 @@ function buildBodegaDemo() {
   sub.innerHTML = "<b>Toca un equipo</b> para anclar una pieza como demostración (cada toque suma una).";
   wrap.append(intro, reg, sub, picker);
   pintaReg();
+  return wrap;
+}
+
+/* ---------- Escaneos guardados (menú oculto: mantener presionado "Historial de reportes") ----------
+   Cada escaneo que se aplica guarda: la foto (comprimida), de qué categoría es y lo que se leyó.
+   Se guarda en este dispositivo (IndexedDB) y se sube UNA sola vez a Firebase (colección "escaneos") para verlo en cualquier dispositivo. */
+const BX_ESC_CURSOR = "ishop_escaneos_cursor";
+function bxEscDb() { return new Promise((ok, fail) => { const r = indexedDB.open("ishop_escaneos_v1", 1); r.onupgradeneeded = () => r.result.createObjectStore("e", { keyPath: "ts" }); r.onsuccess = () => ok(r.result); r.onerror = () => fail(r.error); }); }
+async function bxEscTodos() { const db = await bxEscDb(); return new Promise(ok => { const q = db.transaction("e").objectStore("e").getAll(); q.onsuccess = () => ok((q.result || []).sort((a, b) => b.ts - a.ts)); q.onerror = () => ok([]); }); }
+async function bxEscGet(ts) { const db = await bxEscDb(); return new Promise(ok => { const q = db.transaction("e").objectStore("e").get(ts); q.onsuccess = () => ok(q.result || null); q.onerror = () => ok(null); }); }
+async function bxEscPon(d) { const db = await bxEscDb(); return new Promise(ok => { const t = db.transaction("e", "readwrite"); t.objectStore("e").put(d); t.oncomplete = () => ok(true); t.onerror = () => ok(false); }); }
+function bxEscComprimir(file) {
+  return new Promise(ok => {
+    if (!file) return ok("");
+    const u = URL.createObjectURL(file), im = new Image();
+    im.onload = () => {
+      let out = "";
+      for (const [m, q] of [[1500, .6], [1200, .55], [900, .5]]) {
+        const k = Math.min(1, m / Math.max(im.width, im.height)), c = document.createElement("canvas");
+        c.width = Math.round(im.width * k); c.height = Math.round(im.height * k);
+        c.getContext("2d").drawImage(im, 0, 0, c.width, c.height);
+        out = c.toDataURL("image/jpeg", q); if (out.length < 650000) break;   // Firestore: máx. 1 MB por documento
+      }
+      URL.revokeObjectURL(u); ok(out);
+    };
+    im.onerror = () => { URL.revokeObjectURL(u); ok(""); };
+    im.src = u;
+  });
+}
+function bxEscSecciones(stock) {
+  const n = {}; Object.keys(stock || {}).forEach(c => { const s = bodegaSeccionDe(c); n[s] = (n[s] || 0) + 1; });
+  return Object.keys(n).sort((a, b) => n[b] - n[a]);
+}
+async function bxEscSubir(d) {
+  if (d.subido || typeof window.ishopEscaneoSubir !== "function") return;
+  if (window.ishopSyncPausada && window.ishopSyncPausada()) return;          // modo pruebas: no se sube
+  try { const { subido, ...doc } = d; await window.ishopEscaneoSubir(doc); d.subido = true; await bxEscPon(d); } catch (e) { console.warn("Escaneo sin subir", e); }
+}
+async function bxEscGuardar({ origen, fecha, stock, file, texto }) {
+  try {
+    const secs = bxEscSecciones(stock);
+    const d = { ts: Date.now(), origen: origen || "foto", fecha: fecha || "", seccion: secs[0] || "Otros", secciones: secs, stock: { ...(stock || {}) }, foto: await bxEscComprimir(file), texto: texto ? String(texto).slice(0, 6000) : "", subido: false };
+    await bxEscPon(d); bxEscSubir(d);
+  } catch (e) { console.warn("No se pudo guardar el escaneo", e); }
+}
+async function bxEscSincronizar() {
+  const todos = await bxEscTodos();
+  for (const d of todos) if (!d.subido) await bxEscSubir(d);                    // los que quedaron pendientes
+  if (typeof window.ishopEscaneosNuevos !== "function" || (window.ishopSyncPausada && window.ishopSyncPausada())) return;
+  let cur = +localStorage.getItem(BX_ESC_CURSOR) || 0;
+  try {
+    for (let i = 0; i < 5; i++) {
+      const nuevos = await window.ishopEscaneosNuevos(cur);
+      for (const d of nuevos) { d.subido = true; if (!(await bxEscGet(d.ts))) await bxEscPon(d); cur = Math.max(cur, d.ts); }
+      localStorage.setItem(BX_ESC_CURSOR, String(cur));
+      if (nuevos.length < 40) break;
+    }
+  } catch (e) { console.warn("No se pudieron bajar escaneos", e); }
+}
+function bxEscCss() {
+  if (document.getElementById("bxEscCss")) return;
+  const st = document.createElement("style"); st.id = "bxEscCss";
+  st.textContent = `
+  .bxe-item{ display:flex; gap:14px; align-items:center; width:100%; text-align:left; margin-top:10px; padding:12px; color:var(--text); }
+  .bxe-item .bx-ch{ width:20px; height:20px; flex:0 0 20px; color:var(--text-secondary); }
+  .bxe-th{ flex:0 0 76px; height:76px; border-radius:14px; background:var(--bx-fill); object-fit:cover; overflow:hidden; display:grid; place-items:center; font-size:12px; color:var(--text-secondary); }
+  .bxe-th img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .bxe-item .t{ flex:1; min-width:0; } .bxe-item .t b{ display:block; font-size:19px; } .bxe-item .t small{ display:block; margin-top:3px; font-size:14px; color:var(--text-secondary); }
+  .bxe-tag{ display:inline-block; white-space:nowrap; margin-top:6px; font-size:12px; font-weight:700; padding:2px 9px; border-radius:999px; background:var(--bx-fill); color:var(--text-secondary); }
+  .bxe-tag.ok{ background:rgba(48,209,88,.18); color:var(--bx-green); } .bxe-tag.pend{ background:rgba(255,159,10,.2); color:var(--bx-orange); }
+  .bxe-det{ display:grid; gap:12px; margin-top:10px; } @media (min-width:760px){ .bxe-det{ grid-template-columns:1fr 1fr; align-items:start; } }
+  .bxe-foto{ width:100%; border-radius:16px; display:block; background:var(--bx-fill); cursor:zoom-in; }
+  .bxe-row{ display:flex; justify-content:space-between; gap:12px; padding:9px 0; border-top:1px solid var(--bx-line); font-size:15.5px; }
+  .bxe-row:first-of-type{ border-top:0; } .bxe-row b{ font-size:18px; min-width:34px; text-align:right; }
+  .bxe-sec{ margin:14px 0 2px; font-size:13px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; color:var(--text-secondary); }
+  .bxe-zoom{ position:fixed; inset:0; z-index:99; background:#000; overflow:auto; -webkit-overflow-scrolling:touch; }
+  .bxe-zoom img{ width:100%; display:block; } .bxe-zoom.x img{ width:260%; max-width:none; }
+  .bxe-zoom button{ position:fixed; top:14px; right:14px; z-index:2; border:0; border-radius:999px; padding:9px 16px; font-size:15px; font-weight:700; background:rgba(255,255,255,.9); color:#000; }
+  `;
+  document.head.appendChild(st);
+}
+function buildBodegaEscaneos() {
+  bodegaEstilos(); bxEscCss();
+  const wrap = document.createElement("div"); wrap.className = "bod-wrap bx bx-t-morado";
+  wrap.innerHTML = `<div class="bx-card" style="margin-top:4px"><h3>Escaneos guardados</h3><p class="bx-sub" style="margin:0">Las fotos y escaneos de las existencias, con lo que se leyó de cada uno. Toca uno para abrirlo.</p></div><div id="bxeLista"><p class="bx-sub" style="margin:14px 4px">Cargando…</p></div>`;
+  const pintar = async () => {
+    const l = wrap.querySelector("#bxeLista"), todos = await bxEscTodos();
+    if (!todos.length) { l.innerHTML = `<p class="bx-sub" style="margin:14px 4px">Todavía no hay escaneos. Aparecerán aquí cuando guardes una foto o un texto en Bodega.</p>`; return; }
+    l.innerHTML = ""; 
+    todos.forEach(d => {
+      const piezas = Object.values(d.stock || {}).reduce((x, y) => x + y, 0), n = Object.keys(d.stock || {}).length;
+      const b = document.createElement("button"); b.className = "bx-card bxe-item";
+      b.innerHTML = `<div class="bxe-th">${d.foto ? `<img src="${d.foto}" alt="">` : "Texto"}</div>
+        <div class="t"><b>${bodegaEsc(d.seccion || "Otros")}${(d.secciones || []).length > 1 ? ` <span style="font-size:13px;font-weight:600;color:var(--text-secondary)">+ ${bodegaEsc(d.secciones.slice(1).join(", "))}</span>` : ""}</b>
+          <small>${bodegaFechaHora(d.ts)}${d.fecha ? " · lista " + bodegaEsc(d.fecha) : ""}</small><small>${n} código${n === 1 ? "" : "s"} · ${piezas} pieza${piezas === 1 ? "" : "s"}</small>
+          <span class="bxe-tag ${d.subido ? "ok" : "pend"}">${d.subido ? "En la nube" : "Solo en este equipo"}</span></div><i class="bx-ch">${BX_ICON.chev}</i>`;
+      b.addEventListener("click", () => navigate({ screen: "bodegaEscaneo", title: "Escaneo", ts: d.ts }));
+      l.appendChild(b);
+    });
+  };
+  pintar(); bxEscSincronizar().then(pintar);
+  return wrap;
+}
+function buildBodegaEscaneo(ts) {
+  bodegaEstilos(); bxEscCss();
+  const wrap = document.createElement("div"); wrap.className = "bod-wrap bx bx-t-morado";
+  bxEscGet(ts).then(d => {
+    if (!d) { wrap.innerHTML = `<div class="bx-vacio">No encontré ese escaneo.</div>`; return; }
+    const cat = bodegaCatalogoTodo(d.stock), codes = Object.keys(d.stock || {});
+    const grupos = {}; codes.forEach(c => { const sc = bodegaSeccionDe(c); (grupos[sc] = grupos[sc] || []).push(c); });
+    const piezas = codes.reduce((x, c) => x + d.stock[c], 0);
+    const filas = Object.keys(grupos).map(sc => `<div class="bxe-sec">${bodegaEsc(sc)}</div>` + grupos[sc].sort((a, b) => bodegaNombre(cat, a).localeCompare(bodegaNombre(cat, b), undefined, { numeric: true })).map(c => `<div class="bxe-row"><span>${bodegaEsc(bodegaNombre(cat, c))}</span><b>${d.stock[c]}</b></div>`).join("")).join("");
+    wrap.innerHTML = `<div class="bx-card" style="margin-top:4px"><h3>${bodegaEsc(d.seccion || "Otros")} · ${bodegaFechaHora(d.ts)}</h3>
+      <p class="bx-sub" style="margin:0">${d.origen === "texto" ? "Texto" : "Foto / escaneo"}${d.fecha ? " · lista del " + bodegaEsc(d.fecha) : ""} · ${codes.length} códigos · ${piezas} piezas</p></div>
+      <div class="bxe-det">
+        <div class="bx-card">${d.foto ? `<img class="bxe-foto" src="${d.foto}" alt="">` : `<pre style="white-space:pre-wrap;font:inherit;font-size:14px;margin:0">${bodegaEsc(d.texto || "Sin foto")}</pre>`}</div>
+        <div class="bx-card"><h3>Lo que se guardó</h3>${filas || `<p class="bx-sub">Sin renglones.</p>`}</div>
+      </div>`;
+    const im = wrap.querySelector(".bxe-foto");
+    if (im) im.addEventListener("click", () => {
+      const z = document.createElement("div"); z.className = "bxe-zoom"; z.innerHTML = `<button type="button">Cerrar</button><img src="${d.foto}" alt="">`;
+      z.querySelector("button").addEventListener("click", () => z.remove()); z.querySelector("img").addEventListener("dblclick", () => z.classList.toggle("x"));
+      const bt = document.createElement("button"); bt.textContent = "Acercar"; bt.style.cssText = "top:14px;left:14px;right:auto"; bt.addEventListener("click", () => { z.classList.toggle("x"); bt.textContent = z.classList.contains("x") ? "Alejar" : "Acercar"; }); z.appendChild(bt);
+      document.body.appendChild(z);
+    });
+  });
   return wrap;
 }
 

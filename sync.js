@@ -103,6 +103,18 @@ const NV_KEY = "ishop_bodega_nv_v1";       // misma llave que usa bodega.js (Apa
     F.setDoc(invRef, { nv: JSON.stringify(a || []), ts: Date.now() }, { merge: true }).catch(e => console.warn(e));
   };
 
+  /* ---- Escaneos guardados (menú oculto de Bodega): se SUBEN una sola vez y solo se bajan los nuevos ---- */
+  window.ishopEscaneoSubir = async function (d) {
+    if (!F || !listo || pausaDesde()) throw new Error("sin sync");
+    await F.setDoc(F.doc(db, "escaneos", String(d.ts)), d);
+  };
+  window.ishopEscaneosNuevos = async function (desde) {
+    if (!F || !listo || pausaDesde()) return [];
+    const col = F.collection(db, "escaneos");
+    const q = desde ? F.query(col, F.where("ts", ">", desde), F.orderBy("ts", "asc"), F.limit(40)) : F.query(col, F.orderBy("ts", "desc"), F.limit(40));
+    return (await F.getDocs(q)).docs.map(x => x.data());
+  };
+
   /* ---- Subir cambios: bodegaSave(prev → d) ---- */
   window.ishopSyncPush = function (prev, d) {
     if (!F || !listo || pausaDesde()) return;     // modo pruebas: no se sube nada
