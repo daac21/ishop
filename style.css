@@ -1575,3 +1575,99 @@ html[data-mode="dark"] .bod-reporte{ background:#1c1c1e; }
 .bod-reporte pre{ white-space:pre-wrap; font:inherit; font-size:15px; margin:0; }
 .bod-aviso{ font-size:14px; margin:10px 0 6px; }
 .bod-nuevos .docs-btn{ display:block; width:100%; margin-bottom:6px; }
+
+/* ---- Botón Registros de la pantalla principal ---- */
+.home-reg{ -webkit-tap-highlight-color:transparent; outline:none; }
+
+/* =====================================================================
+   CONTRASTE: letras de botones/pestañas sin seleccionar (Solo equipo, + AppleCare+, etc.)
+   Antes eran gris sobre gris y se perdían. Ahora: texto fuerte + contorno.
+   ===================================================================== */
+.plan-tab, .sw-memb-opts button, .ds-tab, .set-seg button{
+  color:var(--text);
+  font-weight:700;
+  border:1.5px solid color-mix(in srgb, var(--text) 18%, transparent);
+  text-shadow:0 0 .6px color-mix(in srgb, var(--text) 35%, transparent);
+}
+.plan-tabs, .sw-memb-opts{ background:color-mix(in srgb, var(--text) 9%, var(--surface)); }
+html[data-mode="dark"] .plan-tabs, html[data-mode="dark"] .sw-memb-opts{ background:#2c2c2e; }
+.plan-tab{ font-size:13.5px; }
+.plan-tab.active, .sw-memb-opts button.on{
+  color:var(--accent);
+  border-color:var(--accent);
+  font-weight:800;
+  text-shadow:none;
+}
+html[data-mode="dark"] .plan-tab.active, html[data-mode="dark"] .sw-memb-opts button.on{ color:#fff; background:var(--accent); border-color:var(--accent); }
+.ds-tab.on, .set-seg button.on{ color:#fff; border-color:transparent; text-shadow:0 1px 2px rgba(0,0,0,.25); }
+/* textos secundarios más legibles */
+html[data-mode="dark"]{ --text-secondary:#b4b4ba; }
+:root{ --text-secondary:#5c5c61; }
+html[data-mode="dark"]{ --text-secondary:#b4b4ba; }
+.plan-note, .ds-plan-note{ font-weight:600; }
+/* leyenda "Cubre aluminio · titanio · cerámica" (AppleCare+ Watch Series 12) */
+.ds-aplica{ position:relative; margin:12px auto 0; display:inline-flex; gap:6px; align-items:center; padding:7px 14px; border-radius:999px; background:rgba(255,255,255,.2); border:1px solid rgba(255,255,255,.5); color:#fff; font-size:14px; font-weight:700; }
+.ds-aplica b{ font-weight:800; }
+.mp-sub{ display:block; margin-top:3px; font-size:13px; font-weight:700; color:var(--accent); letter-spacing:0; }
+
+
+/* ---- Botón grande Existencias (pantalla principal, arriba de la cuadrícula) ---- */
+.home-exist{
+  width:100%; margin:0 0 14px; border:none; border-radius:26px; padding:24px 20px; min-height:104px; display:flex; align-items:center; gap:16px;
+  color:#fff; font:inherit; text-align:left; position:relative;
+  background:linear-gradient(120deg, #35b394, #1f8a93 55%, #1a6a82);
+  box-shadow:0 14px 28px rgba(31,138,147,.34), inset 0 1px 0 rgba(255,255,255,.28);
+  transition:transform .15s ease; -webkit-tap-highlight-color:transparent;
+}
+.home-exist:active{ transform:scale(.985); }
+.home-exist-icon{ width:62px; height:62px; border-radius:18px; background:rgba(255,255,255,.18); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.home-exist-icon svg{ width:34px; height:34px; }
+.home-exist-text{ flex:1; display:flex; flex-direction:column; gap:4px; }
+.home-exist-text strong{ font-size:25px; font-weight:780; letter-spacing:-0.02em; }
+.home-exist-text small{ font-size:14px; opacity:.82; }
+.home-exist .home-tile-chev{ width:10px; height:10px; border-width:2.5px; }
+
+/* ---- "daac" (mantener presionado 1 s abre Bodega) ---- */
+.ds-wm span{ pointer-events:auto; padding:12px 16px; margin:-12px -16px; -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
+
+/* ---- Registros: datos bloqueados, solo fotos ---- */
+.docs-card.docs-bloq > *{ opacity:.45; pointer-events:none; -webkit-user-select:none; user-select:none; }
+.docs-card.docs-bloq canvas{ pointer-events:none; }
+
+/* ---- Selector iPhone / iPad / Mac (Trade In · Cancelación For Life) ---- */
+.docs-seg3{ display:grid; grid-template-columns:repeat(3,1fr); gap:6px; background:rgba(120,120,128,.14); border-radius:14px; padding:4px; }
+.docs-seg3 button{ border:0; background:none; color:var(--text); font:inherit; font-size:14px; font-weight:700; padding:12px 4px; border-radius:11px; }
+.docs-seg3 button.on{ background:#2f6fe4; color:#fff; box-shadow:0 3px 10px rgba(47,111,228,.35); }
+
+/* =====================================================================
+   TEMA CLARO — profundidad suave (sombras ambientales + luz en el borde superior)
+   Solo aplica con html[data-mode="light"] (todo lo que no sea "dark"). El tema oscuro no se toca.
+   Ajusta aquí la intensidad de todo: --lt-* controla cada nivel.
+   ===================================================================== */
+html:not([data-mode="dark"]){
+  --lt-ink: 22,30,56;                                   /* tono azul-grisáceo de las sombras */
+  --lt-hi: inset 0 1px 0 rgba(255,255,255,.9);          /* reflejo fino arriba (tarjetas blancas) */
+  --lt-1: 0 1px 2px rgba(var(--lt-ink),.05), 0 3px 8px -2px rgba(var(--lt-ink),.07);                                              /* chips, filas, botones pequeños */
+  --lt-2: 0 1px 2px rgba(var(--lt-ink),.05), 0 5px 12px -3px rgba(var(--lt-ink),.08), 0 14px 26px -10px rgba(var(--lt-ink),.07);  /* tarjetas y módulos */
+  --lt-3: 0 1px 3px rgba(var(--lt-ink),.06), 0 8px 18px -4px rgba(var(--lt-ink),.10), 0 18px 34px -12px rgba(var(--lt-ink),.10);  /* superficies principales */
+  --lt-glint: inset 0 1px 0 rgba(255,255,255,.22);      /* reflejo sobre fondos de color */
+}
+/* iluminación ambiental casi imperceptible (el color de fondo sigue siendo el mismo) */
+html:not([data-mode="dark"]):not(.docs-mode) body{ background-image:radial-gradient(130% 55% at 50% -8%, rgba(255,255,255,.65), rgba(255,255,255,0) 62%); background-repeat:no-repeat; }
+
+/* tarjetas y módulos */
+html:not([data-mode="dark"]) :is(.tool-btn,.placeholder-card,.ac-benefits,.ds-card,.set-card,.finance-col,.docs-card,.docs-rec,.sw-memb,.mp-card,.plan-result,.bod-model,.bod-reporte,.ex-model,.bx-card,.bx-m,.bx-g){ box-shadow:var(--lt-2), var(--lt-hi); }
+/* elementos pequeños: filas, chips, botones, campos */
+html:not([data-mode="dark"]) :is(.sub-btn:not(.selected),.ds-row,.ti-row,.ti-cap,.fee-row,.chip:not(.active),.scanner-manual-input,.view-toggle,.ex-search input,.ex-ojo:not(.on),.ex-ventas,.docs-input,.docs-file,.set-input){ box-shadow:var(--lt-1); }
+html:not([data-mode="dark"]) .mp-chip:not(.on){ box-shadow:var(--lt-1), 0 0 0 1px var(--border); }
+html:not([data-mode="dark"]) .ds-tabs{ box-shadow:var(--lt-1); }
+/* tarjetas de bodega con borde de color: sombra con un matiz muy tenue de su color */
+html:not([data-mode="dark"]) .bx[class*="bx-t-"] :is(.bx-card,.bx-m,.bx-g){ box-shadow:0 1px 2px rgba(var(--lt-ink),.04), 0 6px 14px -4px color-mix(in srgb,var(--sc) 22%, transparent), var(--lt-hi); }
+/* superficies de color: se conserva su sombra cromática actual y se suma el reflejo superior */
+html:not([data-mode="dark"]) .tradein-card{ box-shadow:0 1px 2px rgba(var(--lt-ink),.08), 0 8px 18px -4px color-mix(in srgb,var(--tc2) 30%, rgba(0,0,0,.08)), var(--lt-glint); }
+html:not([data-mode="dark"]) .coverage-tile{ box-shadow:0 1px 2px rgba(var(--lt-ink),.08), 0 8px 18px -4px color-mix(in srgb,var(--tile-color) 32%, rgba(0,0,0,.08)), var(--lt-glint); }
+html:not([data-mode="dark"]) .coverage-hero{ box-shadow:0 12px 26px rgba(0,0,0,0.18), var(--lt-glint); }
+html:not([data-mode="dark"]) .ac-hero{ box-shadow:0 10px 24px -8px color-mix(in srgb, var(--tool-color, var(--accent)) 60%, transparent), var(--lt-glint); }
+html:not([data-mode="dark"]) .trade-banner{ box-shadow:0 12px 26px color-mix(in srgb, var(--accent) 34%, transparent), var(--lt-glint); }
+html:not([data-mode="dark"]) .home-tile.light{ box-shadow:0 1px 2px rgba(60,70,110,.06), 0 8px 18px -4px rgba(60,70,110,.14), inset 0 1px 0 rgba(255,255,255,.8); }
+html:not([data-mode="dark"]) .primary-btn{ box-shadow:0 6px 16px color-mix(in srgb, var(--accent) 30%, transparent), var(--lt-glint); }
