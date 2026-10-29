@@ -35,12 +35,13 @@ function exFotoBase(i) {
   const w = exWatchParse(i.modelo); if (!w) return "";
   return "imágenes/existencias/watch/" + [exSlug(w.familia.replace(/^Apple Watch\s+/i, "")), exSlug(w.acabado), exSlug(String(i.corr || "").replace(/^Correa\s+(Estilo\s+)?/i, ""))].join("-");
 }
-function exFotoImg(base) { return base ? `<img src="${base}.webp" alt="" decoding="async" onload="this.parentNode.classList.add('has')" onerror="this.remove()">` : ""; }
+const EX_FOTO_V = "?v=2";   // sube el número si cambias las fotos, para que el teléfono las vuelva a bajar
+function exFotoImg(base) { return base ? `<img src="${base}.webp${EX_FOTO_V}" alt="" decoding="async" onload="this.parentNode.classList.add('has')" onerror="this.remove()">` : ""; }
 function exAbreFoto(base, nombre) {
   const bg = document.createElement("div"); bg.className = "ex-foto-bg";
-  bg.innerHTML = `<div class="ex-foto"><button type="button" class="ex-foto-x" aria-label="Cerrar">×</button><img src="${base}.webp" alt=""><p>${exEsc(nombre)}</p></div>`;
+  bg.innerHTML = `<div class="ex-foto"><button type="button" class="ex-foto-x" aria-label="Cerrar">×</button><img src="${base}.webp${EX_FOTO_V}" alt=""><p>${exEsc(nombre)}</p></div>`;
   const img = bg.querySelector("img"), grande = new Image();
-  grande.onload = () => { img.src = grande.src; img.classList.add("hd"); }; grande.src = base + "-grande.webp";
+  grande.onload = () => { img.src = grande.src; img.classList.add("hd"); }; grande.src = base + "-grande.webp" + EX_FOTO_V;
   bg.addEventListener("click", () => bg.remove());
   document.body.appendChild(bg);
 }
@@ -520,7 +521,7 @@ function buildExistencias() {
   const W = 104;
   let abierto = null, g = null;
   const cerrar = r => { if (!r) return; r.style.transform = ""; r.classList.remove("drag"); if (abierto === r) abierto = null; };
-  lista.addEventListener("pointerdown", e => { const th = e.target.closest(".ex-thumb.has"); if (th && th.dataset.foto) new Image().src = th.dataset.foto + "-grande.webp"; });
+  lista.addEventListener("pointerdown", e => { const th = e.target.closest(".ex-thumb.has"); if (th && th.dataset.foto) new Image().src = th.dataset.foto + "-grande.webp" + EX_FOTO_V; });
   lista.addEventListener("pointerdown", e => {
     const r = e.target.closest(".ex-sw .ex-row");
     if (abierto && abierto !== r) cerrar(abierto);
