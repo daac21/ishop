@@ -1100,7 +1100,7 @@ function buildScanner() {
       <div class="trade-banner"><span>${code}</span><strong>${info.modelo}</strong></div>
       <div class="finance-col">
         <div class="finance-row"><span>Color</span><strong>${info.color}</strong></div>
-        <div class="finance-row"><span>Capacidad</span><strong>${/^\d+$/.test(String(info.capacidad).trim()) ? info.capacidad + " GB" : info.capacidad}</strong></div>
+        <div class="finance-row"><span>${/watch/i.test(info.modelo || "") && /^correa/i.test(String(info.capacidad)) ? "Correa" : "Capacidad"}</span><strong>${/^\d+$/.test(String(info.capacidad).trim()) ? info.capacidad + " GB" : info.capacidad}</strong></div>
         <div class="finance-row${typeof info.applecare_robo_perdida === "number" ? "" : " total"}"><span>AppleCare+</span><strong>${money(info.applecare)}</strong></div>
         ${typeof info.applecare_robo_perdida === "number" ? `<div class="finance-row total"><span>AppleCare+ R y P</span><strong>${money(info.applecare_robo_perdida)}</strong></div>` : ""}
       </div>
