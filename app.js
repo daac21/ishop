@@ -61,7 +61,6 @@ const ISHOP_ICONS = (() => {
     coins:     s(`<ellipse cx="12" cy="6.5" rx="7" ry="3"/><path d="M5 6.5v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5"/><path d="M5 11.5v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5"/>`),
     tag:       s(`<path d="M20.5 12.6 12.6 20.5a1.6 1.6 0 0 1-2.3 0L3.5 13.7V3.5h10.2l6.8 6.8a1.6 1.6 0 0 1 0 2.3z"/><circle cx="8" cy="8" r="1.3"/>`),
     cancel:    s(`<path d="M6 6l12 12M18 6 6 18"/>`),
-    existencias: s(`<path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/>`),
   };
 })();
 
@@ -262,19 +261,6 @@ function dsWatermark() {
   w.className = "ds-wm";
   w.setAttribute("aria-hidden", "true");
   w.innerHTML = "<i></i><span>daac</span><i></i>";
-  // Oculto: mantener presionado "daac" 1 s → Bodega
-  const sp = w.querySelector("span");
-  let t = null;
-  sp.addEventListener("pointerdown", (e) => {
-    if (e.pointerType === "mouse" && e.button !== 0) return;
-    clearTimeout(t);
-    t = setTimeout(() => {
-      if (navigator.vibrate) navigator.vibrate(15);
-      if (currentEntry().screen !== "bodega") navigate({ screen: "bodega", title: "Bodega" });
-    }, 1000);
-  });
-  ["pointerup", "pointerleave", "pointercancel"].forEach(ev => sp.addEventListener(ev, () => clearTimeout(t)));
-  sp.addEventListener("contextmenu", (e) => e.preventDefault());
   return w;
 }
 
@@ -540,8 +526,6 @@ function buildScreen(entry) {
     el.appendChild(buildBodegaManual());
   } else if (entry.screen === "bodegaNoVend") {
     el.appendChild(buildBodegaNoVend());
-  } else if (entry.screen === "bodegaDemo") {
-    el.appendChild(buildBodegaDemo());
   } else if (entry.screen === "bodegaHist") {
     el.appendChild(buildBodegaHist());
   } else if (entry.screen === "bodegaDetalle") {
@@ -592,18 +576,6 @@ function buildHome() {
   heading.querySelector("h2").textContent = nom ? `Hola, ${nom}.` : "Hola.";
   wrap.appendChild(heading);
 
-  const exBtn = document.createElement("button");
-  exBtn.className = "home-exist";
-  exBtn.innerHTML = `
-    <span class="home-exist-icon">${ISHOP_ICONS.existencias}</span>
-    <span class="home-exist-text"><strong>Existencias</strong></span>
-    <span class="home-tile-chev"></span>`;
-  exBtn.addEventListener("click", async () => {
-    if (!ESCANER_DATA) await dataReady;
-    navigate({ screen: "existencias", title: "Existencias" });
-  });
-  wrap.appendChild(exBtn);
-
   const grid = document.createElement("div");
   grid.className = "home-grid";
   MENU.forEach(item => {
@@ -615,7 +587,26 @@ function buildHome() {
       <span class="home-tile-icon">${ISHOP_ICONS[item.id] || ""}</span>
       <span class="home-tile-label">${item.label}</span>
       <span class="home-tile-chev"></span>`;
-    tile.addEventListener("click", () => handleMenuClick(item));
+    if (item.id === "cajas") {
+      // Toque normal → Código cajas. Mantener presionado 1 s → Existencias (oculto)
+      let t = null, largo = false;
+      tile.addEventListener("pointerdown", (e) => {
+        if (e.pointerType === "mouse" && e.button !== 0) return;
+        largo = false;
+        t = setTimeout(async () => {
+          largo = true;
+          if (navigator.vibrate) navigator.vibrate(15);
+          if (!ESCANER_DATA) await dataReady;
+          navigate({ screen: "existencias", title: "Existencias" });
+        }, 1000);
+      });
+      ["pointerup", "pointerleave", "pointercancel"].forEach(ev => tile.addEventListener(ev, () => clearTimeout(t)));
+      tile.addEventListener("contextmenu", (e) => e.preventDefault());
+      tile.addEventListener("click", (e) => { if (largo) { largo = false; e.preventDefault(); return; } handleMenuClick(item); });
+      tile.style.webkitTouchCallout = "none"; tile.style.webkitUserSelect = "none"; tile.style.userSelect = "none";
+    } else {
+      tile.addEventListener("click", () => handleMenuClick(item));
+    }
     grid.appendChild(tile);
   });
   wrap.appendChild(grid);
@@ -624,9 +615,26 @@ function buildHome() {
   reg.className = "home-reg";
   reg.innerHTML = `
     <span class="home-reg-icon">${ISHOP_ICONS.registros}</span>
-    <span class="home-reg-text"><strong>Registros</strong></span>
+    <span class="home-reg-text"><strong>Registros</strong><small>Ver y crear registros</small></span>
     <span class="home-tile-chev"></span>`;
-  reg.addEventListener("click", () => navigate({ screen: "registros", title: "Registros" }));
+  // Toque normal → Registros. Mantener presionado 1 s → Bodega (oculto)
+  let regTimer = null, regLargo = false;
+  const regCancel = () => clearTimeout(regTimer);
+  reg.addEventListener("pointerdown", (e) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    regLargo = false;
+    regTimer = setTimeout(() => {
+      regLargo = true;
+      if (navigator.vibrate) navigator.vibrate(15);
+      navigate({ screen: "bodega", title: "Bodega" });
+    }, 1000);
+  });
+  ["pointerup", "pointerleave", "pointercancel"].forEach(ev => reg.addEventListener(ev, regCancel));
+  reg.addEventListener("contextmenu", (e) => e.preventDefault());
+  reg.addEventListener("click", (e) => {
+    if (regLargo) { regLargo = false; e.preventDefault(); return; }
+    navigate({ screen: "registros", title: "Registros" });
+  });
   wrap.appendChild(reg);
 
   async function handleMenuClick(item) {
@@ -666,7 +674,6 @@ const REGISTROS_TIPOS = [
   { label: "Switch Up",           programa: "Switch Up", icon: "switchup",  c1: "#ffc46b", c2: "#f59a23" },
   { label: "Trade In",            programa: "Trade In",  icon: "tag",       c1: "#6ea8ff", c2: "#2f6fe4" },
   { label: "Cancelación For Life", programa: "Cancelación For Life", icon: "cancel", c1: "#b4b8c2", c2: "#7c808b" },
-  { label: "Trade In · Cancelación For Life", programa: "Trade In Cancelación", icon: "tag", c1: "#6ea8ff", c2: "#2f6fe4" },
 ];
 
 function buildRegistros() {
@@ -675,7 +682,7 @@ function buildRegistros() {
   wrap.innerHTML = `<div class="reg-heading"><h2>Registros</h2><p class="ds-sub">Elige el tipo de registro.</p></div>`;
   const list = document.createElement("div");
   list.className = "reg-list";
-  const JW = { "For Life": "violet", "Get": "navy", "Switch Up": "amber", "Trade In": "blue", "Cancelación For Life": "slate", "Trade In Cancelación": "blue" };
+  const JW = { "For Life": "violet", "Get": "navy", "Switch Up": "amber", "Trade In": "blue", "Cancelación For Life": "slate" };
   REGISTROS_TIPOS.forEach(t => {
     const row = dsRow({
       icon: ISHOP_ICONS[t.icon] || DS_ICONS.doc, jw: JW[t.programa] || "slate", label: t.label,
@@ -1100,9 +1107,9 @@ function buildScanner() {
       <div class="trade-banner"><span>${code}</span><strong>${info.modelo}</strong></div>
       <div class="finance-col">
         <div class="finance-row"><span>Color</span><strong>${info.color}</strong></div>
-        <div class="finance-row"><span>Capacidad</span><strong>${/^\d+$/.test(String(info.capacidad).trim()) ? info.capacidad + " GB" : info.capacidad}</strong></div>
-        <div class="finance-row${typeof info.applecare_robo_perdida === "number" ? "" : " total"}"><span>AppleCare+</span><strong>${money(info.applecare)}</strong></div>
-        ${typeof info.applecare_robo_perdida === "number" ? `<div class="finance-row total"><span>AppleCare+ R y P</span><strong>${money(info.applecare_robo_perdida)}</strong></div>` : ""}
+        <div class="finance-row"><span>Capacidad</span><strong>${info.capacidad} GB</strong></div>
+        <div class="finance-row"><span>AppleCare+</span><strong>${money(info.applecare)}</strong></div>
+        <div class="finance-row total"><span>AppleCare+ R y P</span><strong>${money(info.applecare_robo_perdida)}</strong></div>
       </div>
     `;
   }
@@ -1714,8 +1721,6 @@ function buildModelPicker(catRaw, keys, wrap, onPick, opts) {
     row.className = "mp-row";
     row.innerHTML = `<span class="mp-thumb">${modeloThumb(cat, key, g, catRaw)}</span><span class="mp-name"></span><span class="mp-chev"></span>`;
     row.querySelector(".mp-name").textContent = modeloNombre(key);
-    const subTxt = typeof opts.sub === "function" ? opts.sub(key) : "";
-    if (subTxt) { const sm = document.createElement("small"); sm.className = "mp-sub"; sm.textContent = subTxt; row.querySelector(".mp-name").appendChild(sm); }
     row.addEventListener("click", () => {
       if (opts.recents) tradeGuardarReciente(cat, key);
       onPick(key);
@@ -2116,7 +2121,7 @@ function buildAcModels(category) {
     } else {
       navigate({ screen: "acVariants", category, model, title: modeloNombre(model) });
     }
-  }, { titulo: category, desc: true, sub: (m) => { const v = models[m] && Object.values(models[m])[0]; return v && v.aplica ? "Cubre " + v.aplica : ""; } });
+  }, { titulo: category, desc: true });
   return wrap;
 }
 
@@ -2188,9 +2193,7 @@ function buildAcDetail(category, model, variant) {
       </div>
       ${diff && diff > 0 ? `<p class="ds-plan-note">Agrega protección contra robo y extravío por ${money(diff)} más.</p>` : ""}
     ` : `<div class="ds-price">${money(info.precio)}</div>`}
-    ${info.aplica ? `<p class="ds-aplica"><b>Cubre</b> <span></span></p>` : ""}
   `;
-  if (info.aplica) hero.querySelector(".ds-aplica span").textContent = info.aplica;
   hero.querySelector("h2").textContent = model;
   hero.querySelector(".ds-hero-sub").textContent = variant;
   wrap.appendChild(hero);
@@ -2654,8 +2657,7 @@ function buildSettings(entry) {
    Banner: imágenes/docs/banner.jpg (o .png). Lector de texto: libs/tesseract/.
    ===================================================================== */
 const DOCS_TITULO = "iPhone/iPad/Mac/Watch®";
-const DOCS_PROGRAMAS = ["For Life", "Get", "Switch Up", "Trade In", "Cancelación For Life", "Trade In Cancelación"];
-const DOCS_TC = "Trade In Cancelación";   // Trade In por cancelación de For Life: formato de 1 hoja con datos + firma
+const DOCS_PROGRAMAS = ["For Life", "Get", "Switch Up", "Trade In", "Cancelación For Life"];
 const DOCS_SUCURSAL = "Morelia";
 const DOCS_BANNERS = ["imágenes/docs/banner.jpg", "imágenes/docs/banner.png"];
 const DOCS_TTL_MS = 48 * 60 * 60 * 1000;
@@ -2664,7 +2666,7 @@ const DOCS_HOLD_MS = 3000;
 /* ---------- Borrador compartido entre pantallas ---------- */
 function docsNewDraft() {
   return {
-    email: "", nombre: "", paterno: "", materno: "", telefono: "", serie: "", fechaCompra: "", dispositivo: "iPhone",
+    email: "", nombre: "", paterno: "", materno: "", telefono: "", serie: "",
     firmaUrl: "", firmaAsesorUrl: "",
     // Trade In (contrato completo)
     estado: "", asesor: "", rfc: "", calle: "", cp: "", numExt: "", numInt: "", colonia: "",
@@ -2680,8 +2682,7 @@ function docsNewDraft() {
 }
 let docsDraft = docsNewDraft();
 const docsFullName = (d) => [d.nombre, d.paterno, d.materno].filter(Boolean).join(" ");
-const docsHayDatos = (d) => !!(d.email || (d.nombre && !d.nombreEnFotos) || d.paterno || d.materno || d.telefono || d.serie || d.fechaCompra || d.firmaUrl || d.rfc || d.calle || d.modelo || d.costo);
-const docsIsoLarga = (iso) => { const m = String(iso || "").match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? docsFechaLarga(new Date(+m[1], +m[2] - 1, +m[3])) : String(iso || ""); };
+const docsHayDatos = (d) => !!(d.email || d.nombre || d.paterno || d.materno || d.telefono || d.serie || d.firmaUrl || d.rfc || d.calle || d.modelo || d.costo);
 const docsFechaHoy = () => new Date().toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" });
 
 /* ---------- Base de datos del teléfono ---------- */
@@ -2798,11 +2799,7 @@ const DOCS_CAMPOS_TI = [
   ["modeloN", "Modelo (nuevo)"], ["capacidadN", "Capacidad (nueva)"], ["serieN", "No. Serie (nuevo)"], ["imeiN", "IMEI (nuevo)"],
   ["idTipo", "Identificación"],
 ];
-const DOCS_CAMPOS_TC = [
-  ["nombre", "Nombre"], ["paterno", "Apellido paterno"], ["materno", "Apellido materno"],
-  ["telefono", "Teléfono"], ["email", "Correo"], ["serie", "# Serie"], ["fechaCompra", "Fecha de compra"], ["dispositivo", "Programa for Life"],
-];
-const docsCampos = (prog) => prog === "Trade In" ? DOCS_CAMPOS_TI : prog === DOCS_TC ? DOCS_CAMPOS_TC : DOCS_CAMPOS;
+const docsCampos = (prog) => prog === "Trade In" ? DOCS_CAMPOS_TI : DOCS_CAMPOS;
 const docsNb = (t) => String(t == null ? "" : t).replace(/\u00a0/g, " ");
 // "2500" -> "$2,500.00"
 function docsMoney(v) {
@@ -2849,11 +2846,7 @@ const DOCS_PDF_TEMPLATES = {
   "Switch Up": "contrato/switch_up.pdf",
   "Trade In": "contrato/trade_in.pdf",
   "Cancelación For Life": "contrato/cancelacion.pdf",
-  "Trade In Cancelación": "contrato/trade_in_cancelacion_iphone.pdf",   // la hoja real depende del dispositivo (ver docsMakePdf)
 };
-const docsPlantilla = (rec) => rec.programa === DOCS_TC
-  ? `contrato/trade_in_cancelacion_${String((rec.datos && rec.datos.dispositivo) || "iPhone").toLowerCase()}.pdf`
-  : DOCS_PDF_TEMPLATES[rec.programa];
 let docsPdfLibP = null;
 function docsLoadPdfLib() {
   if (window.PDFLib) return Promise.resolve(window.PDFLib);
@@ -2907,7 +2900,7 @@ const docsFechaLarga = (dt, cap) => { const m = DOCS_MESES[dt.getMonth()]; retur
 async function docsMakePdf(rec) {
   const PDFLib = await docsLoadPdfLib();
   const { PDFDocument, StandardFonts, rgb } = PDFLib;
-  const tplUrl = docsPlantilla(rec);
+  const tplUrl = DOCS_PDF_TEMPLATES[rec.programa];
   if (!tplUrl) throw new Error("no hay plantilla");
   const resp = await fetch(tplUrl);
   if (!resp.ok) throw new Error("no hay plantilla");
@@ -2926,13 +2919,12 @@ async function docsMakePdf(rec) {
   const safe = (t, f) => Array.from(String(t || "").normalize("NFC")).map(ch => { try { f.encodeText(ch); return ch; } catch (e) { return "?"; } }).join("");
   const fit = (t, f, size, maxW) => { let s = size; while (s > 4.5 && f.widthOfTextAtSize(t, s) > maxW) s -= 0.25; return s; };
   // texto alineado a la izquierda, al centro o a la derecha; "top" es la línea base medida desde arriba
-  const put = (page, text, x, top, f, size, maxW, align, col) => {
+  const put = (page, text, x, top, f, size, maxW, align) => {
     const t = safe(text, f); if (!t) return;
     const sz = fit(t, f, size, maxW || 9999);
     const w = f.widthOfTextAtSize(t, sz);
     const px = align === "c" ? x - w / 2 : align === "r" ? x - w : x;
-    page.drawText(t, { x: px, y: Hof(page) - top, size: sz, font: f, color: col || black });
-    return { px, w, sz };
+    page.drawText(t, { x: px, y: Hof(page) - top, size: sz, font: f, color: black });
   };
   const sigCache = {};
   const sign = async (page, cx, top, boxW, boxH, which) => {
@@ -3010,18 +3002,6 @@ async function docsMakePdf(rec) {
     if (line) put(p, line, 75.3, y, font, SZ);
     put(p, nombreCompleto, 286, 578.8, font, 11.5, 250, "c");
     await sign(p, 286, 485, 160, 80);
-
-  } else if (prog === DOCS_TC) {
-    // Hoja única: Nombre, Teléfono, e-Mail, No. de Serie, Fecha de compra (en azul, centrados) + firma sobre la línea
-    const p = pages[0], azul = rgb(0.22, 0.43, 0.72), cx = 183 + 373 / 2;
-    const fila = i => 364 + 29 * i + 16.4;
-    put(p, nombreCompleto.toUpperCase(), cx, fila(0), font, 10, 360, "c", azul);
-    put(p, d.telefono, cx, fila(1), font, 10, 360, "c", azul);
-    const em = put(p, d.email, cx, fila(2), font, 10, 360, "c", azul);
-    if (em) p.drawLine({ start: { x: em.px, y: Hof(p) - fila(2) - 1.6 }, end: { x: em.px + em.w, y: Hof(p) - fila(2) - 1.6 }, thickness: 0.6, color: azul });
-    put(p, (d.serie || "").toUpperCase(), cx, fila(3), font, 10, 360, "c", azul);
-    put(p, d.fechaCompra, cx, fila(4), font, 10, 360, "c", azul);
-    await sign(p, 306, 516, 200, 56);
 
   } else if (prog === "Trade In") {
     const [p1, p2, p3, p4, p5] = pages;
@@ -3343,11 +3323,9 @@ function docsTiHtml() {
       ${docsSignHtml("dSignA", "Captura tu firma (Asesor)", "dClearA")}`;
 }
 
-function docsBaseHtml(tc) {
+function docsBaseHtml() {
   return `
       <h3>Datos del cliente</h3>
-      ${tc ? `<div class="docs-field"><label>Programa for Life :</label>
-        <div class="docs-seg3" id="dDisp">${["iPhone", "iPad", "Mac"].map(v => `<button type="button" data-v="${v}">${v}</button>`).join("")}</div></div>` : ""}
       <div class="docs-field"><label for="dEmail">Email :</label>
         <input id="dEmail" class="docs-input" type="email" inputmode="email" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false"></div>
       <div class="docs-field"><label for="dNombre">Nombre :</label>
@@ -3362,8 +3340,6 @@ function docsBaseHtml(tc) {
         <input id="dTel" class="docs-input" type="tel" inputmode="tel" autocomplete="off"></div>
       <div class="docs-field docs-half"><label for="dSerie"># Serie :</label>
         <input id="dSerie" class="docs-input" type="text" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false"></div>
-      ${tc ? `<div class="docs-field docs-half"><label for="dCompra">Fecha de compra :</label>
-        <input id="dCompra" class="docs-input" type="date"></div>` : ""}
       <div class="docs-row2 docs-info">
         <div><div class="docs-lbl">Fecha :</div><div class="docs-val" id="dFecha"></div></div>
         <div><div class="docs-lbl">Sucursal de iShop :</div><div class="docs-val" id="dSuc"></div></div>
@@ -3371,19 +3347,13 @@ function docsBaseHtml(tc) {
       ${docsSignHtml("dSign", "Captura tu firma (Cliente)", "dClear")}`;
 }
 
-/* Por ahora Registros es solo para tomar las fotos: los campos de datos están bloqueados.
-   Para volver a abrirlos, cambia esto a false. */
-const REGISTROS_SOLO_FOTOS = true;
-
 function buildDocs() {
   const ti = docsDraft.programa === "Trade In";
-  const tc = docsDraft.programa === DOCS_TC;
-  const bloqueado = REGISTROS_SOLO_FOTOS && !tc;   // el formato de cancelación sí lleva captura de datos
   const wrap = document.createElement("div");
   wrap.className = "docs-page";
   wrap.innerHTML = `
     ${docsHeaderHtml()}
-    <div class="docs-card">${ti ? docsTiHtml() : docsBaseHtml(tc)}</div>
+    <div class="docs-card">${ti ? docsTiHtml() : docsBaseHtml()}</div>
     <button type="button" class="docs-accept" id="dNext"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Aceptar</span></button>
     <p class="docs-msg" id="dMsg" role="status"></p>
     <button type="button" class="docs-link" id="dSkip">Omitir datos · solo fotos</button>
@@ -3398,13 +3368,6 @@ function buildDocs() {
   docsBindText(wrap, "dMaterno", "materno", { upper: true });
   docsBindText(wrap, "dTel", "telefono");
   docsBindText(wrap, "dSerie", "serie", { upper: true });
-  if (tc) {
-    docsBindText(wrap, "dCompra", "fechaCompra");
-    const seg = wrap.querySelector("#dDisp"), pinta = () => seg.querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.v === (d.dispositivo || "iPhone")));
-    seg.addEventListener("click", e => { const b = e.target.closest("button[data-v]"); if (!b) return; d.dispositivo = b.dataset.v; pinta(); });
-    if (!d.dispositivo) d.dispositivo = "iPhone";
-    pinta();
-  }
   $("#dFecha").textContent = docsFechaHoy();
   $("#dSuc").textContent = DOCS_SUCURSAL;
   docsSignPad(wrap, "dSign", "dClear", "firmaUrl");
@@ -3453,22 +3416,9 @@ function buildDocs() {
     docsSignPad(wrap, "dSignA", "dClearA", "firmaAsesorUrl");
   }
 
-  if (bloqueado) {
-    const card = wrap.querySelector(".docs-card");
-    card.classList.add("docs-bloq");
-    card.querySelectorAll("input, select, textarea, button").forEach(el => { el.disabled = true; });
-    const sk = wrap.querySelector("#dSkip"); if (sk) sk.hidden = true;
-    wrap.querySelector("#dNext span").textContent = "Continuar a fotos";
-  }
-  if (tc) { const sk = wrap.querySelector("#dSkip"); if (sk) sk.hidden = true; }
   const next = () => navigate({ screen: "docsFotos", title: "Documentos" });
   $("#dNext").addEventListener("click", () => {
-    if (tc) {
-      const f = [["nombre", "nombre"], ["telefono", "teléfono"], ["email", "correo"], ["serie", "# serie"], ["fechaCompra", "fecha de compra"]].filter(([k]) => !String(d[k] || "").trim()).map(x => x[1]);
-      if (!d.firmaUrl) f.push("firma");
-      if (f.length) { $("#dMsg").textContent = "Falta: " + f.join(", ") + "."; return; }
-    }
-    if (!bloqueado && ti && (!d.aceptaTyC || !d.aceptaAviso)) {
+    if (ti && (!d.aceptaTyC || !d.aceptaAviso)) {
       $("#dMsg").textContent = "Marca los dos consentimientos para continuar.";
       $("#dTyC").scrollIntoView({ behavior: "smooth", block: "center" });
       return;
@@ -3631,13 +3581,12 @@ function buildDocsConfirm() {
   const hayDatos = docsHayDatos(d);
   if (d.programa) addRow("Programa", d.programa);
   if (hayDatos) {
-    docsCampos(d.programa).forEach(([k, label]) => { if (d[k]) addRow(label, k === "costo" ? (docsMoney(d[k]) || d[k]) : k === "fechaCompra" ? docsIsoLarga(d[k]) : d[k]); });
+    docsCampos(d.programa).forEach(([k, label]) => { if (d[k]) addRow(label, k === "costo" ? (docsMoney(d[k]) || d[k]) : d[k]); });
     if (d.programa === "Trade In") addRow("Asesor", d.asesor || ishopAjustes().nombre || "—");
     addRow("Fecha", docsFechaHoy());
     addRow("Sucursal", DOCS_SUCURSAL);
   } else {
     addRow("Registro", "Solo fotos");
-    if (docsFullName(d)) addRow("Nombre", docsFullName(d));
   }
 
   const thumbs = wrap.querySelector("#cfThumbs");
@@ -3655,11 +3604,9 @@ function buildDocsConfirm() {
   if (d.firmaAsesorUrl) addThumb("Firma asesor", d.firmaAsesorUrl);
 
   const faltan = [];
-  if (d.programa !== DOCS_TC) {
-    if (!d.frente) faltan.push("foto del frente");
-    if (!d.reverso) faltan.push("foto de atrás");
-    if (!d.ticket) faltan.push("ticket");
-  }
+  if (!d.frente) faltan.push("foto del frente");
+  if (!d.reverso) faltan.push("foto de atrás");
+  if (!d.ticket) faltan.push("ticket");
   if (hayDatos && !d.firmaUrl) faltan.push("firma");
   if ((d.programa === "Trade In" || d.programa === "Switch Up") && !ishopAjustes().nombre && !(d.asesor || "").trim()) faltan.push("tu nombre de asesor (ponlo en Ajustes)");
   if (d.programa === "Trade In") {
@@ -3685,7 +3632,6 @@ function buildDocsConfirm() {
       const firmaAsesor = d.firmaAsesorUrl ? await docsDataUrlToWhitePng(d.firmaAsesorUrl) : null;
       const datosRec = {};
       docsCampos(d.programa).forEach(([k]) => { datosRec[k] = String(d[k] == null ? "" : d[k]).trim(); });
-      if (d.programa === DOCS_TC) datosRec.fechaCompra = docsIsoLarga(datosRec.fechaCompra);
       if (d.programa === "Trade In") datosRec.costo = docsMoney(d.costo) || datosRec.costo;
       const rec = {
         id: Date.now() + "-" + Math.random().toString(36).slice(2, 7),

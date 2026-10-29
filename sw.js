@@ -1,4 +1,4 @@
-const CACHE_NAME = "ishop-tools-v48";
+const CACHE_NAME = "ishop-tools-v36";
 const ASSETS = [
   "./index.html",
   "./style.css",
@@ -7,7 +7,6 @@ const ASSETS = [
   "./lectorpantalla.js",
   "./datos/lector_pantalla.js",
   "./existencias.js",
-  "./sync.js",
   "./games/games.css",
   "./games/minesweeper.js",
   "./games/snake.js",
@@ -48,8 +47,6 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
-  // Firebase y librerías externas (otro dominio) o escrituras: directo a la red, sin tocar.
-  if (event.request.method !== "GET" || new URL(event.request.url).origin !== self.location.origin) return;
   // Red primero: si hay internet, siempre trae la versión más nueva
   // (precios, modelos, etc.) y actualiza la copia guardada en el celular.
   // Si no hay internet, usa esa copia guardada como respaldo.
