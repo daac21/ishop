@@ -1443,7 +1443,7 @@ function buildBodega() {
     // 2) códigos que no pude leer
     const dud = esc.dudosos || [];
     // 3) códigos que tenías y no salieron en la foto
-    const faltan = (hayPrev && !pendiente.parcial) ? Object.keys(estado.stock).filter(code => estado.stock[code] > 0 && !(code in esc.stock) && !esc.faltaOk[code] && Object.keys(esc.stock).some(k => sec(k) === sec(code))) : [];
+    const faltan = [];   // lo que ya no sale en la foto simplemente pasa a 0 (sin preguntar); vuelve a aparecer cuando salga en un escaneo nuevo
     // 4) cambios muy grandes contra el reporte anterior
     const grandes = hayPrev ? Object.keys(esc.stock).filter(code => {
       if (esc.confirmadas[code] || esc.grandeOk[code] || rev.some(x => x.code === code) || !(code in estado.stock)) return false;
@@ -1480,14 +1480,6 @@ function buildBodega() {
         <div class="bx-rv-upc dim">${bodegaEsc(d.raw || "—")}</div><div class="bx-rv-nom">Cantidad que leí: ${d.qty}</div>
         ${img(d, "Renglón " + (d.idx || ""))}
         <div class="bx-rv-opts"><button class="bx-rv-b main" data-act="cod" data-i="${i}">Escribir el código</button><button class="bx-rv-b" data-act="quitar" data-i="${i}">Quitar renglón</button></div></div>`);
-    });
-    faltan.forEach(code => {
-      const nom = bodegaNombre(c, code), antes = estado.stock[code];
-      cards.push(`<div class="bx-rv" data-c="${code}"><div class="bx-rv-top"><span class="bx-rv-n">No apareció en la foto</span><span class="bx-rv-s">${bodegaEsc(sec(code))}</span></div>
-        <div class="bx-rv-tag f">Tenías ${antes} pieza${antes === 1 ? "" : "s"}</div>
-        <div class="bx-rv-upc">${code}</div><div class="bx-rv-nom">${bodegaEsc(nom)}</div>
-        ${demoChk(code)}
-        <div class="bx-rv-opts"><button class="bx-rv-b main" data-act="conservar" data-c="${code}" data-v="${antes}">Conservar ${antes}</button><button class="bx-rv-b" data-act="cero" data-c="${code}">Ya no hay (0)</button></div></div>`);
     });
     grandes.forEach(code => {
       const nom = bodegaNombre(c, code), p = estado.stock[code], n = esc.stock[code];

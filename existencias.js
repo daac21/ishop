@@ -30,6 +30,8 @@ function exIcono(id) { return `<svg viewBox="0 0 24 24" fill="none" stroke="curr
 function exSlug(t) { return String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""); }
 function exImg(nombre) { return `<img src="imágenes/existencias/${exSlug(nombre)}.png" alt="" loading="lazy" onload="this.parentNode.classList.add('has')" onerror="this.remove()">`; }
 const EX_COLORES = [
+  [/bronce|bronze/i, "#8a6a4d"],
+  [/azul noche|midnight blue/i, "#1f2a44"],
   [/nocturno|night|negro|black|medianoche|midnight|space|grafito/i, "#2b2b2e"],
   [/blanco|white|estelar|starlight|star/i, "#f2efe9"],
   [/plata|silver|plateado/i, "#d7d8da"],
@@ -56,7 +58,9 @@ function exSeccion(nombre) {
   if (/mac/.test(n)) return "Mac";
   return "Otros";
 }
-function exColor(nombre) {
+function exColor(nombre, modelo) {
+  const w = modelo ? exWatchParse(modelo) : null;
+  if (w) nombre = w.acabado;
   for (const [re, hex] of EX_COLORES) if (re.test(nombre || "")) return hex;
   return "#c7c7cc";
 }
@@ -84,9 +88,27 @@ function exCatalogo() {
   return out;
 }
 
+/* ---- Apple Watch (nombre nuevo): "Apple Watch Series 12 GPS + Cellular Titanio Oro Radiante 42 mm" + color = "Correa Deportiva (Talla M/L)" ---- */
+const EX_WATCH_RE = /^(Apple Watch (?:Ultra \d+|Series \d+))\s+(GPS(?:\s*\+\s*Cellular)?)\s+(Titanio|Aluminio|Cerámica|Acero)\s+(.+?)\s+(\d{2})\s*mm$/i;
+function exWatchParse(modelo) {
+  const m = String(modelo || "").trim().match(EX_WATCH_RE);
+  if (!m) return null;
+  const con = m[2].replace(/\s*\+\s*/, " + "), mm = +m[5];
+  const orden = [m[1], /cell/i.test(con) ? 1 : 0, ["aluminio", "titanio", "cerámica", "acero"].indexOf(m[3].toLowerCase()), String(mm).padStart(3, "0"), m[4]].join("|");
+  return { familia: m[1], conexion: con, material: m[3], acabado: m[4], mm, spec: [con, m[3] + " " + m[4], mm + " mm"].join(" · "), orden };
+}
+/* "Correa Alpine (Talla M)" → { corr: "Correa Alpine", talla: "Talla M" } */
+function exCorrea(color) {
+  const m = String(color || "").match(/^(.*?)\s*\((Talla[^)]*)\)\s*$/);
+  return m ? { corr: m[1].trim(), talla: m[2].trim() } : { corr: String(color || "").trim(), talla: "" };
+}
+const EX_TALLA_RANK = { "única": 0, "s": 1, "s/m": 2, "s, m": 2, "m": 3, "m/l": 4, "m, l": 4, "l": 5 };
+function exTallaRank(t) { const k = String(t || "").replace(/^talla\s*/i, "").trim().toLowerCase(); return k in EX_TALLA_RANK ? EX_TALLA_RANK[k] : 9; }
+
 /* ---- Separar "MacBook Pro 14" + M5 · 16 GB · CPU 10 · GPU 10" para que cada configuración sea su propia tarjeta ---- */
 function exParse(modelo, seccion) {
   const m = String(modelo || "").trim();
+  if (seccion === "Watch") { const w = exWatchParse(m); if (w) return { titulo: w.familia, spec: w.spec, acabado: w.acabado, orden: w.orden }; }
   if (seccion !== "Mac") return { titulo: m, spec: "" };
   const chipRe = /\b(A\d{2}(?:\s*Pro)?|M\d(?:\s*(?:Pro|Max|Ultra))?)\b/i;
   const cm = m.match(chipRe);
@@ -230,6 +252,14 @@ function exEstilos() {
   .ex-capbar b{ color:#fff; font-size:22px; font-weight:850; letter-spacing:-.01em; display:flex; align-items:center; gap:10px; }
   .ex-capbar span{ color:rgba(255,255,255,.72); font-size:14.5px; font-weight:650; }
   html[data-mode="dark"] .ex-capbar{ background:linear-gradient(90deg,#000,#242428 70%,#101012); }
+  /* Apple Watch: correa grande + talla en chip, sin cortar el texto */
+  .ex-wl{ display:flex; align-items:center; flex-wrap:wrap; gap:4px 8px; margin-top:4px; }
+  .ex-wl .ex-upc{ margin-top:0; }
+  .ex-talla{ display:inline-block; font-size:13.5px; font-weight:800; letter-spacing:.01em; padding:3px 10px; border-radius:999px; background:var(--bx-cap); color:#fff; white-space:nowrap; }
+  html[data-mode="dark"] .ex-talla{ color:#0b2540; }
+  .ex-info .col{ overflow-wrap:anywhere; }
+  .ex-wsub{ flex-wrap:wrap; align-items:flex-start; line-height:1.3; }
+  .ex-wsub .ex-sws{ margin-top:2px; }
   .ex-apa.demo{ color:#1c8da3; background:rgba(48,176,199,.2); margin-left:6px; }
   html[data-mode="dark"] .ex-apa.demo{ color:#5fd0e4; }
   .ex-price{ font-size:19px; font-weight:800; letter-spacing:-.01em; white-space:nowrap; }
@@ -297,12 +327,14 @@ function buildExistencias() {
     apart = (typeof bodegaApartados === "function") ? bodegaApartados() : {};
     Object.keys(todos).forEach(k => {
       const p = exParse(todos[k].modelo, todos[k].seccion);
-      const it = { upc: k, ...todos[k], titulo: p.titulo, spec: p.spec, qty: libre(k), demo: Math.min(demo[k] || 0, stock[k] || 0) };
+      const it = { upc: k, ...todos[k], titulo: p.titulo, spec: p.spec, orden: p.orden, qty: libre(k), demo: Math.min(demo[k] || 0, stock[k] || 0) };
+      if (p.orden) Object.assign(it, exCorrea(it.color));   // Watch nuevo: correa + talla
       (it.qty > 0 ? disp : agot).push(it);
     });
   }
   calc();
-  const cmp = (a, b) => exCapNum(a.capacidad) - exCapNum(b.capacidad) || (a.capacidad || "").localeCompare(b.capacidad || "") || a.color.localeCompare(b.color);
+  const cmp = (a, b) => exCapNum(a.capacidad) - exCapNum(b.capacidad) || (a.capacidad || "").localeCompare(b.capacidad || "")
+    || (a.orden && b.orden ? (a.corr || "").localeCompare(b.corr || "") || exTallaRank(a.talla) - exTallaRank(b.talla) : 0) || a.color.localeCompare(b.color);
   const ordenModelos = (ms) => ms.sort((a, b) => (typeof BODEGA_ORDEN !== "undefined" ? (BODEGA_ORDEN.indexOf(a) < 0 ? 99 : BODEGA_ORDEN.indexOf(a)) - (BODEGA_ORDEN.indexOf(b) < 0 ? 99 : BODEGA_ORDEN.indexOf(b)) : 0) || a.localeCompare(b, undefined, { numeric: true }));
 
   const tieneSec = id => disp.some(i => i.seccion === id) || agot.some(i => i.seccion === id);
@@ -337,8 +369,8 @@ function buildExistencias() {
 
   const coincide = (i) => {
     if (!texto) return true;
-    const t = texto.toLowerCase();
-    return (i.titulo + " " + i.spec + " " + i.modelo + " " + i.color + " " + i.capacidad + " " + i.upc).toLowerCase().includes(t);
+    const hay = (i.titulo + " " + i.spec + " " + i.modelo + " " + i.color + " " + i.capacidad + " " + i.upc).toLowerCase();
+    return texto.toLowerCase().split(/\s+/).filter(Boolean).every(w => hay.includes(w));
   };
   const apaHtml = (n, u) => n > 0 ? `<span class="ex-apa" data-ap="${exEsc(u || "")}"><svg viewBox="0 0 24 24"><path d="M7 4h10v16l-5-3.5L7 20z"/></svg>${n} apartado${n === 1 ? "" : "s"}</span>` : "";
   const demoHtml = (n) => n > 0 ? `<span class="ex-apa demo"><svg viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="11.5" rx="2" fill="none"/><path d="M8 20h8M12 16v4" fill="none"/></svg>${n} en demostración</span>` : "";
@@ -351,8 +383,9 @@ function buildExistencias() {
   const fila = (i) => {
     const pr = exPrecio(i);
     const row = `<div class="ex-row" data-u="${i.upc}">
-      <div class="ex-dot" style="background:${exColor(i.color)}"></div>
-      <div class="ex-info"><span class="col">${exEsc(i.color || "Sin color")}</span><span class="ex-upc">${exEsc(i.upc)}</span>${apaHtml(apart[i.upc] || 0, i.upc)}${demoHtml(i.demo)}</div>
+      <div class="ex-dot" style="background:${exColor(i.color, i.modelo)}"></div>
+      ${i.orden ? `<div class="ex-info"><span class="col">${exEsc(i.corr || "Sin correa")}</span><span class="ex-wl">${i.talla ? `<b class="ex-talla">${exEsc(i.talla)}</b>` : ""}<span class="ex-upc">${exEsc(i.upc)}</span></span>${apaHtml(apart[i.upc] || 0, i.upc)}${demoHtml(i.demo)}</div>`
+      : `<div class="ex-info"><span class="col">${exEsc(i.color || "Sin color")}</span><span class="ex-upc">${exEsc(i.upc)}</span>${apaHtml(apart[i.upc] || 0, i.upc)}${demoHtml(i.demo)}</div>`}
       ${pr != null ? `<span class="ex-price">${exMoney(pr)}</span>` : ""}
       ${badge(i.qty, "u:" + i.upc, i.seccion)}
     </div>`;
@@ -374,7 +407,8 @@ function buildExistencias() {
     const p = items[0];
     return `<div class="ex-model${abierto ? " open" : ""}" data-m="${exEsc(clave)}" style="--c1:${sec.c1};--c2:${sec.c2}">
       <button class="ex-mh" type="button"><div class="ex-pic">${exIcono(sec.id)}${exImg(p.titulo)}</div>
-        <div class="ex-mt"><strong>${exEsc(p.titulo)}</strong>${p.spec ? `<span class="spec">${exEsc(p.spec)}</span>` : ""}<div class="sub"><span class="ex-sws">${colores.slice(0, 6).map(c => `<i style="background:${exColor(c)}"></i>`).join("")}</span><span>${colores.length} color${colores.length === 1 ? "" : "es"}</span></div></div>
+        <div class="ex-mt"><strong>${exEsc(p.titulo)}</strong>${p.spec ? `<span class="spec">${exEsc(p.spec)}</span>` : ""}${p.orden ? `<div class="sub ex-wsub"><span class="ex-sws"><i style="background:${exColor(p.color, p.modelo)}"></i></span><span>${[...new Set(items.map(i => (i.corr || "").replace(/^Correa\s+/i, "")).filter(Boolean))].join(" · ")}</span></div>`
+        : `<div class="sub"><span class="ex-sws">${colores.slice(0, 6).map(c => `<i style="background:${exColor(c)}"></i>`).join("")}</span><span>${colores.length} color${colores.length === 1 ? "" : "es"}</span></div>`}</div>
         ${badge(tot, "m:" + clave, sec.id)}<i class="ex-chev"></i></button>
       <div class="ex-rows">${bloques(items)}</div></div>`;
   };
@@ -384,7 +418,7 @@ function buildExistencias() {
     return o;
   };
   const ordIdx = (m) => typeof BODEGA_ORDEN !== "undefined" ? (BODEGA_ORDEN.indexOf(m) < 0 ? 99 : BODEGA_ORDEN.indexOf(m)) : 0;
-  const ordenClaves = (g) => Object.keys(g).sort((a, b) => ordIdx(g[a][0].modelo) - ordIdx(g[b][0].modelo) || a.localeCompare(b, undefined, { numeric: true }));
+  const ordenClaves = (g) => Object.keys(g).sort((a, b) => ordIdx(g[a][0].modelo) - ordIdx(g[b][0].modelo) || (g[a][0].orden || a).localeCompare(g[b][0].orden || b, undefined, { numeric: true }));
 
   function pintaLista() {
     const f = texto ? "Todo" : filtro;
@@ -498,7 +532,7 @@ function buildExistencias() {
     const it = todos[upc], q = libre(upc); if (!it || q <= 0) return;
     const bg = document.createElement("div"); bg.className = "ex-conf-bg";
     bg.innerHTML = `<div class="ex-conf"><h3>¿Vendiste este producto?</h3>
-      <div class="ex-conf-it"><div class="ex-dot" style="background:${exColor(it.color)}"></div><div><b>${exEsc(it.modelo)}</b><small>${exEsc([it.color, it.capacidad && exCap(it.capacidad)].filter(Boolean).join(" · "))}</small><small style="font-family:ui-monospace,Menlo,monospace">UPC ${exEsc(upc)}</small></div></div>
+      <div class="ex-conf-it"><div class="ex-dot" style="background:${exColor(it.color, it.modelo)}"></div><div><b>${exEsc(it.modelo)}</b><small>${exEsc([it.color, it.capacidad && exCap(it.capacidad)].filter(Boolean).join(" · "))}</small><small style="font-family:ui-monospace,Menlo,monospace">UPC ${exEsc(upc)}</small></div></div>
       <p class="ex-conf-q">Pasará de <b>${q}</b> a <b>${q - 1}</b> pieza${q - 1 === 1 ? "" : "s"} en bodega.</p>
       <div class="ex-conf-b"><button type="button" data-n>No</button><button type="button" class="si" data-s>Sí, vendido</button></div></div>`;
     document.body.appendChild(bg);
@@ -563,7 +597,7 @@ function buildExistencias() {
       const x = (h.items || []).find(i => i.antes > i.ahora); if (!x) return "";
       const it = todos[x.code] || { modelo: "Código nuevo", color: "", capacidad: "" };
       const p = exParse(it.modelo, it.seccion);
-      return `<div class="ex-vr${h.deshecha ? " hecha" : ""}"><div class="ex-dot" style="background:${exColor(it.color)}"></div>
+      return `<div class="ex-vr${h.deshecha ? " hecha" : ""}"><div class="ex-dot" style="background:${exColor(it.color, it.modelo)}"></div>
         <div class="ex-info"><span class="col">${exEsc(p.titulo)}</span><small>${exEsc([p.spec, it.color, it.capacidad && exCap(it.capacidad)].filter(Boolean).join(" · "))}</small><small>${exEsc(typeof bodegaFechaHora === "function" ? bodegaFechaHora(h.ts) : "")}${h.deshecha ? " · deshecha" : ""}</small></div>
         <button type="button" data-ts="${h.ts}" data-u="${x.code}">Deshacer</button></div>`;
     }).join("");
