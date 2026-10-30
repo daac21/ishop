@@ -31,7 +31,11 @@ function exSlug(t) { return String(t || "").normalize("NFD").replace(/[\u0300-\u
 function exImg(nombre) { return `<img src="imágenes/existencias/${exSlug(nombre)}.png" alt="" loading="lazy" onload="this.parentNode.classList.add('has')" onerror="this.remove()">`; }
 /* Fotos de Watch: imágenes/existencias/watch/<modelo>-<acabado>-<correa>.webp (miniatura ~3 KB) y ...-grande.webp (solo se baja al tocar) */
 function exFotoBase(i) {
-  if (!i || !i.orden) return "";
+  if (!i) return "";
+  if (!i.orden) {   // Series 12 de aluminio con el nombre anterior: "Bronce Oscuro Aluminio Deportiva Oliva"
+    const m = /^Apple Watch Series 12 Aluminio$/i.test(i.modelo || "") && String(i.color || "").match(/^(.+?)\s+Aluminio\s+(\S+)/i);
+    return m ? "imágenes/existencias/watch/" + ["series-12", exSlug(m[1]), exSlug(m[2])].join("-") : "";
+  }
   const w = exWatchParse(i.modelo); if (!w) return "";
   return "imágenes/existencias/watch/" + [exSlug(w.familia.replace(/^Apple Watch\s+/i, "")), exSlug(w.acabado), exSlug(String(i.corr || "").replace(/^Correa\s+(Estilo\s+)?/i, ""))].join("-");
 }
@@ -410,7 +414,7 @@ function buildExistencias() {
   const fila = (i) => {
     const pr = exPrecio(i);
     const row = `<div class="ex-row" data-u="${i.upc}">
-      ${i.orden ? `<div class="ex-dot ex-thumb" data-foto="${exEsc(exFotoBase(i))}" data-n="${exEsc(i.modelo + " · " + i.color)}" style="background:${exColor(i.color, i.modelo)}">${exFotoImg(exFotoBase(i))}</div>` : `<div class="ex-dot" style="background:${exColor(i.color, i.modelo)}"></div>`}
+      ${exFotoBase(i) ? `<div class="ex-dot ex-thumb" data-foto="${exEsc(exFotoBase(i))}" data-n="${exEsc(i.modelo + " · " + i.color + (i.capacidad ? " · " + i.capacidad : ""))}" style="background:${exColor(i.color, i.modelo)}">${exFotoImg(exFotoBase(i))}</div>` : `<div class="ex-dot" style="background:${exColor(i.color, i.modelo)}"></div>`}
       ${i.orden ? `<div class="ex-info"><span class="col">${exEsc(i.corr || "Sin correa")}</span><span class="ex-wl">${i.talla ? `<b class="ex-talla">${exEsc(i.talla)}</b>` : ""}<span class="ex-upc">${exEsc(i.upc)}</span></span>${apaHtml(apart[i.upc] || 0, i.upc)}${demoHtml(i.demo)}</div>`
       : `<div class="ex-info"><span class="col">${exEsc(i.color || "Sin color")}</span><span class="ex-upc">${exEsc(i.upc)}</span>${apaHtml(apart[i.upc] || 0, i.upc)}${demoHtml(i.demo)}</div>`}
       ${pr != null ? `<span class="ex-price">${exMoney(pr)}</span>` : ""}
