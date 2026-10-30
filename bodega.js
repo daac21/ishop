@@ -190,20 +190,21 @@ function bodegaTextoReporte(rep, fecha) {
 
 /* Lista de {raw,qty} → existencias. Marca para revisar las cantidades poco seguras y los códigos repetidos */
 function bodegaConstruir(filas, cat) {
-  const stock = {}, dudosos = [], nuevos = [], info = {};
+  const stock = {}, dudosos = [], nuevos = [], info = {}, rows = [];
   let ignorados = 0;
   filas.forEach((r, i) => {
     const idx = r.idx || i + 1;
-    if (/^20\d{11}$/.test(String(r.raw || "").replace(/\D/g, ""))) { ignorados++; return; }   // devoluciones / códigos 2021… con cantidad negativa
+    if (/^20\d{11}$/.test(String(r.raw || "").replace(/\D/g, ""))) { ignorados++; rows.push({ n: idx, code: String(r.raw || "").replace(/\D/g, ""), estado: "ign", qty: r.qty }); return; }   // devoluciones / códigos 2021… con cantidad negativa
     const res = bodegaResolver(r.raw, cat);
-    if (res.estado === "ilegible" || res.estado === "ambiguo") { dudosos.push({ raw: r.raw, qty: r.qty, mini: r.mini || null, idx }); return; }
+    if (res.estado === "ilegible" || res.estado === "ambiguo") { dudosos.push({ raw: r.raw, qty: r.qty, mini: r.mini || null, idx }); rows.push({ n: idx, code: String(r.raw || "").replace(/\D/g, ""), estado: "dud", qty: r.qty }); return; }
     if (res.estado === "nuevo" && !nuevos.includes(res.code)) nuevos.push(res.code);
+    rows.push({ n: idx, code: res.code, estado: res.estado, qty: r.qty });
     const repetido = res.code in stock;
     stock[res.code] = (stock[res.code] || 0) + r.qty;
     const dudCod = res.estado === "corregido" || res.estado === "nuevo";
     if (r.dudoso || repetido) info[res.code] = { code: res.code, qty: stock[res.code], alt: r.alt == null ? null : r.alt, repetido, raw: r.raw, leido: res.estado === "corregido" ? r.raw : "", idx, mini: r.mini || (info[res.code] && info[res.code].mini) || null };
   });
-  return { stock, dudosos, nuevos, leidos: Object.keys(stock).length, revisar: Object.values(info), total: filas.length, ignorados };
+  return { rows, stock, dudosos, nuevos, leidos: Object.keys(stock).length, revisar: Object.values(info), total: filas.length, ignorados };
 }
 
 /* Texto (escaneado con el teclado del iPhone o pegado): un renglón por línea */
@@ -1544,20 +1545,20 @@ function buildBodega() {
       else if (act === "grande") { esc.grandeOk[code] = true; hecho(code, `${bodegaNombre(c, code)} · ${esc.stock[code]}`); }
       else if (act === "conservar") { esc.stock[code] = +v; esc.faltaOk[code] = true; hecho(code, `${bodegaNombre(c, code)} · se conserva ${v}`); }
       else if (act === "cero") { esc.faltaOk[code] = true; hecho(code, `${bodegaNombre(c, code)} · 0`); }
-      else if (act === "quitar") { esc.dudosos.splice(i, 1); }
+      else if (act === "quitar") { const dq = esc.dudosos[i]; if (dq) (esc.quitados = esc.quitados || {})[dq.idx] = 1; esc.dudosos.splice(i, 1); }
       else if (act === "cod") {
         const d = esc.dudosos[i], raw12 = String(d.raw || "").replace(/\D/g, "");
         bodegaEditor(cat(), raw12.length === 12 ? raw12 : "", d.qty, (v, n) => {
           esc.stock[v] = n; esc.confirmadas[v] = true; esc.leidos = Object.keys(esc.stock).length;
           if (!bodegaCatalogoEscaneo()[v] && !esc.nuevos.includes(v)) esc.nuevos.push(v);
-          const k = esc.dudosos.indexOf(d); if (k >= 0) esc.dudosos.splice(k, 1);
+          (esc.resueltos = esc.resueltos || {})[d.idx] = v; const k = esc.dudosos.indexOf(d); if (k >= 0) esc.dudosos.splice(k, 1);
           hecho(v, `${bodegaNombre(cat(), v)} · ${n}`); again();
         });
         return;
       }
       else if (act === "upc") {
         bodegaEditor(cat(), code, esc.stock[code], (v, n) => {
-          if (v !== code) { delete esc.stock[code]; esc.revisar = (esc.revisar || []).filter(x => x.code !== code); }
+          if (v !== code) { (esc.recodes = esc.recodes || {})[code] = v; delete esc.stock[code]; esc.revisar = (esc.revisar || []).filter(x => x.code !== code); }
           esc.stock[v] = n; esc.confirmadas[v] = true; esc.leidos = Object.keys(esc.stock).length;
           if (!bodegaCatalogoEscaneo()[v] && !esc.nuevos.includes(v)) esc.nuevos.push(v);
           hecho(v, `${bodegaNombre(cat(), v)} · ${n}`); again();
@@ -1583,7 +1584,7 @@ function buildBodega() {
       const dm = bodegaDemo(); let dmCambio = false;
       Object.keys(esc.demoSel || {}).forEach(c => { if (esc.demoSel[c] && !(dm[c] > 0)) { dm[c] = 1; dmCambio = true; } });
       if (dmCambio) bodegaDemoSave(dm);
-      bxEscGuardar({ origen, fecha, stock: esc.stock, file: pendiente && pendiente.file, texto: pendiente && pendiente.texto });
+      bxEscGuardar({ origen, fecha, esc, file: pendiente && pendiente.file, texto: pendiente && pendiente.texto });
       pendiente = null; pintar();
     });
   }
@@ -1840,25 +1841,44 @@ function buildBodegaDemo() {
   return wrap;
 }
 
-/* ---------- Escaneos guardados (menú oculto: mantener presionado "Historial de reportes") ----------
-   Cada escaneo que se aplica guarda: la foto (comprimida), de qué categoría es y lo que se leyó.
-   Se guarda en este dispositivo (IndexedDB) y se sube UNA sola vez a Firebase (colección "escaneos") para verlo en cualquier dispositivo. */
-const BX_ESC_CURSOR = "ishop_escaneos_cursor";
+/* ---------- Historial de Escaneos (menú oculto: mantener presionado "Historial de reportes") ----------
+   Cada escaneo que se aplica (foto, escáner de documento o texto) se guarda con: la foto, la categoría, la fecha/hora,
+   quién lo hizo y los renglones EN EL MISMO ORDEN de la hoja (UPC · modelo · piezas).
+   Los renglones se pueden corregir (UPC / piezas): el cambio se sincroniza a todos los dispositivos y se aplica a Existencias. */
+const BX_TABS = ["iPhone", "Mac", "iPad", "Watch"];
+let bxEscTab = "iPhone";
 function bxEscDb() { return new Promise((ok, fail) => { const r = indexedDB.open("ishop_escaneos_v1", 1); r.onupgradeneeded = () => r.result.createObjectStore("e", { keyPath: "ts" }); r.onsuccess = () => ok(r.result); r.onerror = () => fail(r.error); }); }
-async function bxEscTodos() { const db = await bxEscDb(); return new Promise(ok => { const q = db.transaction("e").objectStore("e").getAll(); q.onsuccess = () => ok((q.result || []).sort((a, b) => b.ts - a.ts)); q.onerror = () => ok([]); }); }
-async function bxEscGet(ts) { const db = await bxEscDb(); return new Promise(ok => { const q = db.transaction("e").objectStore("e").get(ts); q.onsuccess = () => ok(q.result || null); q.onerror = () => ok(null); }); }
+async function bxEscTodos() { const db = await bxEscDb(); return new Promise(ok => { const q = db.transaction("e").objectStore("e").getAll(); q.onsuccess = () => ok((q.result || []).map(bxEscNorm).sort((a, b) => b.ts - a.ts)); q.onerror = () => ok([]); }); }
+async function bxEscGet(ts) { const db = await bxEscDb(); return new Promise(ok => { const q = db.transaction("e").objectStore("e").get(ts); q.onsuccess = () => ok(bxEscNorm(q.result) || null); q.onerror = () => ok(null); }); }
 async function bxEscPon(d) { const db = await bxEscDb(); return new Promise(ok => { const t = db.transaction("e", "readwrite"); t.objectStore("e").put(d); t.oncomplete = () => ok(true); t.onerror = () => ok(false); }); }
+
+/* Escaneos de la versión anterior (solo "stock"): se convierten a renglones */
+function bxEscNorm(d) {
+  if (!d) return d;
+  if (!Array.isArray(d.rows)) { d.rows = Object.keys(d.stock || {}).map((u, i) => ({ upc: u, qty: d.stock[u], orig: { upc: u, qty: d.stock[u], estado: "" } })); d.legacy = true; }
+  if (d.nube == null) d.nube = !!d.subido;
+  d.rev = d.rev || 1; d.log = d.log || [];
+  return d;
+}
+function bxQuien() {
+  try {
+    const q = localStorage.getItem("ishop_bodega_quien"); if (q) return q;
+    let id = localStorage.getItem("ishop_equipo_id"); if (!id) { id = Math.random().toString(36).slice(2, 5).toUpperCase(); localStorage.setItem("ishop_equipo_id", id); }
+    const ua = navigator.userAgent, tipo = /iPad/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) ? "iPad" : /iPhone/.test(ua) ? "iPhone" : /Android/.test(ua) ? "Android" : "Computadora";
+    return tipo + " " + id;
+  } catch (e) { return "Equipo"; }
+}
 function bxEscComprimir(file) {
   return new Promise(ok => {
     if (!file) return ok("");
     const u = URL.createObjectURL(file), im = new Image();
     im.onload = () => {
       let out = "";
-      for (const [m, q] of [[1500, .6], [1200, .55], [900, .5]]) {
+      for (const [m, q] of [[1600, .62], [1300, .56], [1000, .5]]) {
         const k = Math.min(1, m / Math.max(im.width, im.height)), c = document.createElement("canvas");
         c.width = Math.round(im.width * k); c.height = Math.round(im.height * k);
         c.getContext("2d").drawImage(im, 0, 0, c.width, c.height);
-        out = c.toDataURL("image/jpeg", q); if (out.length < 650000) break;   // Firestore: máx. 1 MB por documento
+        out = c.toDataURL("image/jpeg", q); if (out.length < 700000) break;   // Firestore: máx. 1 MB por documento
       }
       URL.revokeObjectURL(u); ok(out);
     };
@@ -1866,103 +1886,289 @@ function bxEscComprimir(file) {
     im.src = u;
   });
 }
-function bxEscSecciones(stock) {
-  const n = {}; Object.keys(stock || {}).forEach(c => { const s = bodegaSeccionDe(c); n[s] = (n[s] || 0) + 1; });
-  return Object.keys(n).sort((a, b) => n[b] - n[a]);
+/* Renglones del escaneo tal como salen en la hoja, ya con las correcciones hechas en la revisión */
+function bxEscFilas(esc) {
+  const stock = esc.stock || {}, rec = esc.recodes || {}, res = esc.resueltos || {}, qui = esc.quitados || {};
+  const sigue = c => { let k = 0; while (rec[c] && k++ < 5) c = rec[c]; return c; };
+  let rows = [];
+  (esc.rows || []).forEach(r => {
+    if (r.estado === "ign") { rows.push({ upc: r.code, qty: r.qty, estado: "ign" }); return; }
+    if (r.estado === "dud") {
+      if (qui[r.n]) { rows.push({ upc: r.code, qty: r.qty, estado: "pend", del: 1 }); return; }
+      const v = res[r.n]; if (v) { rows.push({ upc: v, qty: stock[v] != null ? stock[v] : r.qty }); return; }
+      rows.push({ upc: r.code, qty: r.qty, estado: "pend" }); return;
+    }
+    rows.push({ upc: sigue(r.code), qty: r.qty });
+  });
+  const por = {};
+  rows.forEach(r => { if (r.estado || r.del) return; (por[r.upc] = por[r.upc] || []).push(r); });
+  Object.keys(por).forEach(u => {
+    const rs = por[u], suma = rs.reduce((s, r) => s + r.qty, 0), fin = stock[u];
+    if (fin == null) rs.forEach(r => { r.qty = 0; });
+    else if (fin !== suma) rs[0].qty = Math.max(0, rs[0].qty + fin - suma);
+  });
+  const vistos = new Set(rows.map(r => r.upc));
+  Object.keys(stock).forEach(u => { if (!vistos.has(u)) rows.push({ upc: u, qty: stock[u], extra: 1 }); });
+  rows.forEach(r => { r.orig = { upc: r.upc, qty: r.qty, estado: r.estado || "" }; });
+  return rows;
 }
-async function bxEscSubir(d) {
-  if (d.subido || typeof window.ishopEscaneoSubir !== "function") return;
-  if (window.ishopSyncPausada && window.ishopSyncPausada()) return;          // modo pruebas: no se sube
-  try { const { subido, ...doc } = d; await window.ishopEscaneoSubir(doc); d.subido = true; await bxEscPon(d); } catch (e) { console.warn("Escaneo sin subir", e); }
-}
-async function bxEscGuardar({ origen, fecha, stock, file, texto }) {
+function bxEscEfec(rows) { const m = {}; (rows || []).forEach(r => { if (r.del || r.estado === "pend" || r.estado === "ign" || !r.upc) return; m[r.upc] = (m[r.upc] || 0) + (+r.qty || 0); }); return m; }
+function bxEscSinId(r, cat) { return !r.del && r.estado !== "ign" && (r.estado === "pend" || !cat[r.upc]); }
+
+async function bxEscGuardar({ origen, fecha, esc, file, texto }) {
   try {
-    const secs = bxEscSecciones(stock);
-    const d = { ts: Date.now(), origen: origen || "foto", fecha: fecha || "", seccion: secs[0] || "Otros", secciones: secs, stock: { ...(stock || {}) }, foto: await bxEscComprimir(file), texto: texto ? String(texto).slice(0, 6000) : "", subido: false };
+    const cat = bodegaCatalogoEscaneo(), rows = bxEscFilas(esc), n = {};
+    rows.forEach(r => { if (!r.estado && !r.del && cat[r.upc]) { const s = bodegaSeccionDe(r.upc); n[s] = (n[s] || 0) + 1; } });
+    const secs = Object.keys(n).sort((a, b) => n[b] - n[a]);
+    const foto = await bxEscComprimir(file);
+    const d = { ts: Date.now(), v: 2, rev: 1, origen: origen || "foto", fecha: fecha || "", seccion: secs[0] || "Otros", secciones: secs, usuario: bxQuien(), rows, log: [], texto: texto ? String(texto).slice(0, 6000) : "", foto, hayFoto: !!foto, nube: false };
     await bxEscPon(d); bxEscSubir(d);
   } catch (e) { console.warn("No se pudo guardar el escaneo", e); }
 }
+async function bxEscSubir(d) {
+  if (d.nube || typeof window.ishopEscaneoCrear !== "function") return;
+  if (window.ishopSyncPausada && window.ishopSyncPausada()) return;          // modo pruebas: no se sube
+  try { const { foto, nube, ...meta } = d; await window.ishopEscaneoCrear(meta, foto || ""); d.nube = true; await bxEscPon(d); } catch (e) { console.warn("Escaneo sin subir", e); }
+}
+/* Tiempo real: Firebase avisa solo cuando alguien crea o corrige un escaneo */
+let bxEscUnsub = null; const bxEscOyentes = new Set();
+function bxEscEscuchar() {
+  if (bxEscUnsub || typeof window.ishopEscaneosEscuchar !== "function" || (window.ishopSyncPausada && window.ishopSyncPausada())) return;
+  bxEscUnsub = window.ishopEscaneosEscuchar(async docs => {
+    let cambio = false;
+    for (const r of docs) {
+      const loc = await bxEscGet(r.ts), rr = bxEscNorm({ ...r, nube: true });
+      if (!loc) { await bxEscPon(rr); cambio = true; }
+      else if ((rr.rev || 1) > (loc.rev || 1)) { await bxEscPon({ ...rr, foto: rr.foto || loc.foto }); cambio = true; }
+      else if (!loc.nube) { loc.nube = true; await bxEscPon(loc); cambio = true; }
+    }
+    if (cambio) bxEscOyentes.forEach(f => { try { f(); } catch (e) {} });
+  });
+}
 async function bxEscSincronizar() {
   const todos = await bxEscTodos();
-  for (const d of todos) if (!d.subido) await bxEscSubir(d);                    // los que quedaron pendientes
-  if (typeof window.ishopEscaneosNuevos !== "function" || (window.ishopSyncPausada && window.ishopSyncPausada())) return;
-  let cur = +localStorage.getItem(BX_ESC_CURSOR) || 0;
-  try {
-    for (let i = 0; i < 5; i++) {
-      const nuevos = await window.ishopEscaneosNuevos(cur);
-      for (const d of nuevos) { d.subido = true; if (!(await bxEscGet(d.ts))) await bxEscPon(d); cur = Math.max(cur, d.ts); }
-      localStorage.setItem(BX_ESC_CURSOR, String(cur));
-      if (nuevos.length < 40) break;
-    }
-  } catch (e) { console.warn("No se pudieron bajar escaneos", e); }
+  for (const d of todos) if (!d.nube) await bxEscSubir(d);                    // los que quedaron pendientes
+  bxEscEscuchar();
 }
 function bxEscCss() {
-  if (document.getElementById("bxEscCss")) return;
-  const st = document.createElement("style"); st.id = "bxEscCss";
+  if (document.getElementById("bxEscCss2")) return;
+  const st = document.createElement("style"); st.id = "bxEscCss2";
   st.textContent = `
   .bxe-item{ display:flex; gap:14px; align-items:center; width:100%; text-align:left; margin-top:10px; padding:12px; color:var(--text); }
   .bxe-item .bx-ch{ width:20px; height:20px; flex:0 0 20px; color:var(--text-secondary); }
-  .bxe-th{ flex:0 0 76px; height:76px; border-radius:14px; background:var(--bx-fill); object-fit:cover; overflow:hidden; display:grid; place-items:center; font-size:12px; color:var(--text-secondary); }
+  .bxe-th{ flex:0 0 76px; height:76px; border-radius:14px; background:var(--bx-fill); overflow:hidden; display:grid; place-items:center; font-size:12px; color:var(--text-secondary); }
   .bxe-th img{ width:100%; height:100%; object-fit:cover; display:block; }
   .bxe-item .t{ flex:1; min-width:0; } .bxe-item .t b{ display:block; font-size:19px; } .bxe-item .t small{ display:block; margin-top:3px; font-size:14px; color:var(--text-secondary); }
-  .bxe-tag{ display:inline-block; white-space:nowrap; margin-top:6px; font-size:12px; font-weight:700; padding:2px 9px; border-radius:999px; background:var(--bx-fill); color:var(--text-secondary); }
+  .bxe-tag{ display:inline-block; white-space:nowrap; margin:6px 6px 0 0; font-size:12px; font-weight:700; padding:2px 9px; border-radius:999px; background:var(--bx-fill); color:var(--text-secondary); }
   .bxe-tag.ok{ background:rgba(48,209,88,.18); color:var(--bx-green); } .bxe-tag.pend{ background:rgba(255,159,10,.2); color:var(--bx-orange); }
-  .bxe-det{ display:grid; gap:12px; margin-top:10px; } @media (min-width:760px){ .bxe-det{ grid-template-columns:1fr 1fr; align-items:start; } }
-  .bxe-foto{ width:100%; border-radius:16px; display:block; background:var(--bx-fill); cursor:zoom-in; }
-  .bxe-row{ display:flex; justify-content:space-between; gap:12px; padding:9px 0; border-top:1px solid var(--bx-line); font-size:15.5px; }
-  .bxe-row:first-of-type{ border-top:0; } .bxe-row b{ font-size:18px; min-width:34px; text-align:right; }
-  .bxe-sec{ margin:14px 0 2px; font-size:13px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; color:var(--text-secondary); }
-  .bxe-zoom{ position:fixed; inset:0; z-index:99; background:#000; overflow:auto; -webkit-overflow-scrolling:touch; }
-  .bxe-zoom img{ width:100%; display:block; } .bxe-zoom.x img{ width:260%; max-width:none; }
-  .bxe-zoom button{ position:fixed; top:14px; right:14px; z-index:2; border:0; border-radius:999px; padding:9px 16px; font-size:15px; font-weight:700; background:rgba(255,255,255,.9); color:#000; }
+  .bxe-tabs{ display:flex; gap:8px; overflow-x:auto; padding:12px 2px 4px; scrollbar-width:none; } .bxe-tabs::-webkit-scrollbar{ display:none; }
+  .bxe-tabs button{ flex:0 0 auto; border:0; border-radius:14px; padding:9px 14px; font:inherit; font-size:15px; font-weight:700; background:var(--bx-fill); color:var(--text); text-align:center; line-height:1.15; }
+  .bxe-tabs button small{ display:block; font-size:11.5px; font-weight:600; opacity:.7; } .bxe-tabs button.on{ background:var(--accent); color:#fff; }
+  .bxe-yo{ display:flex; gap:8px; align-items:center; margin-top:10px; font-size:13px; color:var(--text-secondary); } .bxe-yo input{ flex:1; min-width:0; border:1px solid var(--bx-line); border-radius:10px; padding:7px 10px; font:inherit; font-size:14px; background:transparent; color:var(--text); }
+  .bxe-det{ display:grid; gap:12px; margin-top:10px; } @media (min-width:820px){ .bxe-det{ grid-template-columns:minmax(300px,5fr) 7fr; align-items:start; } }
+  .bxe-hd{ display:flex; align-items:center; justify-content:space-between; gap:8px 12px; flex-wrap:wrap; margin-bottom:10px; } .bxe-hd h3{ margin:0; font-size:17px; } .bxe-hd small{ color:var(--text-secondary); font-size:13.5px; }
+  .bxe-pill{ font-size:12.5px; font-weight:700; padding:4px 11px; border-radius:999px; background:rgba(48,209,88,.18); color:var(--bx-green); white-space:nowrap; } .bxe-pill.rev{ background:var(--accent); color:#fff; } .bxe-pill.w{ background:rgba(255,159,10,.2); color:var(--bx-orange); }
+  .bxe-foto{ width:100%; border-radius:14px; display:block; background:var(--bx-fill); cursor:zoom-in; max-height:78vh; object-fit:contain; }
+  .bxe-tb{ border:1px solid var(--bx-line); border-radius:14px; overflow:hidden; }
+  .bxe-r{ display:grid; grid-template-columns:28px 1fr 78px 66px; grid-template-areas:"n u q a" ". m m m"; gap:3px 8px; align-items:center; padding:9px 10px; border-top:1px solid var(--bx-line); font-size:15px; }
+  .bxe-r.h{ border-top:0; background:var(--bx-fill); font-size:12.5px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; color:var(--text-secondary); padding:8px 10px; } .bxe-r.h .m{ display:none; }
+  @media (min-width:820px){ .bxe-r{ grid-template-columns:30px 138px 1fr 82px 66px; grid-template-areas:"n u m q a"; } .bxe-r.h .m{ display:block; } }
+  .bxe-r .n{ grid-area:n; width:24px; height:24px; border-radius:50%; background:var(--accent); color:#fff; font-size:12px; font-weight:800; display:grid; place-items:center; }
+  .bxe-r.h .n{ background:none; color:inherit; } .bxe-r .u{ grid-area:u; font:600 13.5px ui-monospace,Menlo,monospace; letter-spacing:.01em; word-break:break-all; } .bxe-r .m{ grid-area:m; color:var(--text); line-height:1.25; } .bxe-r .m em{ color:var(--bx-orange); font-style:normal; font-weight:700; }
+  .bxe-r .q{ grid-area:q; } .bxe-r .q input{ width:100%; box-sizing:border-box; text-align:center; font:700 17px inherit; padding:6px 2px; border:1px solid var(--bx-line); border-radius:10px; background:transparent; color:var(--text); }
+  .bxe-r .a{ grid-area:a; display:flex; gap:4px; justify-content:flex-end; } .bxe-r .a button{ width:30px; height:30px; border:0; border-radius:9px; background:transparent; color:var(--accent); padding:5px; } .bxe-r .a button svg{ width:100%; height:100%; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; } .bxe-r .a button[data-a=del]{ color:var(--bx-red,#ff453a); }
+  .bxe-r.mod .n{ box-shadow:0 0 0 3px rgba(255,159,10,.35); } .bxe-r.del .u,.bxe-r.del .m,.bxe-r.del .q input{ text-decoration:line-through; opacity:.5; } .bxe-r.ign{ opacity:.55; }
+  .bxe-r.pend{ background:rgba(255,159,10,.08); }
+  .bxe-bar{ display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; } .bxe-bar button{ flex:1 1 140px; border:0; border-radius:14px; padding:12px 10px; font:inherit; font-size:15px; font-weight:700; background:var(--bx-fill); color:var(--text); } .bxe-bar button.pri{ background:var(--accent); color:#fff; } .bxe-bar button:disabled{ opacity:.4; }
+  .bxe-nota{ margin-top:10px; font-size:13px; color:var(--text-secondary); } .bxe-aviso{ margin-top:10px; padding:10px 12px; border-radius:12px; background:rgba(255,159,10,.15); color:var(--text); font-size:14px; }
+  .bxe-log{ margin-top:12px; font-size:13px; color:var(--text-secondary); } .bxe-log summary{ cursor:pointer; font-weight:700; } .bxe-log div{ padding:4px 0; border-top:1px solid var(--bx-line); }
+  .bxe-modal-bg{ position:fixed; inset:0; z-index:99; background:rgba(0,0,0,.6); display:flex; align-items:flex-end; justify-content:center; } @media (min-width:600px){ .bxe-modal-bg{ align-items:center; } }
+  .bxe-modal{ width:100%; max-width:480px; background:var(--bx-card,#fff); color:var(--text,#111); border-radius:22px 22px 0 0; padding:18px; box-sizing:border-box; max-height:85vh; overflow:auto; } @media (min-width:600px){ .bxe-modal{ border-radius:22px; } }
+  .bxe-modal h3{ margin:0 0 4px; } .bxe-modal p{ margin:0 0 10px; font-size:13.5px; color:var(--text-secondary); }
+  .bxe-modal input{ width:100%; box-sizing:border-box; font:600 17px ui-monospace,Menlo,monospace; padding:11px 12px; border:1px solid var(--bx-line); border-radius:12px; background:transparent; color:inherit; }
+  .bxe-res button,.bxe-res .no{ display:block; width:100%; text-align:left; margin-top:8px; padding:10px 12px; border:1px solid var(--bx-line); border-radius:12px; background:transparent; color:inherit; font:inherit; font-size:15px; } .bxe-res button.sel{ border-color:var(--accent); background:rgba(120,120,128,.12); } .bxe-res small{ display:block; font:12.5px ui-monospace,Menlo,monospace; color:var(--text-secondary); } .bxe-res .no{ border-color:var(--bx-orange); color:var(--bx-orange); }
+  .bxe-mb{ display:flex; gap:8px; margin-top:14px; } .bxe-mb button{ flex:1; border:0; border-radius:14px; padding:12px; font:inherit; font-weight:700; font-size:16px; background:var(--bx-fill); color:inherit; } .bxe-mb button.pri{ background:var(--accent); color:#fff; } .bxe-mb button:disabled{ opacity:.4; }
+  .bxe-zoom{ position:fixed; inset:0; z-index:99; background:#000; overflow:auto; -webkit-overflow-scrolling:touch; } .bxe-zoom img{ width:100%; display:block; } .bxe-zoom.x img{ width:260%; max-width:none; }
+  .bxe-zoom button{ position:fixed; top:14px; z-index:2; border:0; border-radius:999px; padding:9px 16px; font-size:15px; font-weight:700; background:rgba(255,255,255,.9); color:#000; }
   `;
   document.head.appendChild(st);
 }
+
+/* ---- Lista por categoría ---- */
 function buildBodegaEscaneos() {
   bodegaEstilos(); bxEscCss();
   const wrap = document.createElement("div"); wrap.className = "bod-wrap bx bx-t-morado";
-  wrap.innerHTML = `<div class="bx-card" style="margin-top:4px"><h3>Escaneos guardados</h3><p class="bx-sub" style="margin:0">Las fotos y escaneos de las existencias, con lo que se leyó de cada uno. Toca uno para abrirlo.</p></div><div id="bxeLista"><p class="bx-sub" style="margin:14px 4px">Cargando…</p></div>`;
+  wrap.innerHTML = `<div class="bx-card" style="margin-top:4px"><h3>Historial de escaneos</h3><p class="bx-sub" style="margin:0">Lo que se escanea en Bodega, con su foto y renglones. Toca uno para revisarlo o corregirlo.</p>
+    <label class="bxe-yo">Mi nombre<input id="bxeYo" maxlength="30" placeholder="${bodegaEsc(bxQuien())}" value="${bodegaEsc((() => { try { return localStorage.getItem("ishop_bodega_quien") || ""; } catch (_) { return ""; } })())}"></label></div>
+    <div class="bxe-tabs" id="bxeTabs"></div><div id="bxeLista"></div>`;
+  wrap.querySelector("#bxeYo").addEventListener("change", e => { try { localStorage.setItem("ishop_bodega_quien", e.target.value.trim()); } catch (_) {} });
   const pintar = async () => {
-    const l = wrap.querySelector("#bxeLista"), todos = await bxEscTodos();
-    if (!todos.length) { l.innerHTML = `<p class="bx-sub" style="margin:14px 4px">Todavía no hay escaneos. Aparecerán aquí cuando guardes una foto o un texto en Bodega.</p>`; return; }
-    l.innerHTML = ""; 
-    todos.forEach(d => {
-      const piezas = Object.values(d.stock || {}).reduce((x, y) => x + y, 0), n = Object.keys(d.stock || {}).length;
+    const todos = await bxEscTodos(), cat = bodegaCatalogoEscaneo();
+    const pend = d => d.rows.some(r => bxEscSinId(r, cat));
+    const cuenta = t => t === "Pendientes" ? todos.filter(pend).length : todos.filter(d => t === "Otros" ? !BX_TABS.includes(d.seccion) : d.seccion === t).length;
+    const tabs = [...BX_TABS, ...(cuenta("Otros") ? ["Otros"] : []), "Pendientes"];
+    if (!tabs.includes(bxEscTab)) bxEscTab = "iPhone";
+    wrap.querySelector("#bxeTabs").innerHTML = tabs.map(t => `<button data-t="${t}" class="${t === bxEscTab ? "on" : ""}">${t}<small>${cuenta(t)} escaneo${cuenta(t) === 1 ? "" : "s"}</small></button>`).join("");
+    const lista = todos.filter(d => bxEscTab === "Pendientes" ? pend(d) : bxEscTab === "Otros" ? !BX_TABS.includes(d.seccion) : d.seccion === bxEscTab);
+    const l = wrap.querySelector("#bxeLista");
+    if (!lista.length) { l.innerHTML = `<p class="bx-sub" style="margin:14px 4px">${bxEscTab === "Pendientes" ? "No hay UPC por identificar." : "Todavía no hay escaneos de " + bxEscTab + "."}</p>`; return; }
+    l.innerHTML = "";
+    lista.forEach(d => {
+      const ef = bxEscEfec(d.rows), piezas = Object.values(ef).reduce((x, y) => x + y, 0), np = d.rows.filter(r => bxEscSinId(r, cat)).length;
       const b = document.createElement("button"); b.className = "bx-card bxe-item";
-      b.innerHTML = `<div class="bxe-th">${d.foto ? `<img src="${d.foto}" alt="">` : "Texto"}</div>
-        <div class="t"><b>${bodegaEsc(d.seccion || "Otros")}${(d.secciones || []).length > 1 ? ` <span style="font-size:13px;font-weight:600;color:var(--text-secondary)">+ ${bodegaEsc(d.secciones.slice(1).join(", "))}</span>` : ""}</b>
-          <small>${bodegaFechaHora(d.ts)}${d.fecha ? " · lista " + bodegaEsc(d.fecha) : ""}</small><small>${n} código${n === 1 ? "" : "s"} · ${piezas} pieza${piezas === 1 ? "" : "s"}</small>
-          <span class="bxe-tag ${d.subido ? "ok" : "pend"}">${d.subido ? "En la nube" : "Solo en este equipo"}</span></div><i class="bx-ch">${BX_ICON.chev}</i>`;
+      b.innerHTML = `<div class="bxe-th">${d.foto ? `<img src="${d.foto}" alt="">` : d.hayFoto ? "Foto" : "Texto"}</div>
+        <div class="t"><b>${bodegaEsc(d.seccion || "Otros")}</b><small>${bodegaFechaHora(d.ts)}${d.usuario ? " · " + bodegaEsc(d.usuario) : ""}</small>
+          <small>${d.rows.length} renglones · ${piezas} pieza${piezas === 1 ? "" : "s"}${d.fecha ? " · lista " + bodegaEsc(d.fecha) : ""}</small>
+          ${d.revisado ? `<span class="bxe-tag ok">Revisado</span>` : ""}${d.editado ? `<span class="bxe-tag">Editado</span>` : ""}${np ? `<span class="bxe-tag pend">${np} por identificar</span>` : ""}${d.nube ? "" : `<span class="bxe-tag pend">Solo en este equipo</span>`}</div><i class="bx-ch">${BX_ICON.chev}</i>`;
       b.addEventListener("click", () => navigate({ screen: "bodegaEscaneo", title: "Escaneo", ts: d.ts }));
       l.appendChild(b);
     });
   };
+  wrap.querySelector("#bxeTabs").addEventListener("click", e => { const b = e.target.closest("[data-t]"); if (b) { bxEscTab = b.dataset.t; pintar(); } });
+  bxEscOyentes.add(pintar);
   pintar(); bxEscSincronizar().then(pintar);
   return wrap;
 }
+
+/* ---- Buscar / corregir un UPC contra el catálogo real ---- */
+function bxEscModalUpc(actual, cb) {
+  const cat = bodegaCatalogoEscaneo(), entradas = Object.entries(cat);
+  const bg = document.createElement("div"); bg.className = "bxe-modal-bg";
+  bg.innerHTML = `<div class="bxe-modal"><h3>Editar UPC</h3><p>Escribe el UPC correcto o busca por nombre (ej. "17 pro 256 naranja").</p>
+    <input id="bxeU" inputmode="search" autocomplete="off" value="${bodegaEsc(/^\d+$/.test(actual) ? actual : "")}" placeholder="UPC o nombre del modelo"><div class="bxe-res" id="bxeRes"></div>
+    <div class="bxe-mb"><button type="button" id="bxeC">Cancelar</button><button type="button" id="bxeOk" class="pri" disabled>Aplicar</button></div></div>`;
+  const inp = bg.querySelector("#bxeU"), res = bg.querySelector("#bxeRes"), ok = bg.querySelector("#bxeOk"); let sel = "";
+  const nombre = c => bodegaNombre(cat, c);
+  const buscar = () => {
+    const t = inp.value.trim().replace(/\s+/g, " "); sel = ""; ok.disabled = true; res.innerHTML = "";
+    if (/^\d+$/.test(t)) {
+      if (t.length < 8) return;
+      sel = t; ok.disabled = t.length > 14;
+      res.innerHTML = cat[t] ? `<button type="button" class="sel"><b>${bodegaEsc(nombre(t))}</b><small>${t}</small></button>` : `<div class="no">Ese UPC no existe en el catálogo. Se conservará como pendiente de clasificación, sin asignarle ningún producto.</div>`;
+    } else if (t.length >= 2) {
+      const ws = t.toLowerCase().split(" ");
+      const hit = entradas.filter(([k, v]) => { const h = (k + " " + v.modelo + " " + (v.color || "") + " " + bodegaCapTxt(v.capacidad) + " " + (v.capacidad || "")).toLowerCase(); return ws.every(w => h.includes(w)); }).slice(0, 8);
+      res.innerHTML = hit.length ? hit.map(([k]) => `<button type="button" data-u="${k}"><b>${bodegaEsc(nombre(k))}</b><small>${k}</small></button>`).join("") : `<div class="no">Sin coincidencias en el catálogo.</div>`;
+    }
+  };
+  res.addEventListener("click", e => { const b = e.target.closest("[data-u]"); if (!b) return; inp.value = b.dataset.u; buscar(); });
+  inp.addEventListener("input", buscar);
+  bg.querySelector("#bxeC").addEventListener("click", () => bg.remove());
+  bg.addEventListener("click", e => { if (e.target === bg) bg.remove(); });
+  ok.addEventListener("click", () => { if (sel) { bg.remove(); cb(sel); } });
+  document.body.appendChild(bg); inp.focus(); if (inp.value) buscar();
+}
+
+/* ---- Detalle: foto a la izquierda, renglones a la derecha ---- */
 function buildBodegaEscaneo(ts) {
   bodegaEstilos(); bxEscCss();
   const wrap = document.createElement("div"); wrap.className = "bod-wrap bx bx-t-morado";
-  bxEscGet(ts).then(d => {
-    if (!d) { wrap.innerHTML = `<div class="bx-vacio">No encontré ese escaneo.</div>`; return; }
-    const cat = bodegaCatalogoTodo(d.stock), codes = Object.keys(d.stock || {});
-    const grupos = {}; codes.forEach(c => { const sc = bodegaSeccionDe(c); (grupos[sc] = grupos[sc] || []).push(c); });
-    const piezas = codes.reduce((x, c) => x + d.stock[c], 0);
-    const filas = Object.keys(grupos).map(sc => `<div class="bxe-sec">${bodegaEsc(sc)}</div>` + grupos[sc].sort((a, b) => bodegaNombre(cat, a).localeCompare(bodegaNombre(cat, b), undefined, { numeric: true })).map(c => `<div class="bxe-row"><span>${bodegaEsc(bodegaNombre(cat, c))}</span><b>${d.stock[c]}</b></div>`).join("")).join("");
-    wrap.innerHTML = `<div class="bx-card" style="margin-top:4px"><h3>${bodegaEsc(d.seccion || "Otros")} · ${bodegaFechaHora(d.ts)}</h3>
-      <p class="bx-sub" style="margin:0">${d.origen === "texto" ? "Texto" : "Foto / escaneo"}${d.fecha ? " · lista del " + bodegaEsc(d.fecha) : ""} · ${codes.length} códigos · ${piezas} piezas</p></div>
-      <div class="bxe-det">
-        <div class="bx-card">${d.foto ? `<img class="bxe-foto" src="${d.foto}" alt="">` : `<pre style="white-space:pre-wrap;font:inherit;font-size:14px;margin:0">${bodegaEsc(d.texto || "Sin foto")}</pre>`}</div>
-        <div class="bx-card"><h3>Lo que se guardó</h3>${filas || `<p class="bx-sub">Sin renglones.</p>`}</div>
-      </div>`;
+  let base = null, w = [];
+  const clon = o => JSON.parse(JSON.stringify(o));
+  const rowsTxt = r => JSON.stringify(r.map(x => [x.upc, x.qty, x.del ? 1 : 0, x.estado || ""]));
+  const sucio = () => rowsTxt(w) !== rowsTxt(base.rows);
+  const pintar = () => {
+    const cat = bodegaCatalogoEscaneo(), ef = bxEscEfec(w), piezas = Object.values(ef).reduce((x, y) => x + y, 0), np = w.filter(r => bxEscSinId(r, cat)).length;
+    const cambios = w.filter((r, i) => r.upc !== r.orig.upc || r.qty !== r.orig.qty || r.del).length;
+    const filas = w.map((r, i) => {
+      const sin = bxEscSinId(r, cat), mod = r.upc !== r.orig.upc || r.qty !== r.orig.qty || r.del;
+      const mt = r.estado === "ign" ? "Devolución (no cuenta)" : r.del ? (cat[r.upc] ? bodegaNombre(cat, r.upc) : "Quitado") : cat[r.upc] ? bodegaNombre(cat, r.upc) : r.estado === "pend" ? "<em>UPC ilegible · sin identificar</em>" : "<em>No está en el catálogo · pendiente</em>";
+      return `<div class="bxe-r ${mod ? "mod" : ""} ${r.del ? "del" : ""} ${sin ? "pend" : ""} ${r.estado === "ign" ? "ign" : ""}" data-i="${i}"><span class="n">${i + 1}</span><span class="u">${bodegaEsc(r.upc)}</span><span class="m">${mt}</span>
+        <span class="q"><input type="number" inputmode="numeric" min="0" value="${r.qty}" ${r.del || r.estado === "ign" ? "disabled" : ""}></span>
+        <span class="a">${r.estado === "ign" ? "" : `<button type="button" data-a="edit" title="Editar UPC">${BX_ICON.pen}</button><button type="button" data-a="del" title="${r.del ? "Restaurar" : "Quitar"}">${r.del ? BX_ICON.arrow : BX_ICON.trash}</button>`}</span></div>`;
+    }).join("");
+    const log = (base.log || []).slice().reverse().map(l => `<div>${bodegaFechaHora(l.ts)} · ${bodegaEsc(l.quien || "")} · renglón ${l.n}: ${bodegaEsc(l.txt)}</div>`).join("");
+    wrap.innerHTML = `<div class="bxe-det">
+      <div class="bx-card"><div class="bxe-hd"><h3>Fotografía original</h3><small>${bodegaFechaHora(base.ts)}${base.usuario ? " · " + bodegaEsc(base.usuario) : ""}</small></div>
+        ${base.foto ? `<img class="bxe-foto" src="${base.foto}" alt="">` : base.hayFoto ? `<p class="bx-sub" id="bxeCarga">Descargando la foto…</p>` : `<pre style="white-space:pre-wrap;font:inherit;font-size:14px;margin:0">${bodegaEsc(base.texto || "Escaneo sin foto")}</pre>`}
+        ${base.foto ? `<p class="bxe-nota">Toca la foto para ampliarla. La foto nunca se modifica.</p>` : ""}</div>
+      <div class="bx-card"><div class="bxe-hd"><div><h3>${bodegaEsc(base.seccion || "Otros")} · resultados</h3><small id="bxeSum">${w.length} renglones · ${piezas} piezas${base.fecha ? " · lista " + bodegaEsc(base.fecha) : ""}</small></div>
+        <span class="bxe-pill ${base.revisado ? "rev" : np ? "w" : ""}">${base.revisado ? "Revisado" : np ? np + " por identificar" : "Escaneo completado"}</span></div>
+        <div class="bxe-tb"><div class="bxe-r h"><span class="n">#</span><span class="u">UPC</span><span class="m">Modelo</span><span class="q" style="text-align:center">Piezas</span><span class="a"></span></div>${filas}</div>
+        <p class="bxe-nota" id="bxeNota">${sucio() ? `Hay cambios sin guardar${cambios ? " · " + cambios + " renglón" + (cambios === 1 ? "" : "es") + " distinto" + (cambios === 1 ? "" : "s") + " del original" : ""}.` : "Puedes corregir el UPC (lápiz) y las piezas de cada renglón."}</p>
+        <div id="bxeAv"></div>
+        <div class="bxe-bar"><button type="button" id="bxeRest">Restaurar original</button><button type="button" id="bxeBus">Buscar UPC en catálogo</button><button type="button" id="bxeGc" ${sucio() ? "" : "disabled"}>Guardar cambios</button><button type="button" id="bxeGt" class="pri">${sucio() ? "Guardar y marcar revisado" : "Marcar revisado"}</button></div>
+        ${log ? `<details class="bxe-log"><summary>Modificaciones (${base.log.length})</summary>${log}</details>` : ""}</div></div>`;
     const im = wrap.querySelector(".bxe-foto");
     if (im) im.addEventListener("click", () => {
-      const z = document.createElement("div"); z.className = "bxe-zoom"; z.innerHTML = `<button type="button">Cerrar</button><img src="${d.foto}" alt="">`;
-      z.querySelector("button").addEventListener("click", () => z.remove()); z.querySelector("img").addEventListener("dblclick", () => z.classList.toggle("x"));
-      const bt = document.createElement("button"); bt.textContent = "Acercar"; bt.style.cssText = "top:14px;left:14px;right:auto"; bt.addEventListener("click", () => { z.classList.toggle("x"); bt.textContent = z.classList.contains("x") ? "Alejar" : "Acercar"; }); z.appendChild(bt);
+      const z = document.createElement("div"); z.className = "bxe-zoom"; z.innerHTML = `<button type="button" style="right:14px">Cerrar</button><button type="button" id="zz" style="left:14px">Acercar</button><img src="${base.foto}" alt="">`;
+      z.querySelector("button").addEventListener("click", () => z.remove());
+      const zz = z.querySelector("#zz"); zz.addEventListener("click", () => { z.classList.toggle("x"); zz.textContent = z.classList.contains("x") ? "Alejar" : "Acercar"; });
       document.body.appendChild(z);
     });
-  });
+    wrap.querySelectorAll(".bxe-r .q input").forEach(inp => inp.addEventListener("change", () => {
+      /* sin redibujar: así un toque inmediato en otro botón no se pierde */
+      const fila = inp.closest(".bxe-r"), i = +fila.dataset.i, v = Math.max(0, Math.round(+inp.value || 0)); w[i].qty = v; inp.value = v;
+      fila.classList.toggle("mod", w[i].upc !== w[i].orig.upc || w[i].qty !== w[i].orig.qty || !!w[i].del);
+      const ef2 = bxEscEfec(w), pz = Object.values(ef2).reduce((x, y) => x + y, 0), su = sucio(), cm = w.filter(r => r.upc !== r.orig.upc || r.qty !== r.orig.qty || r.del).length;
+      const sm = wrap.querySelector("#bxeSum"); if (sm) sm.textContent = `${w.length} renglones · ${pz} piezas${base.fecha ? " · lista " + base.fecha : ""}`;
+      const nt = wrap.querySelector("#bxeNota"); if (nt) nt.textContent = su ? `Hay cambios sin guardar${cm ? " · " + cm + " renglón" + (cm === 1 ? "" : "es") + " distinto" + (cm === 1 ? "" : "s") + " del original" : ""}.` : "Puedes corregir el UPC (lápiz) y las piezas de cada renglón.";
+      wrap.querySelector("#bxeGc").disabled = !su; wrap.querySelector("#bxeGt").textContent = su ? "Guardar y marcar revisado" : "Marcar revisado";
+    }));
+    wrap.querySelectorAll(".bxe-r .a button").forEach(b => b.addEventListener("click", () => {
+      const i = +b.closest(".bxe-r").dataset.i, r = w[i];
+      if (b.dataset.a === "del") { if (!r.del && !confirm(`¿Quitar el renglón ${i + 1}? Sus piezas se restan de Existencias al guardar.`)) return; r.del = r.del ? 0 : 1; pintar(); return; }
+      bxEscModalUpc(r.upc, nuevo => { r.upc = nuevo; if (r.estado === "pend") r.estado = ""; r.del = 0; pintar(); });
+    }));
+    wrap.querySelector("#bxeBus").addEventListener("click", () => {
+      const i = w.findIndex(r => bxEscSinId(r, bodegaCatalogoEscaneo())); const r = w[i < 0 ? 0 : i]; if (!r) return;
+      bxEscModalUpc(r.upc, nuevo => { r.upc = nuevo; if (r.estado === "pend") r.estado = ""; r.del = 0; pintar(); });
+    });
+    wrap.querySelector("#bxeRest").addEventListener("click", () => {
+      if (!sucio() && !w.some((r, i) => r.upc !== r.orig.upc || r.qty !== r.orig.qty || r.del)) return;
+      if (!confirm("¿Regresar todos los renglones a como los leyó el escaneo?")) return;
+      w.forEach(r => { r.upc = r.orig.upc; r.qty = r.orig.qty; r.estado = r.orig.estado || ""; r.del = 0; if (!r.estado) delete r.estado; }); pintar();
+    });
+    wrap.querySelector("#bxeGc").addEventListener("click", () => guardar(false));
+    wrap.querySelector("#bxeGt").addEventListener("click", () => guardar(true));
+  };
+  const aviso = t => { const a = wrap.querySelector("#bxeAv"); if (a) a.innerHTML = t ? `<div class="bxe-aviso">${t}</div>` : ""; };
+  const cargarFoto = async () => {
+    if (base.foto || !base.hayFoto || typeof window.ishopEscaneoFoto !== "function") return;
+    try { const f = await window.ishopEscaneoFoto(base.ts); if (f) { base.foto = f; await bxEscPon(base); if (!sucio()) { w = clon(base.rows); } pintar(); } } catch (e) { const c = wrap.querySelector("#bxeCarga"); if (c) c.textContent = "No se pudo descargar la foto (revisa tu conexión)."; }
+  };
+  async function guardar(revisado) {
+    const eff0 = bxEscEfec(base.rows), eff1 = bxEscEfec(w), quien = bxQuien(), ahora = Date.now(), cat = bodegaCatalogoEscaneo(), log = [];
+    w.forEach((r, i) => {
+      const b = base.rows[i] || r, nom = c => cat[c] ? bodegaNombre(cat, c) : "sin identificar";
+      if (!!r.del !== !!b.del) log.push({ ts: ahora, quien, n: i + 1, txt: r.del ? `quitado (${b.upc}, ${b.qty} pzas)` : "restaurado" });
+      if (r.upc !== b.upc) log.push({ ts: ahora, quien, n: i + 1, txt: `UPC ${b.upc} → ${r.upc} (${nom(r.upc)})` });
+      if (r.qty !== b.qty) log.push({ ts: ahora, quien, n: i + 1, txt: `piezas ${b.qty} → ${r.qty}` });
+    });
+    if (!log.length && !revisado) return;
+    const patch = { rows: clon(w), log: (base.log || []).concat(log).slice(-60), editado: log.length ? ahora : (base.editado || 0), editor: log.length ? quien : (base.editor || ""), revisado: revisado ? { ts: ahora, quien } : (log.length ? null : (base.revisado || null)) };
+    const enLinea = typeof window.ishopEscaneoEditar === "function" && !(window.ishopSyncPausada && window.ishopSyncPausada()) && base.nube;
+    let nuevo;
+    if (enLinea) {
+      try { nuevo = await window.ishopEscaneoEditar(base.ts, base.rev || 1, patch); }
+      catch (e) {
+        if (e && e.message === "conflicto" && e.actual) {
+          const act = bxEscNorm({ ...e.actual, nube: true, foto: base.foto }); await bxEscPon(act); base = act; w = clon(base.rows); pintar();
+          aviso("Otra persona acaba de modificar este escaneo. Cargué su versión; revisa y vuelve a hacer tu cambio. No se guardó nada tuyo."); return;
+        }
+        aviso("No se pudo guardar (¿sin internet?). No se aplicó ningún cambio."); return;
+      }
+    } else nuevo = { ...base, ...patch, rev: (base.rev || 1) + 1 };
+    nuevo = bxEscNorm({ ...nuevo, nube: enLinea ? true : base.nube, foto: base.foto });
+    // Existencias: se suma / resta solo la diferencia (lo vendido después se respeta)
+    const st = bodegaLoad(), prev = { ...st.stock }, sig = { ...st.stock };
+    new Set([...Object.keys(eff0), ...Object.keys(eff1)]).forEach(c => { const dif = (eff1[c] || 0) - (eff0[c] || 0); if (dif) sig[c] = Math.max(0, (sig[c] || 0) + dif); });
+    if (JSON.stringify(prev) !== JSON.stringify(sig)) { const hist = bodegaRegistrar(st, prev, sig, bodegaCatalogoTodo({ ...prev, ...sig }), "correccion", base.fecha); bodegaSave({ ...st, stock: sig, historial: hist }); }
+    await bxEscPon(nuevo); base = nuevo; w = clon(base.rows); pintar();
+    aviso(enLinea ? "Guardado. Ya se ve en todos los dispositivos y en Existencias." : "Guardado solo en este equipo (sincronización pausada o sin conexión).");
+  }
+  const cargar = async () => {
+    const d = await bxEscGet(ts);
+    if (!d) { wrap.innerHTML = `<div class="bx-vacio">No encontré ese escaneo.</div>`; return; }
+    base = d; w = clon(d.rows); pintar(); cargarFoto();
+  };
+  const alCambiar = async () => {
+    if (!base) return; const d = await bxEscGet(ts); if (!d || (d.rev || 1) <= (base.rev || 1)) return;
+    if (sucio()) { aviso("Otra persona modificó este escaneo. Guarda o descarta tus cambios para ver su versión."); return; }
+    base = d; w = clon(d.rows); pintar(); aviso("Se actualizó con los cambios de otra persona.");
+  };
+  bxEscOyentes.add(alCambiar); bxEscEscuchar();
+  cargar();
   return wrap;
 }
 
@@ -1971,7 +2177,7 @@ function buildBodegaHist() {
   bodegaEstilos();
   const wrap = document.createElement("div"); wrap.className = "bod-wrap bx bx-t-morado";
   const estado = bodegaLoad(), hist = estado.historial || [], cat = bodegaCatalogoTodo(estado.stock);
-  const ORIGEN = { foto: "Foto", texto: "Texto", manual: "Manual", venta: "Venta", deshacer: "Venta deshecha", baja: "Baja de inventario" };
+  const ORIGEN = { foto: "Foto", texto: "Texto", manual: "Manual", venta: "Venta", deshacer: "Venta deshecha", baja: "Baja de inventario", correccion: "Corrección de escaneo" };
   wrap.innerHTML = `<div class="bx-card" style="margin-top:4px"><h3>Historial de reportes</h3><p class="bx-sub" style="margin:0">${hist.length ? "Todo lo que fue subiendo, bajando, agregándose o quitándose. Toca un reporte para ver el detalle." : "Todavía no hay reportes. Aparecerán aquí cuando apliques cambios."}</p></div>`;
   hist.forEach(h => {
     const r = bodegaResumen(h.items), d = r.ahora - r.antes;

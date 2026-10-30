@@ -103,16 +103,40 @@ const NV_KEY = "ishop_bodega_nv_v1";       // misma llave que usa bodega.js (Apa
     F.setDoc(invRef, { nv: JSON.stringify(a || []), ts: Date.now() }, { merge: true }).catch(e => console.warn(e));
   };
 
-  /* ---- Escaneos guardados (menú oculto de Bodega): se SUBEN una sola vez y solo se bajan los nuevos ---- */
-  window.ishopEscaneoSubir = async function (d) {
-    if (!F || !listo || pausaDesde()) throw new Error("sin sync");
-    await F.setDoc(F.doc(db, "escaneos", String(d.ts)), d);
+  /* ---- Historial de escaneos (menú oculto de Bodega) ----
+     escaneos/{ts}        = datos del escaneo y sus renglones (ligero; "rev" controla que nadie pise cambios ajenos)
+     escaneos_fotos/{ts}  = la foto, aparte para no bajarla hasta que se abre el escaneo ---- */
+  const syncOn = () => F && listo && !pausaDesde();
+  window.ishopEscaneoCrear = async function (meta, foto) {
+    if (!syncOn()) throw new Error("sin sync");
+    if (foto) await F.setDoc(F.doc(db, "escaneos_fotos", String(meta.ts)), { foto });
+    await F.setDoc(F.doc(db, "escaneos", String(meta.ts)), meta);
   };
-  window.ishopEscaneosNuevos = async function (desde) {
-    if (!F || !listo || pausaDesde()) return [];
-    const col = F.collection(db, "escaneos");
-    const q = desde ? F.query(col, F.where("ts", ">", desde), F.orderBy("ts", "asc"), F.limit(40)) : F.query(col, F.orderBy("ts", "desc"), F.limit(40));
-    return (await F.getDocs(q)).docs.map(x => x.data());
+  window.ishopEscaneoFoto = async function (ts) {
+    if (!syncOn()) return "";
+    const s = await F.getDoc(F.doc(db, "escaneos_fotos", String(ts)));
+    return s.exists() ? (s.data().foto || "") : "";
+  };
+  window.ishopEscaneoEditar = async function (ts, baseRev, patch) {
+    if (!syncOn()) throw new Error("sin sync");
+    const ref = F.doc(db, "escaneos", String(ts));
+    return await F.runTransaction(db, async tx => {
+      const s = await tx.get(ref);
+      if (!s.exists()) throw new Error("noexiste");
+      const cur = s.data();
+      if ((cur.rev || 1) !== baseRev) { const e = new Error("conflicto"); e.actual = cur; throw e; }   // otra persona ya lo cambió
+      const nuevo = { ...cur, ...patch, rev: baseRev + 1 };
+      tx.set(ref, nuevo);
+      return nuevo;
+    });
+  };
+  window.ishopEscaneosEscuchar = function (cb) {
+    const q = F.query(F.collection(db, "escaneos"), F.orderBy("ts", "desc"), F.limit(80));
+    return F.onSnapshot(q, snap => {
+      if (pausaDesde()) return;
+      const docs = snap.docChanges().filter(c => c.type !== "removed").map(c => c.doc.data());
+      if (docs.length) cb(docs);
+    }, e => console.warn("Escaneos sin sync", e));
   };
 
   /* ---- Subir cambios: bodegaSave(prev → d) ---- */
