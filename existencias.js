@@ -436,8 +436,9 @@ function buildExistencias() {
     const tot = items.reduce((s, i) => s + i.qty, 0), colores = [...new Set(items.map(i => i.color))];
     const abierto = texto || abiertos.has(clave);
     const p = items[0];
+    const pf = p.orden ? p : items.slice().sort(cmp)[0], fb = exFotoBase(pf);   // Series 12 (nombre anterior): foto principal = primer color
     return `<div class="ex-model${abierto ? " open" : ""}" data-m="${exEsc(clave)}" style="--c1:${sec.c1};--c2:${sec.c2}">
-      <button class="ex-mh" type="button"><div class="ex-pic${p.orden && exFotoBase(p) ? " wpic" : ""}">${exIcono(sec.id)}${p.orden && exFotoBase(p) ? exFotoImg(exFotoBase(p)) : exImg(p.titulo)}</div>
+      <button class="ex-mh" type="button"><div class="ex-pic${fb ? " wpic" : ""}">${exIcono(sec.id)}${fb ? exFotoImg(fb) : exImg(p.titulo)}</div>
         <div class="ex-mt"><strong>${exEsc(p.titulo)}</strong>${p.spec ? `<span class="spec">${exEsc(p.spec)}</span>` : ""}${p.orden ? `<div class="sub ex-wsub"><span class="ex-sws"><i style="background:${exColor(p.color, p.modelo)}"></i></span><span>${[...new Set(items.map(i => (i.corr || "").replace(/^Correa\s+/i, "")).filter(Boolean))].join(" · ")}</span></div>`
         : `<div class="sub"><span class="ex-sws">${colores.slice(0, 6).map(c => `<i style="background:${exColor(c)}"></i>`).join("")}</span><span>${colores.length} color${colores.length === 1 ? "" : "es"}</span></div>`}</div>
         ${badge(tot, "m:" + clave, sec.id)}<i class="ex-chev"></i></button>
