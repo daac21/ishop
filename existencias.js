@@ -32,14 +32,16 @@ function exImg(nombre) { return `<img src="imágenes/existencias/${exSlug(nombre
 /* Fotos de Watch: imágenes/existencias/watch/<modelo>-<acabado>-<correa>.webp (miniatura ~3 KB) y ...-grande.webp (solo se baja al tocar) */
 function exFotoBase(i) {
   if (!i) return "";
-  if (!i.orden) {   // Series 12 de aluminio con el nombre anterior: "Bronce Oscuro Aluminio Deportiva Oliva"
+  if (!i.orden) {
+    if (/^Apple Watch SE ?3$/i.test(i.modelo || "")) { const c = String(i.color || "").match(/^(.+?)\s+Aluminio/i); return c ? "imágenes/existencias/watch/se3-" + exSlug(c[1]) : ""; }   // SE3: se3-medianoche, se3-blanco-estelar
+    // Series 12 de aluminio con el nombre anterior: "Bronce Oscuro Aluminio Deportiva Oliva"
     const m = /^Apple Watch Series 12 Aluminio$/i.test(i.modelo || "") && String(i.color || "").match(/^(.+?)\s+Aluminio\s+(\S+)/i);
     return m ? "imágenes/existencias/watch/" + ["series-12", exSlug(m[1]), exSlug(m[2])].join("-") : "";
   }
   const w = exWatchParse(i.modelo); if (!w) return "";
   return "imágenes/existencias/watch/" + [exSlug(w.familia.replace(/^Apple Watch\s+/i, "")), exSlug(w.acabado), exSlug(String(i.corr || "").replace(/^Correa\s+(Estilo\s+)?/i, ""))].join("-");
 }
-const EX_FOTO_V = "?v=2";   // sube el número si cambias las fotos, para que el teléfono las vuelva a bajar
+const EX_FOTO_V = "?v=3";   // sube el número si cambias las fotos, para que el teléfono las vuelva a bajar
 function exFotoImg(base) { return base ? `<img src="${base}.webp${EX_FOTO_V}" alt="" decoding="async" onload="this.parentNode.classList.add('has')" onerror="this.remove()">` : ""; }
 function exAbreFoto(base, nombre) {
   const bg = document.createElement("div"); bg.className = "ex-foto-bg";
