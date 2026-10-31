@@ -33,6 +33,7 @@ function exImg(nombre) { return `<img src="imágenes/existencias/${exSlug(nombre
 function exFotoBase(i) {
   if (!i) return "";
   if (!i.orden) {
+    if (i.seccion === "iPad") return "imágenes/existencias/ipad/" + exSlug(i.modelo) + "-" + exSlug(i.color);   // ej. ipad-11-a16-amarillo (si no existe la foto, se queda el punto de color)
     if (/^Apple Watch SE ?3$/i.test(i.modelo || "")) { const c = String(i.color || "").match(/^(.+?)\s+Aluminio/i); return c ? "imágenes/existencias/watch/se3-" + exSlug(c[1]) : ""; }   // SE3: se3-medianoche, se3-blanco-estelar
     // Series 12 de aluminio con el nombre anterior: "Bronce Oscuro Aluminio Deportiva Oliva"
     const m = /^Apple Watch Series 12 Aluminio$/i.test(i.modelo || "") && String(i.color || "").match(/^(.+?)\s+Aluminio\s+(\S+)/i);
