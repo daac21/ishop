@@ -113,9 +113,9 @@
         "Fallas de Software Beta (cualquier software que no sea iPadOS)"
       ],
       "cuotas": [
-        { "label": "Dispositivos de entrada (Apple Pencil / Pencil Pro)", "precio": "$559 MXN" },
-        { "label": "Desperfecto físico — Air/Pro (M2-M5), iPad A16, mini A17 Pro", "precio": "$1,899 MXN" },
-        { "label": "Desperfecto físico — resto de modelos", "precio": "$799 MXN" }
+        { "label": "Pantalla", "precio": "$559 MXN" },
+        { "label": "Otros daños accidentales", "precio": "$1,899 MXN" },
+        { "label": "Dispositivos de entrada (Apple Pencil / Pencil Pro)", "precio": "$559 MXN" }
       ],
       "si_aplica": [
         "Se cayó de una mochila",

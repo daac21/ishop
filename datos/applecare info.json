@@ -375,7 +375,8 @@
       "AppleCare+": {
         "precio": 1799,
         "deducibles": {
-          "iPad": 799,
+          "Pantalla": 559,
+          "Otros daños": 1899,
           "Apple Pencil": 559,
           "Magic Keyboard": 559
         },
@@ -392,7 +393,8 @@
       "AppleCare+": {
         "precio": 1799,
         "deducibles": {
-          "iPad": 799,
+          "Pantalla": 559,
+          "Otros daños": 1899,
           "Apple Pencil": 559,
           "Magic Keyboard": 559
         },
@@ -409,7 +411,8 @@
       "AppleCare+": {
         "precio": 1999,
         "deducibles": {
-          "iPad": 799,
+          "Pantalla": 559,
+          "Otros daños": 1899,
           "Apple Pencil": 559,
           "Magic Keyboard": 559
         },
@@ -426,7 +429,8 @@
       "AppleCare+": {
         "precio": 2499,
         "deducibles": {
-          "iPad": 799,
+          "Pantalla": 559,
+          "Otros daños": 1899,
           "Apple Pencil": 559,
           "Magic Keyboard": 559
         },
@@ -443,7 +447,8 @@
       "AppleCare+": {
         "precio": 3699,
         "deducibles": {
-          "iPad": 799,
+          "Pantalla": 559,
+          "Otros daños": 1899,
           "Apple Pencil": 559,
           "Magic Keyboard": 559
         },
@@ -460,7 +465,8 @@
       "AppleCare+": {
         "precio": 4199,
         "deducibles": {
-          "iPad": 799,
+          "Pantalla": 559,
+          "Otros daños": 1899,
           "Apple Pencil": 559,
           "Magic Keyboard": 559
         },
