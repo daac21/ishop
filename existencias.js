@@ -23,8 +23,8 @@ const EX_SECCIONES = [
   { id: "Otros",   label: "Otros",   icono: "📦", c1: "#ff9f0a", c2: "#ff6b35" },
 ];
 /* Hasta cuántas piezas se considera "pocas" (naranja) en cada categoría. 0 piezas = agotado (rojo). Más de eso = hay (verde). */
-const EX_POCAS = { "iPhone": 3, "iPad": 2, "Mac": 2, "Watch": 3, "AirPods": 3, "Bocinas / Home": 2, "Otros": 3 };
-const exPocas = id => EX_POCAS[id] != null ? EX_POCAS[id] : 3;
+const EX_POCAS = { "iPhone": 5, "iPad": 5, "Mac": 5, "Watch": 5, "AirPods": 5, "Bocinas / Home": 5, "Otros": 5 };   // de 1 a 5 piezas = "pocas" (naranja, con ojito para ver cuántas)
+const exPocas = id => EX_POCAS[id] != null ? EX_POCAS[id] : 5;
 function exIcono(id) { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${EX_SVG[id] || EX_SVG.Otros}</svg>`; }
 /* Imagen opcional: imágenes/existencias/<nombre-en-minúsculas-con-guiones>.png (si no existe se queda el icono) */
 function exSlug(t) { return String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""); }
@@ -336,6 +336,7 @@ function exEstilos() {
 }
 
 /* Ojo estilo SF Symbols (iOS): "eye.slash" = oculto, "eye" = visible */
+const EX_OK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 const EX_EYE_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.8 12S6.2 6.2 12 6.2 21.2 12 21.2 12 17.8 17.8 12 17.8 2.8 12 2.8 12z"/><circle cx="12" cy="12" r="2.9"/><path d="M4.6 20 19.4 4"/></svg>';
 const EX_EYE_ON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.8 12S6.2 6.2 12 6.2 21.2 12 21.2 12 17.8 17.8 12 17.8 2.8 12 2.8 12z"/><circle cx="12" cy="12" r="2.9" fill="currentColor" stroke="none"/></svg>';
 const EX_CHECK = '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
@@ -387,7 +388,7 @@ function buildExistencias() {
   wrap.innerHTML = `
     <div class="ex-car" id="exCar"></div>
     <div class="ex-search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg><input id="exBuscar" type="search" placeholder="Buscar modelo, color, tamaño o UPC" autocomplete="off"></div>
-    <div class="ex-metar"><p class="ex-meta">${Object.keys(stock).length ? "Bodega" + (bod.fecha ? " · lista del " + exEsc(bod.fecha) : "") : "Sin datos de bodega todavía"}</p><div class="ex-btns"><button class="ex-ojo" id="exOjo" type="button" aria-label="Mostrar u ocultar piezas">${EX_EYE_OFF}</button><button class="ex-apbtn" id="exAp" type="button" aria-label="Ver apartados"><svg viewBox="0 0 24 24"><path d="M7 4h10v16l-5-3.5L7 20z"/></svg><span id="exApN"></span></button><button class="ex-ventas" id="exVentas" type="button">Ventas</button><button class="ex-todo" id="exTodo" type="button">Abrir todo</button></div></div>
+    <div class="ex-metar"><p class="ex-meta">${Object.keys(stock).length ? "Bodega" + (bod.fecha ? " · lista del " + exEsc(bod.fecha) : "") : "Sin datos de bodega todavía"}</p><div class="ex-btns"><button class="ex-ojo" id="exOjo" type="button" aria-label="Mostrar u ocultar piezas (solo las que quedan pocas)">${EX_EYE_OFF}</button><button class="ex-apbtn" id="exAp" type="button" aria-label="Ver apartados"><svg viewBox="0 0 24 24"><path d="M7 4h10v16l-5-3.5L7 20z"/></svg><span id="exApN"></span></button><button class="ex-ventas" id="exVentas" type="button">Ventas</button><button class="ex-todo" id="exTodo" type="button">Abrir todo</button></div></div>
     <p class="ex-hint">Toca una configuración para ver capacidades y colores. Desliza un renglón a la izquierda para marcarlo como vendido.</p>
     <div id="exLista"></div>`;
 
@@ -414,8 +415,9 @@ function buildExistencias() {
   const badge = (q, k, sec) => {
     if (q <= 0) return `<div class="ex-badge zero"><small>AGOTADO</small></div>`;
     const poca = q <= exPocas(sec);
-    if (!visto(k)) return `<div class="ex-badge hid ${poca ? "low" : "ok"}" data-eye="${exEsc(k)}" role="button" aria-label="Mostrar piezas">${EX_EYE_OFF}</div>`;
-    return poca ? `<div class="ex-badge low" data-eye="${exEsc(k)}" role="button">${q}<small>POCAS</small></div>` : `<div class="ex-badge" data-eye="${exEsc(k)}" role="button">${q}</div>`;
+    if (!poca) return `<div class="ex-badge hid ok" aria-label="Disponible">${EX_OK}</div>`;   // hay suficiente: solo recuadro verde, sin ojito ni número
+    if (!visto(k)) return `<div class="ex-badge hid low" data-eye="${exEsc(k)}" role="button" aria-label="Mostrar piezas">${EX_EYE_OFF}</div>`;
+    return `<div class="ex-badge low" data-eye="${exEsc(k)}" role="button">${q}<small>POCAS</small></div>`;
   };
   const fila = (i) => {
     const pr = exPrecio(i);
@@ -434,7 +436,7 @@ function buildExistencias() {
     items.sort(cmp).forEach(i => { const k = i.capacidad ? exCap(i.capacidad) : ""; (por[k] = por[k] || []).push(i); });
     return Object.keys(por).map(k => {
       const l = por[k], pz = l.reduce((s, i) => s + i.qty, 0), nc = new Set(l.map(i => i.color)).size;
-      return (k ? `<div class="ex-capbar"><b>${exEsc(k)}</b><span>${nc} color${nc === 1 ? "" : "es"}${ver && pz ? " · " + pz + (pz === 1 ? " pza" : " pzas") : ""}</span></div>` : "") + l.map(fila).join("");
+      return (k ? `<div class="ex-capbar"><b>${exEsc(k)}</b><span>${nc} color${nc === 1 ? "" : "es"}</span></div>` : "") + l.map(fila).join("");
     }).join("");
   };
   /* tarjeta por configuración (titulo + spec) */
@@ -466,7 +468,7 @@ function buildExistencias() {
     EX_SECCIONES.forEach(sec => {
       const ds = d.filter(i => i.seccion === sec.id); if (!ds.length) return;
       const g = agrupa(ds), piezas = ds.reduce((s, i) => s + i.qty, 0);
-      html += `<div class="ex-sec" style="--c1:${sec.c1};--c2:${sec.c2}"><h3>${exEsc(sec.label || sec.id)}</h3><em>${ver ? piezas + " pzas" : Object.keys(g).length + " modelo" + (Object.keys(g).length === 1 ? "" : "s")}</em></div>`;
+      html += `<div class="ex-sec" style="--c1:${sec.c1};--c2:${sec.c2}"><h3>${exEsc(sec.label || sec.id)}</h3><em>${Object.keys(g).length + " modelo" + (Object.keys(g).length === 1 ? "" : "s")}</em></div>`;
       ordenClaves(g).forEach(k => { html += tarjeta(k, g[k], sec); });
     });
     if (!html) {
