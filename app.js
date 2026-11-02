@@ -442,6 +442,15 @@ settingsBtn.innerHTML = `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2
 document.getElementById("topbar").appendChild(settingsBtn);
 settingsBtn.addEventListener("click", () => navigate({ screen: "settings", title: "Ajustes" }));
 
+// Botón Récord (junto al engrane): solo se ve en el inicio
+const recordBtn = document.createElement("button");
+recordBtn.id = "recordBtn";
+recordBtn.setAttribute("aria-label", "Récord de ventas");
+recordBtn.hidden = true;
+recordBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M9 20h6"/></svg><span>Récord</span>`;
+document.getElementById("topbar").appendChild(recordBtn);
+recordBtn.addEventListener("click", () => navigate({ screen: "record", title: "Récord" }));
+
 backBtn.addEventListener("click", goBack);
 homeBtn.addEventListener("click", goHome);
 setupArcadeTrigger(titleEl);
@@ -478,6 +487,7 @@ function render(isForward) {
   backBtn.hidden = stack.length === 1;
   homeBtn.hidden = stack.length === 1;
   settingsBtn.hidden = entry.screen !== "home";
+  recordBtn.hidden = entry.screen !== "home";
   document.documentElement.classList.toggle("home-mode", entry.screen === "home");
   document.documentElement.classList.toggle("docs-mode", /^docs/.test(entry.screen));
   ishopAplicarTema();
@@ -532,6 +542,8 @@ function buildScreen(entry) {
     el.appendChild(buildRepair(entry.category, entry.model, entry.variant));
   } else if (entry.screen === "settings") {
     el.appendChild(buildSettings(entry));
+  } else if (entry.screen === "record") {
+    el.appendChild(buildRecord());
   } else if (entry.screen === "registros") {
     el.appendChild(buildRegistros());
   } else if (entry.screen === "bodega") {
