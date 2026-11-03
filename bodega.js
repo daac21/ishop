@@ -2059,73 +2059,184 @@ function bxEscModalUpc(actual, cb) {
   document.body.appendChild(bg); inp.focus(); if (inp.value) buscar();
 }
 
-/* ---- Detalle: foto a la izquierda, renglones a la derecha ---- */
+/* ---- Detalle (vista de verificación): foto fija arriba con línea guía, renglones grandes abajo ---- */
+function bxEscCss3() {
+  if (document.getElementById("bxEscCss3")) return;
+  const st = document.createElement("style"); st.id = "bxEscCss3";
+  st.textContent = `
+  .bxv-top{ position:sticky; top:0; z-index:20; background:var(--bg,#f2f2f7); padding:6px 0 8px; }
+  .bxv-photo{ height:32vh; height:32dvh; min-height:170px; overflow:auto; -webkit-overflow-scrolling:touch; border-radius:16px; background:#111; position:relative; border:1px solid var(--bx-line); }
+  .bxv-in{ position:relative; width:100%; }
+  .bxv-in img{ width:100%; display:block; -webkit-user-drag:none; user-select:none; }
+  .bxv-in pre{ margin:0; padding:12px; color:#eee; white-space:pre-wrap; font:13px ui-monospace,Menlo,monospace; }
+  .bxv-line{ position:absolute; left:0; right:0; height:0; border-top:3px solid #ff2d55; box-shadow:0 0 0 1px rgba(255,45,85,.3), 0 0 14px 3px rgba(255,45,85,.65); pointer-events:none; transition:top .25s ease; z-index:2; }
+  .bxv-line::after{ content:""; position:absolute; left:0; right:0; top:-11px; height:22px; background:rgba(255,45,85,.12); }
+  .bxv-tools{ display:flex; align-items:center; gap:8px; margin-top:6px; font-size:12.5px; color:var(--text-secondary); }
+  .bxv-tools span{ flex:1; line-height:1.2; }
+  .bxv-tools button{ border:0; border-radius:10px; padding:7px 11px; font:inherit; font-size:13px; font-weight:700; background:var(--bx-fill); color:var(--text); }
+  .bxv-focus{ display:flex; align-items:center; gap:8px; margin-top:8px; padding:8px 10px; border-radius:16px; background:var(--bx-card,#fff); border:1px solid var(--bx-line); }
+  .bxv-focus .nv{ flex:0 0 44px; height:56px; border:0; border-radius:12px; background:var(--bx-fill); color:var(--text); font-size:22px; font-weight:800; }
+  .bxv-focus .nv:disabled{ opacity:.3; }
+  .bxv-focus .fc{ flex:1; min-width:0; text-align:center; }
+  .bxv-focus .fc small{ display:block; font-size:12px; color:var(--text-secondary); font-weight:700; }
+  .bxv-focus .fu{ display:block; font:800 25px/1.1 ui-monospace,Menlo,monospace; letter-spacing:.02em; color:var(--text); }
+  .bxv-focus .fm{ display:block; font-size:12.5px; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .bxv-focus .fq{ flex:0 0 auto; min-width:58px; text-align:center; font:850 38px/1 inherit; color:var(--accent); }
+  .bxv-focus .fq small{ display:block; font-size:11px; font-weight:700; color:var(--text-secondary); }
+  .bxv-sum{ display:flex; flex-wrap:wrap; gap:6px; margin:10px 2px 4px; align-items:center; font-size:13.5px; color:var(--text-secondary); }
+  .bxv-tag{ display:inline-block; white-space:nowrap; font-size:12.5px; font-weight:800; padding:3px 10px; border-radius:999px; }
+  .bxv-tag.demo{ background:rgba(48,176,199,.2); color:#1f8fa3; } html[data-mode="dark"] .bxv-tag.demo{ color:#5fd0e4; }
+  .bxv-tag.apa{ background:rgba(10,132,255,.18); color:#0a6fe0; } html[data-mode="dark"] .bxv-tag.apa{ color:#64a8ff; }
+  .bxv-r{ display:grid; grid-template-columns:34px 1fr 92px; grid-template-areas:"n u q" "n m q" "n t a"; gap:2px 10px; align-items:center; padding:12px 12px; margin-top:8px; border-radius:16px; background:var(--bx-card,#fff); border:2px solid transparent; box-shadow:0 1px 0 var(--bx-line); }
+  .bxv-r.on{ border-color:#ff2d55; box-shadow:0 0 0 3px rgba(255,45,85,.16); }
+  .bxv-r .n{ grid-area:n; width:32px; height:32px; border-radius:50%; background:var(--accent); color:#fff; font-size:14px; font-weight:800; display:grid; place-items:center; align-self:start; margin-top:3px; }
+  .bxv-r .u{ grid-area:u; font:800 21px/1.15 ui-monospace,Menlo,monospace; letter-spacing:.02em; word-break:break-all; color:var(--text); }
+  .bxv-r .m{ grid-area:m; font-size:13.5px; line-height:1.25; color:var(--text-secondary); } .bxv-r .m em{ color:var(--bx-orange); font-style:normal; font-weight:700; }
+  .bxv-r .t{ grid-area:t; display:flex; flex-wrap:wrap; gap:5px; margin-top:4px; min-height:0; }
+  .bxv-r .q{ grid-area:q; align-self:start; } .bxv-r .q input{ width:100%; box-sizing:border-box; text-align:center; font:850 30px/1 inherit; padding:9px 2px; border:1px solid var(--bx-line); border-radius:12px; background:transparent; color:var(--text); }
+  .bxv-r .a{ grid-area:a; display:flex; gap:6px; justify-content:flex-end; } .bxv-r .a button{ width:40px; height:36px; border:0; border-radius:10px; background:var(--bx-fill); color:var(--accent); padding:7px; } .bxv-r .a button svg{ width:100%; height:100%; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; } .bxv-r .a button[data-a=del]{ color:var(--bx-red,#ff453a); }
+  .bxv-r.mod .n{ box-shadow:0 0 0 3px rgba(255,159,10,.4); } .bxv-r.del .u,.bxv-r.del .m,.bxv-r.del .q input{ text-decoration:line-through; opacity:.5; } .bxv-r.ign{ opacity:.55; } .bxv-r.pend{ background:rgba(255,159,10,.1); }
+  .bxv-act{ position:sticky; bottom:0; z-index:20; display:flex; gap:8px; padding:10px 0 calc(10px + env(safe-area-inset-bottom,0px)); margin-top:10px; background:var(--bg,#f2f2f7); }
+  .bxv-act button{ flex:1; border:0; border-radius:14px; padding:13px 8px; font:inherit; font-size:15px; font-weight:800; background:var(--bx-fill); color:var(--text); } .bxv-act button.pri{ flex:1.5; background:var(--accent); color:#fff; } .bxv-act button:disabled{ opacity:.4; }
+  `;
+  document.head.appendChild(st);
+}
 function buildBodegaEscaneo(ts) {
-  bodegaEstilos(); bxEscCss();
+  bodegaEstilos(); bxEscCss(); bxEscCss3();
   const wrap = document.createElement("div"); wrap.className = "bod-wrap bx bx-t-morado";
-  let base = null, w = [];
+  let base = null, w = [], act = 0, zoom = 0;
+  const ZOOMS = [100, 160, 240], AKEY = "ishop_esc_linea_" + ts;
+  let anchors = []; try { anchors = JSON.parse(localStorage.getItem(AKEY) || "[]") || []; } catch (_) { anchors = []; }
   const clon = o => JSON.parse(JSON.stringify(o));
   const rowsTxt = r => JSON.stringify(r.map(x => [x.upc, x.qty, x.del ? 1 : 0, x.estado || ""]));
   const sucio = () => rowsTxt(w) !== rowsTxt(base.rows);
-  const pintar = () => {
+  const $ = q => wrap.querySelector(q);
+  const D0 = 0.14, D1 = 0.94;
+  const ypos = i => {
+    const n = w.length, step0 = n > 1 ? (D1 - D0) / (n - 1) : 0, pts = anchors.slice().sort((a, b) => a[0] - b[0]);
+    if (!pts.length) return D0 + i * step0;
+    if (pts.length === 1) return pts[0][1] + (i - pts[0][0]) * step0;
+    let a = pts[0], b = pts[1];
+    for (let j = 0; j < pts.length - 1; j++) if (i >= pts[j][0]) { a = pts[j]; b = pts[j + 1]; }
+    return a[1] + (i - a[0]) * (b[1] - a[1]) / (b[0] - a[0]);
+  };
+  const apDem = c => { let ap = 0, dm = 0; try { ap = bodegaApartados()[c] || 0; } catch (_) {} try { dm = bodegaDemo()[c] || 0; } catch (_) {} return { ap, dm }; };
+  const tagsHtml = r => { if (r.del || r.estado === "ign" || !r.upc) return ""; const { ap, dm } = apDem(r.upc); return (dm ? `<span class="bxv-tag demo">Demo ${dm}</span>` : "") + (ap ? `<span class="bxv-tag apa">Apartado ${ap}</span>` : ""); };
+  const nomDe = (r, cat) => r.estado === "ign" ? "Devolución (no cuenta)" : r.del ? (cat[r.upc] ? bodegaNombre(cat, r.upc) : "Quitado") : cat[r.upc] ? bodegaNombre(cat, r.upc) : r.estado === "pend" ? "<em>UPC ilegible · sin identificar</em>" : "<em>No está en el catálogo · pendiente</em>";
+
+  function armar() {
+    wrap.innerHTML = `<div class="bxv-top" id="bxvTop">
+        <div class="bxv-photo" id="bxvPh"><div class="bxv-in" id="bxvIn">${base.foto ? `<img src="${base.foto}" alt="">` : base.hayFoto ? `<pre id="bxeCarga">Descargando la foto…</pre>` : `<pre>${bodegaEsc(base.texto || "Escaneo sin foto")}</pre>`}${base.foto || base.hayFoto ? `<i class="bxv-line" id="bxvLn"></i>` : ""}</div></div>
+        <div class="bxv-tools"><span>Toca la foto donde está el renglón para ajustar la línea.</span><button type="button" id="bxvZm">Zoom ${ZOOMS[zoom]}%</button><button type="button" id="bxvRl">Reiniciar línea</button></div>
+        <div class="bxv-focus"><button type="button" class="nv" id="bxvPr">▲</button><div class="fc"><small id="bxvN"></small><b class="fu" id="bxvU"></b><span class="fm" id="bxvM"></span></div><div class="fq"><span id="bxvQ"></span><small>piezas</small></div><button type="button" class="nv" id="bxvNx">▼</button></div>
+      </div>
+      <div class="bxv-sum" id="bxvSum"></div><div id="bxeAv"></div>
+      <div id="bxvList"></div>
+      <details class="bxe-log" id="bxvLog"></details>
+      <div class="bxv-act"><button type="button" id="bxeRest">Restaurar</button><button type="button" id="bxeGc">Guardar cambios</button><button type="button" id="bxeGt" class="pri">Marcar revisado</button></div>`;
+    const ph = $("#bxvPh");
+    $("#bxvIn").style.width = ZOOMS[zoom] + "%";
+    const img = $("#bxvIn img"); if (img) img.addEventListener("load", () => enfocarLinea(false));
+    ph.addEventListener("click", e => {
+      if (!$("#bxvLn")) return; const r = $("#bxvIn").getBoundingClientRect(); if (!r.height) return;
+      const f = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
+      anchors = anchors.filter(a => a[0] !== act); anchors.push([act, f]); if (anchors.length > 8) anchors.shift();
+      try { localStorage.setItem(AKEY, JSON.stringify(anchors)); } catch (_) {}
+      enfocarLinea(false);
+    });
+    $("#bxvZm").addEventListener("click", () => { zoom = (zoom + 1) % ZOOMS.length; $("#bxvIn").style.width = ZOOMS[zoom] + "%"; $("#bxvZm").textContent = "Zoom " + ZOOMS[zoom] + "%"; setTimeout(() => enfocarLinea(false), 30); });
+    $("#bxvRl").addEventListener("click", () => { anchors = []; try { localStorage.removeItem(AKEY); } catch (_) {} enfocarLinea(true); });
+    $("#bxvPr").addEventListener("click", () => ir(act - 1, true));
+    $("#bxvNx").addEventListener("click", () => ir(act + 1, true));
+    $("#bxeRest").addEventListener("click", () => {
+      if (!w.some(r => r.upc !== r.orig.upc || r.qty !== r.orig.qty || r.del)) return;
+      if (!confirm("¿Regresar todos los renglones a como los leyó el escaneo?")) return;
+      w.forEach(r => { r.upc = r.orig.upc; r.qty = r.orig.qty; r.estado = r.orig.estado || ""; r.del = 0; if (!r.estado) delete r.estado; }); pintarLista();
+    });
+    $("#bxeGc").addEventListener("click", () => guardar(false));
+    $("#bxeGt").addEventListener("click", () => guardar(true));
+    pintarLista();
+  }
+  function enfocarLinea(suave) {
+    const ln = $("#bxvLn"), inn = $("#bxvIn"), ph = $("#bxvPh"); if (!ln || !w.length) return;
+    const f = ypos(act); ln.style.top = (f * 100) + "%";
+    const alto = inn.offsetHeight, y = f * alto;
+    ph.scrollTo({ top: Math.max(0, y - ph.clientHeight / 2), behavior: suave ? "smooth" : "auto" });
+  }
+  function foco() {
+    const cat = bodegaCatalogoEscaneo(), r = w[act]; if (!r) return;
+    $("#bxvN").textContent = `Renglón ${act + 1} de ${w.length}`;
+    $("#bxvU").textContent = r.upc || "—";
+    $("#bxvM").innerHTML = nomDe(r, cat) + (tagsHtml(r) ? "" : "");
+    $("#bxvQ").textContent = r.del ? "0" : r.qty;
+    $("#bxvPr").disabled = act <= 0; $("#bxvNx").disabled = act >= w.length - 1;
+    wrap.querySelectorAll(".bxv-r").forEach(el => el.classList.toggle("on", +el.dataset.i === act));
+  }
+  function ir(i, desplazar) {
+    i = Math.max(0, Math.min(w.length - 1, i)); act = i; foco(); enfocarLinea(true);
+    if (desplazar) { const el = wrap.querySelector(`.bxv-r[data-i="${i}"]`), top = $("#bxvTop"); if (el && top) { const y = el.getBoundingClientRect().top - top.getBoundingClientRect().bottom - 6; window.scrollBy ? scrollContenedor(y) : 0; } }
+  }
+  function scrollContenedor(dy) {
+    let el = wrap.parentElement; while (el && el !== document.body) { if (el.scrollHeight > el.clientHeight + 4 && /(auto|scroll)/.test(getComputedStyle(el).overflowY)) { el.scrollBy({ top: dy, behavior: "smooth" }); return; } el = el.parentElement; }
+    window.scrollBy({ top: dy, behavior: "smooth" });
+  }
+  function resumen() {
     const cat = bodegaCatalogoEscaneo(), ef = bxEscEfec(w), piezas = Object.values(ef).reduce((x, y) => x + y, 0), np = w.filter(r => bxEscSinId(r, cat)).length;
-    const cambios = w.filter((r, i) => r.upc !== r.orig.upc || r.qty !== r.orig.qty || r.del).length;
-    const filas = w.map((r, i) => {
+    let dm = 0, ap = 0; Object.keys(ef).forEach(c => { const x = apDem(c); dm += Math.min(ef[c], x.dm); ap += Math.min(ef[c], x.ap); });
+    const cambios = w.filter(r => r.upc !== r.orig.upc || r.qty !== r.orig.qty || r.del).length;
+    $("#bxvSum").innerHTML = `<b style="color:var(--text)">${bodegaEsc(base.seccion || "Otros")}</b> · ${w.length} renglones · ${piezas} piezas${base.fecha ? " · lista " + bodegaEsc(base.fecha) : ""}
+      ${base.revisado ? `<span class="bxe-pill rev">Revisado</span>` : np ? `<span class="bxe-pill w">${np} por identificar</span>` : ""}
+      ${dm ? `<span class="bxv-tag demo">${dm} en demo</span>` : ""}${ap ? `<span class="bxv-tag apa">${ap} apartado${ap === 1 ? "" : "s"}</span>` : ""}
+      ${dm || ap ? `<span style="flex-basis:100%">Disponible para venta al publicar: <b style="color:var(--text)">${Math.max(0, piezas - dm - ap)}</b> de ${piezas}</span>` : ""}
+      <span style="flex-basis:100%">${sucio() ? `Hay cambios sin guardar${cambios ? " · " + cambios + " distinto" + (cambios === 1 ? "" : "s") + " del original" : ""}.` : "Sin cambios. Los datos capturados no se modifican hasta que guardes."}</span>`;
+    $("#bxeGc").disabled = !sucio(); $("#bxeGt").textContent = sucio() ? "Guardar y marcar revisado" : "Marcar revisado";
+    const log = (base.log || []).slice().reverse().map(l => `<div>${bodegaFechaHora(l.ts)} · ${bodegaEsc(l.quien || "")} · renglón ${l.n}: ${bodegaEsc(l.txt)}</div>`).join("");
+    const lg = $("#bxvLog"); lg.style.display = log ? "" : "none"; lg.innerHTML = log ? `<summary>Modificaciones (${base.log.length})</summary>${log}` : "";
+  }
+  function pintarLista() {
+    const cat = bodegaCatalogoEscaneo(), L = $("#bxvList");
+    L.innerHTML = w.map((r, i) => {
       const sin = bxEscSinId(r, cat), mod = r.upc !== r.orig.upc || r.qty !== r.orig.qty || r.del;
-      const mt = r.estado === "ign" ? "Devolución (no cuenta)" : r.del ? (cat[r.upc] ? bodegaNombre(cat, r.upc) : "Quitado") : cat[r.upc] ? bodegaNombre(cat, r.upc) : r.estado === "pend" ? "<em>UPC ilegible · sin identificar</em>" : "<em>No está en el catálogo · pendiente</em>";
-      return `<div class="bxe-r ${mod ? "mod" : ""} ${r.del ? "del" : ""} ${sin ? "pend" : ""} ${r.estado === "ign" ? "ign" : ""}" data-i="${i}"><span class="n">${i + 1}</span><span class="u">${bodegaEsc(r.upc)}</span><span class="m">${mt}</span>
+      return `<div class="bxv-r ${i === act ? "on" : ""} ${mod ? "mod" : ""} ${r.del ? "del" : ""} ${sin ? "pend" : ""} ${r.estado === "ign" ? "ign" : ""}" data-i="${i}"><span class="n">${i + 1}</span><span class="u">${bodegaEsc(r.upc)}</span><span class="m">${nomDe(r, cat)}</span>
         <span class="q"><input type="number" inputmode="numeric" min="0" value="${r.qty}" ${r.del || r.estado === "ign" ? "disabled" : ""}></span>
+        <span class="t">${tagsHtml(r)}</span>
         <span class="a">${r.estado === "ign" ? "" : `<button type="button" data-a="edit" title="Editar UPC">${BX_ICON.pen}</button><button type="button" data-a="del" title="${r.del ? "Restaurar" : "Quitar"}">${r.del ? BX_ICON.arrow : BX_ICON.trash}</button>`}</span></div>`;
     }).join("");
-    const log = (base.log || []).slice().reverse().map(l => `<div>${bodegaFechaHora(l.ts)} · ${bodegaEsc(l.quien || "")} · renglón ${l.n}: ${bodegaEsc(l.txt)}</div>`).join("");
-    wrap.innerHTML = `<div class="bxe-det">
-      <div class="bx-card"><div class="bxe-hd"><h3>Fotografía original</h3><small>${bodegaFechaHora(base.ts)}${base.usuario ? " · " + bodegaEsc(base.usuario) : ""}</small></div>
-        ${base.foto ? `<img class="bxe-foto" src="${base.foto}" alt="">` : base.hayFoto ? `<p class="bx-sub" id="bxeCarga">Descargando la foto…</p>` : `<pre style="white-space:pre-wrap;font:inherit;font-size:14px;margin:0">${bodegaEsc(base.texto || "Escaneo sin foto")}</pre>`}
-        ${base.foto ? `<p class="bxe-nota">Toca la foto para ampliarla. La foto nunca se modifica.</p>` : ""}</div>
-      <div class="bx-card"><div class="bxe-hd"><div><h3>${bodegaEsc(base.seccion || "Otros")} · resultados</h3><small id="bxeSum">${w.length} renglones · ${piezas} piezas${base.fecha ? " · lista " + bodegaEsc(base.fecha) : ""}</small></div>
-        <span class="bxe-pill ${base.revisado ? "rev" : np ? "w" : ""}">${base.revisado ? "Revisado" : np ? np + " por identificar" : "Escaneo completado"}</span></div>
-        <div class="bxe-tb"><div class="bxe-r h"><span class="n">#</span><span class="u">UPC</span><span class="m">Modelo</span><span class="q" style="text-align:center">Piezas</span><span class="a"></span></div>${filas}</div>
-        <p class="bxe-nota" id="bxeNota">${sucio() ? `Hay cambios sin guardar${cambios ? " · " + cambios + " renglón" + (cambios === 1 ? "" : "es") + " distinto" + (cambios === 1 ? "" : "s") + " del original" : ""}.` : "Puedes corregir el UPC (lápiz) y las piezas de cada renglón."}</p>
-        <div id="bxeAv"></div>
-        <div class="bxe-bar"><button type="button" id="bxeRest">Restaurar original</button><button type="button" id="bxeBus">Buscar UPC en catálogo</button><button type="button" id="bxeGc" ${sucio() ? "" : "disabled"}>Guardar cambios</button><button type="button" id="bxeGt" class="pri">${sucio() ? "Guardar y marcar revisado" : "Marcar revisado"}</button></div>
-        ${log ? `<details class="bxe-log"><summary>Modificaciones (${base.log.length})</summary>${log}</details>` : ""}</div></div>`;
-    const im = wrap.querySelector(".bxe-foto");
-    if (im) im.addEventListener("click", () => {
-      const z = document.createElement("div"); z.className = "bxe-zoom"; z.innerHTML = `<button type="button" style="right:14px">Cerrar</button><button type="button" id="zz" style="left:14px">Acercar</button><img src="${base.foto}" alt="">`;
-      z.querySelector("button").addEventListener("click", () => z.remove());
-      const zz = z.querySelector("#zz"); zz.addEventListener("click", () => { z.classList.toggle("x"); zz.textContent = z.classList.contains("x") ? "Alejar" : "Acercar"; });
-      document.body.appendChild(z);
+    L.querySelectorAll(".bxv-r").forEach(fila => {
+      fila.addEventListener("click", e => { if (e.target.closest("button")) return; const i = +fila.dataset.i; if (i !== act) { act = i; foco(); enfocarLinea(true); } });
+      const inp = fila.querySelector("input");
+      inp.addEventListener("focus", () => { const i = +fila.dataset.i; if (i !== act) { act = i; foco(); enfocarLinea(true); } });
+      inp.addEventListener("change", () => {
+        const i = +fila.dataset.i, v = Math.max(0, Math.round(+inp.value || 0)); w[i].qty = v; inp.value = v;
+        fila.classList.toggle("mod", w[i].upc !== w[i].orig.upc || w[i].qty !== w[i].orig.qty || !!w[i].del);
+        resumen(); foco();
+      });
+      fila.querySelectorAll(".a button").forEach(b => b.addEventListener("click", () => {
+        const i = +fila.dataset.i, r = w[i]; act = i;
+        if (b.dataset.a === "del") { if (!r.del && !confirm(`¿Quitar el renglón ${i + 1}? Sus piezas se restan de Existencias al guardar.`)) return; r.del = r.del ? 0 : 1; pintarLista(); return; }
+        bxEscModalUpc(r.upc, nuevo => { r.upc = nuevo; if (r.estado === "pend") r.estado = ""; r.del = 0; pintarLista(); });
+      }));
     });
-    wrap.querySelectorAll(".bxe-r .q input").forEach(inp => inp.addEventListener("change", () => {
-      /* sin redibujar: así un toque inmediato en otro botón no se pierde */
-      const fila = inp.closest(".bxe-r"), i = +fila.dataset.i, v = Math.max(0, Math.round(+inp.value || 0)); w[i].qty = v; inp.value = v;
-      fila.classList.toggle("mod", w[i].upc !== w[i].orig.upc || w[i].qty !== w[i].orig.qty || !!w[i].del);
-      const ef2 = bxEscEfec(w), pz = Object.values(ef2).reduce((x, y) => x + y, 0), su = sucio(), cm = w.filter(r => r.upc !== r.orig.upc || r.qty !== r.orig.qty || r.del).length;
-      const sm = wrap.querySelector("#bxeSum"); if (sm) sm.textContent = `${w.length} renglones · ${pz} piezas${base.fecha ? " · lista " + base.fecha : ""}`;
-      const nt = wrap.querySelector("#bxeNota"); if (nt) nt.textContent = su ? `Hay cambios sin guardar${cm ? " · " + cm + " renglón" + (cm === 1 ? "" : "es") + " distinto" + (cm === 1 ? "" : "s") + " del original" : ""}.` : "Puedes corregir el UPC (lápiz) y las piezas de cada renglón.";
-      wrap.querySelector("#bxeGc").disabled = !su; wrap.querySelector("#bxeGt").textContent = su ? "Guardar y marcar revisado" : "Marcar revisado";
-    }));
-    wrap.querySelectorAll(".bxe-r .a button").forEach(b => b.addEventListener("click", () => {
-      const i = +b.closest(".bxe-r").dataset.i, r = w[i];
-      if (b.dataset.a === "del") { if (!r.del && !confirm(`¿Quitar el renglón ${i + 1}? Sus piezas se restan de Existencias al guardar.`)) return; r.del = r.del ? 0 : 1; pintar(); return; }
-      bxEscModalUpc(r.upc, nuevo => { r.upc = nuevo; if (r.estado === "pend") r.estado = ""; r.del = 0; pintar(); });
-    }));
-    wrap.querySelector("#bxeBus").addEventListener("click", () => {
-      const i = w.findIndex(r => bxEscSinId(r, bodegaCatalogoEscaneo())); const r = w[i < 0 ? 0 : i]; if (!r) return;
-      bxEscModalUpc(r.upc, nuevo => { r.upc = nuevo; if (r.estado === "pend") r.estado = ""; r.del = 0; pintar(); });
-    });
-    wrap.querySelector("#bxeRest").addEventListener("click", () => {
-      if (!sucio() && !w.some((r, i) => r.upc !== r.orig.upc || r.qty !== r.orig.qty || r.del)) return;
-      if (!confirm("¿Regresar todos los renglones a como los leyó el escaneo?")) return;
-      w.forEach(r => { r.upc = r.orig.upc; r.qty = r.orig.qty; r.estado = r.orig.estado || ""; r.del = 0; if (!r.estado) delete r.estado; }); pintar();
-    });
-    wrap.querySelector("#bxeGc").addEventListener("click", () => guardar(false));
-    wrap.querySelector("#bxeGt").addEventListener("click", () => guardar(true));
+    resumen(); foco(); enfocarLinea(false);
+    // la línea sigue al renglón que va quedando arriba al deslizar la lista
+    if (!pintarLista.ya) { pintarLista.ya = 1; }
+  }
+  /* al deslizar la lista, el renglón que queda justo bajo la foto es el activo */
+  let tmr = 0;
+  const alDeslizar = () => {
+    if (!wrap.isConnected) { document.removeEventListener("scroll", alDeslizar, true); return; }
+    clearTimeout(tmr); tmr = setTimeout(() => {
+      const top = $("#bxvTop"); if (!top) return; const lim = top.getBoundingClientRect().bottom + 10;
+      const filas = [...wrap.querySelectorAll(".bxv-r")]; const f = filas.find(el => el.getBoundingClientRect().bottom > lim);
+      if (f && +f.dataset.i !== act) { act = +f.dataset.i; foco(); enfocarLinea(true); }
+    }, 60);
   };
+  document.addEventListener("scroll", alDeslizar, true);
   const aviso = t => { const a = wrap.querySelector("#bxeAv"); if (a) a.innerHTML = t ? `<div class="bxe-aviso">${t}</div>` : ""; };
+  const pintar = () => { if (wrap.querySelector("#bxvList")) pintarLista(); else armar(); };
   const cargarFoto = async () => {
     if (base.foto || !base.hayFoto || typeof window.ishopEscaneoFoto !== "function") return;
-    try { const f = await window.ishopEscaneoFoto(base.ts); if (f) { base.foto = f; await bxEscPon(base); if (!sucio()) { w = clon(base.rows); } pintar(); } } catch (e) { const c = wrap.querySelector("#bxeCarga"); if (c) c.textContent = "No se pudo descargar la foto (revisa tu conexión)."; }
+    try { const f = await window.ishopEscaneoFoto(base.ts); if (f) { base.foto = f; await bxEscPon(base); const sc = sucio(); const keep = sc ? clon(w) : null; armar(); if (keep) { w = keep; pintarLista(); } } } catch (e) { const c = wrap.querySelector("#bxeCarga"); if (c) c.textContent = "No se pudo descargar la foto (revisa tu conexión)."; }
   };
   async function guardar(revisado) {
     const eff0 = bxEscEfec(base.rows), eff1 = bxEscEfec(w), quien = bxQuien(), ahora = Date.now(), cat = bodegaCatalogoEscaneo(), log = [];
@@ -2160,12 +2271,12 @@ function buildBodegaEscaneo(ts) {
   const cargar = async () => {
     const d = await bxEscGet(ts);
     if (!d) { wrap.innerHTML = `<div class="bx-vacio">No encontré ese escaneo.</div>`; return; }
-    base = d; w = clon(d.rows); pintar(); cargarFoto();
+    base = d; w = clon(d.rows); armar(); cargarFoto();
   };
   const alCambiar = async () => {
     if (!base) return; const d = await bxEscGet(ts); if (!d || (d.rev || 1) <= (base.rev || 1)) return;
     if (sucio()) { aviso("Otra persona modificó este escaneo. Guarda o descarta tus cambios para ver su versión."); return; }
-    base = d; w = clon(d.rows); pintar(); aviso("Se actualizó con los cambios de otra persona.");
+    base = d; w = clon(d.rows); pintarLista(); aviso("Se actualizó con los cambios de otra persona.");
   };
   bxEscOyentes.add(alCambiar); bxEscEscuchar();
   cargar();
