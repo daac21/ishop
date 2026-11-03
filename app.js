@@ -521,10 +521,12 @@ function buildScreen(entry) {
     el.appendChild(buildQuoteSelectNew(entry.path, entry.tradeIn));
   } else if (entry.screen === "quoteResult") {
     el.appendChild(buildQuoteResult(entry.tradeIn, entry.newModel, entry.newCapacity));
+  } else if (entry.screen === "switchCosto") {
+    el.appendChild(buildSwitchCosto());
   } else if (entry.screen === "switchSelect") {
-    el.appendChild(buildSwitchSelect(entry.path));
+    el.appendChild(buildSwitchSelect(entry.path, entry.costo));
   } else if (entry.screen === "switchResult") {
-    el.appendChild(buildSwitchResult(entry.newModel, entry.newCapacity));
+    el.appendChild(buildSwitchResult(entry.newModel, entry.newCapacity, entry.costo));
   } else if (entry.screen === "financeSelect") {
     el.appendChild(buildFinanceSelect(entry.path, entry.planType));
   } else if (entry.screen === "financeResult") {
@@ -654,7 +656,8 @@ function buildHome() {
       navigate({ screen: "tradeNode", path: [], title: item.label });
     } else if (item.id === "switchup") {
       if (!PRECIOS_IPHONE) await dataReady;
-      navigate({ screen: "switchSelect", path: [], title: item.label });
+      switchCostoUlt = "";
+      navigate({ screen: "switchCosto", title: item.label });
     } else if (item.id === "applecare") {
       if (!APPLECARE_INFO) await dataReady;
       navigate({ screen: "acCategories", title: item.label });
@@ -1980,7 +1983,40 @@ function buildTradeInAltFinancing(tradeIn, newModel, newCapacity, newPrice, ac) 
   return wrap;
 }
 
-function buildSwitchSelect(path) {
+let switchCostoUlt = "";   // lo último que se escribió en "Ingresar costo" (para poder regresar y corregirlo)
+function buildSwitchCosto() {
+  const wrap = document.createElement("div");
+  const heading = document.createElement("div");
+  heading.className = "section-heading";
+  heading.innerHTML = `<h2>Ingresar costo</h2>`;
+  wrap.appendChild(heading);
+
+  const card = document.createElement("div");
+  card.className = "sw-costo";
+  card.innerHTML = `
+    <label class="sw-costo-l" for="swCosto">Costo que da la plataforma por su equipo</label>
+    <div class="sw-costo-in"><span>$</span><input id="swCosto" type="text" inputmode="numeric" enterkeyhint="done" autocomplete="off" placeholder="0"></div>
+    <button type="button" class="primary-btn">Siguiente</button>`;
+  wrap.appendChild(card);
+
+  const input = card.querySelector("input");
+  const digits = () => input.value.replace(/\D/g, "");
+  input.value = switchCostoUlt;
+  input.addEventListener("input", () => {
+    const d = digits().replace(/^0+(?=\d)/, "").slice(0, 7);
+    input.value = d ? Number(d).toLocaleString("es-MX") : "";
+    switchCostoUlt = input.value;
+  });
+  const seguir = () => {
+    const costo = Number(digits()) || 0;
+    navigate({ screen: "switchSelect", path: [], costo, title: "Switch Up" });
+  };
+  card.querySelector("button").addEventListener("click", seguir);
+  input.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); input.blur(); seguir(); } });
+  return wrap;
+}
+
+function buildSwitchSelect(path, costo = 0) {
   const node = getNodeAtPathIn(PRECIOS_IPHONE, path);
   const wrap = document.createElement("div");
 
@@ -2004,13 +2040,13 @@ function buildSwitchSelect(path) {
       btn.className = "sub-btn";
       btn.innerHTML = `<span>${cap}</span><span style="font-weight:650;">${money(price)}</span>`;
       btn.addEventListener("click", () => {
-        navigate({ screen: "switchResult", newModel: path[path.length - 1], newCapacity: cap, title: "Switch Up" });
+        navigate({ screen: "switchResult", newModel: path[path.length - 1], newCapacity: cap, costo, title: "Switch Up" });
       });
       list.appendChild(btn);
     });
   } else if (path.length === 0) {
     buildModelPicker("iPhone", filteredModelKeys(node, path), wrap, (key) => {
-      navigate({ screen: "switchSelect", path: [...path, key], title: modeloNombre(key) });
+      navigate({ screen: "switchSelect", path: [...path, key], costo, title: modeloNombre(key) });
     }, { desc: true });
     return wrap;
   } else {
@@ -2019,7 +2055,7 @@ function buildSwitchSelect(path) {
       btn.className = "sub-btn";
       btn.innerHTML = `<span>${key}</span><span class="chev"></span>`;
       btn.addEventListener("click", () => {
-        navigate({ screen: "switchSelect", path: [...path, key], title: key });
+        navigate({ screen: "switchSelect", path: [...path, key], costo, title: key });
       });
       list.appendChild(btn);
     });
@@ -2028,7 +2064,7 @@ function buildSwitchSelect(path) {
   return wrap;
 }
 
-function buildSwitchResult(newModel, newCapacity) {
+function buildSwitchResult(newModel, newCapacity, costo = 0) {
   const wrap = document.createElement("div");
   const newPrice = PRECIOS_IPHONE?.[newModel]?.[newCapacity] ?? null;
   const ac = findApplecareForModel(newModel);
@@ -2039,7 +2075,7 @@ function buildSwitchResult(newModel, newCapacity) {
   banner.className = "trade-banner";
   wrap.appendChild(banner);
 
-  const baseActual = () => newPrice === null ? null : newPrice + (incluir ? MEMBRESIA_SWITCH : 0);
+  const baseActual = () => newPrice === null ? null : newPrice + (incluir ? MEMBRESIA_SWITCH : 0) - costo;
 
   function updateBanner(opt) {
     lastOpt = opt || lastOpt;
@@ -2051,13 +2087,14 @@ function buildSwitchResult(newModel, newCapacity) {
     const base = baseActual();
     const extra = opt && opt.extra !== null && opt.extra !== undefined ? opt.extra : 0;
     const line = (cls, label, val) => `<div class="q-line ${cls}"><i></i><em>${label}</em><b>${val}</b></div>`;
-    let html = `<span>${newModel} ${newCapacity}</span><strong class="q-total">${money(base + extra)}</strong><div class="q-lines">`;
+    let html = `<span>${newModel} ${newCapacity}</span><strong class="q-total">${money(Math.max(0, base + extra))}</strong><div class="q-lines">`;
     html += line("q-eq", "Equipo nuevo", money(newPrice));
     if (incluir) html += line("q-ti", "Membresía Switch Up", "+ " + money(MEMBRESIA_SWITCH));
     if (extra) html += line("q-ac", opt.label, "+ " + money(extra));
+    if (costo) html += line("q-co", "Costo (equipo del cliente)", "− " + money(costo));
     html += `</div>`;
     banner.classList.add("quote", "q-tint");
-    banner.style.setProperty("--b1", "#f6a850"); banner.style.setProperty("--b2", "#e8645e");
+    banner.style.setProperty("--b1", "#5d6676"); banner.style.setProperty("--b2", "#3b414d");
     banner.innerHTML = html;
   }
 
@@ -2070,7 +2107,7 @@ function buildSwitchResult(newModel, newCapacity) {
   const memb = document.createElement("div");
   memb.className = "sw-memb";
   memb.innerHTML = `
-    <div class="sw-memb-head"><span class="sw-memb-ico"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 3l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 16.4 6.8 19.2l1-5.9L3.5 9.2l5.9-.8z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span><div><b>Incluir membresía Switch Up</b><small>Membresía Switch Up · ${money(MEMBRESIA_SWITCH)}</small></div></div>
+    <div class="sw-memb-head"><div><b>Incluir membresía Switch Up</b><small>Membresía Switch Up · ${money(MEMBRESIA_SWITCH)}</small></div></div>
     <div class="sw-memb-opts"><button type="button" class="on" data-v="1">Sí, incluir</button><button type="button" data-v="0">No, solo equipo</button></div>`;
   wrap.appendChild(memb);
 
@@ -3949,10 +3986,48 @@ function buildPlanTabs(options, base, extraOpts = {}) {
         selectedAcMonths = m;
         acChipsRow.querySelectorAll(".chip").forEach(c => c.classList.remove("active"));
         chip.classList.add("active");
+        const mc = acChipsRow.querySelector(".chip-more"); if (mc) mc.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
         renderResult();
       });
       acChipsRow.appendChild(chip);
     });
+    // Rectángulo con flechita: abre 3, 6 y 9 (meses restantes)
+    const moreWrap = document.createElement("div");
+    moreWrap.className = "ac-more";
+    const moreChip = document.createElement("button");
+    moreChip.type = "button";
+    moreChip.className = "chip chip-more";
+    moreChip.setAttribute("aria-label", "Más plazos: 3, 6 o 9 meses");
+    const ARROW = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    moreChip.innerHTML = ARROW;
+    const menu = document.createElement("div");
+    menu.className = "ac-menu";
+    menu.hidden = true;
+    [3, 6, 9].forEach(m => {
+      const it = document.createElement("button");
+      it.type = "button";
+      it.textContent = "AC " + m + " msi";
+      it.addEventListener("click", (e) => {
+        e.stopPropagation();
+        selectedAcMonths = m;
+        acChipsRow.querySelectorAll(".chip").forEach(c => c.classList.remove("active"));
+        moreChip.classList.add("active");
+        moreChip.innerHTML = m + " " + ARROW;
+        menu.hidden = true;
+        renderResult();
+      });
+      menu.appendChild(it);
+    });
+    moreChip.addEventListener("click", (e) => {
+      e.stopPropagation();
+      menu.hidden = !menu.hidden;
+      if (!menu.hidden) {
+        const cerrar = () => { menu.hidden = true; document.removeEventListener("click", cerrar); };
+        setTimeout(() => document.addEventListener("click", cerrar), 0);
+      }
+    });
+    moreWrap.append(moreChip, menu);
+    acChipsRow.appendChild(moreWrap);
 
     const resultBox = document.createElement("div");
     resultBox.className = "plan-result";
@@ -4005,7 +4080,7 @@ function buildPlanTabs(options, base, extraOpts = {}) {
     if (opt.extra) {
       const note = document.createElement("p");
       note.className = "plan-note";
-      note.textContent = "* A 15 meses, el AppleCare+ se financia solo dentro de los meses que elijas (10, 12 o 13).";
+      note.textContent = "* A 15 meses, el AppleCare+ se financia solo dentro de los meses que elijas (3, 6, 9, 10, 12 o 13).";
       panels.appendChild(note);
 
       if (phonePrice !== undefined && phonePrice !== null) {

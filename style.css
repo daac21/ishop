@@ -1709,3 +1709,21 @@ html .trade-banner.q-tint, html:not([data-mode="dark"]) .trade-banner.q-tint{
 .finance-row.total{ flex:1.15; margin-top:6px; }
 .finance-row.total strong{ font-size:24px; }
 .finance-col .pending{ margin:10px 0; }
+
+
+/* ---- Switch Up: Ingresar costo ---- */
+.sw-costo{ background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:16px; box-shadow:0 6px 16px rgba(0,0,0,.05); }
+.sw-costo-l{ display:block; font-size:15px; font-weight:600; color:var(--text-secondary); margin-bottom:10px; }
+.sw-costo-in{ display:flex; align-items:center; gap:8px; background:var(--bg); border:1px solid var(--border); border-radius:14px; padding:4px 14px; margin-bottom:14px; }
+.sw-costo-in span{ font-size:26px; font-weight:700; color:var(--text-secondary); }
+.sw-costo-in input{ flex:1; min-width:0; border:0; background:transparent; font:inherit; font-size:30px; font-weight:750; letter-spacing:-.01em; color:var(--text); padding:10px 0; outline:none; }
+.q-co i{ background:#ff9f9a; box-shadow:0 0 0 3px rgba(255,159,154,.3); }
+.q-co b{ color:#ffd0cd; }
+
+/* ---- Plazos AppleCare+ 3, 6 y 9 (flechita) ---- */
+.ac-more{ position:relative; display:inline-block; }
+.chip-more{ display:inline-flex; align-items:center; gap:4px; padding:9px 14px; }
+.ac-menu{ position:absolute; top:calc(100% + 6px); left:0; z-index:20; min-width:116px; background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:5px; box-shadow:0 10px 26px rgba(0,0,0,.22); }
+.ac-menu[hidden]{ display:none; }
+.ac-menu button{ display:block; width:100%; border:0; background:transparent; font:inherit; font-size:15px; font-weight:650; color:var(--text); text-align:left; padding:11px 12px; border-radius:10px; }
+.ac-menu button:active{ background:color-mix(in srgb, var(--accent) 14%, transparent); }

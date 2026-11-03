@@ -18,9 +18,6 @@ const EX_SECCIONES = [
   { id: "iPad",    label: "iPad",    icono: "🟦", c1: "#30b0c7", c2: "#0a84ff" },
   { id: "Mac",     label: "Mac",     icono: "💻", c1: "#8e8e93", c2: "#48484a" },
   { id: "Watch",   label: "Watch",   icono: "⌚", c1: "#ff375f", c2: "#ff9f0a" },
-  { id: "AirPods", label: "AirPods", icono: "🎧", c1: "#bf5af2", c2: "#5e5ce6" },
-  { id: "Bocinas / Home", label: "Bocinas", icono: "🔊", c1: "#34c759", c2: "#30b0c7" },
-  { id: "Otros",   label: "Otros",   icono: "📦", c1: "#ff9f0a", c2: "#ff6b35" },
 ];
 /* Hasta cuántas piezas se considera "pocas" (naranja) en cada categoría. 0 piezas = agotado (rojo). Más de eso = hay (verde). */
 const EX_POCAS = { "iPhone": 5, "iPad": 5, "Mac": 5, "Watch": 5, "AirPods": 5, "Bocinas / Home": 5, "Otros": 5 };   // de 1 a 5 piezas = "pocas" (naranja, con ojito para ver cuántas)
@@ -35,7 +32,10 @@ function exFotoBase(i) {
   if (!i.orden) {
     if (i.seccion === "iPad" || i.seccion === "iPhone") {   // ej. ipad/ipad-air-11-m4-azul · iphone/iphone-18-pro-max-borgona (sin Wi-Fi / Cellular / VNT en el nombre; si no existe la foto, se queda el punto de color)
       const mod = String(i.modelo || "").replace(/\s*\+\s*Cell(?:ular)?/i, "").replace(/\s*-\s*VNT/i, "").replace(/\s*Wi-?Fi/i, "");
-      return "imágenes/existencias/" + i.seccion.toLowerCase() + "/" + exSlug(mod) + "-" + exSlug(i.color);
+      /* Misma foto para: iPhone 18 Pro = 18 Pro Max · iPhone 17 Pro = 17 Pro Max · iPad Pro 11 = Pro 13 · iPad Air 13 = Air 11 */
+      const sm = exSlug(mod).replace(/^(iphone-1[78]-pro)$/, "$1-max").replace(/^(ipad-pro)-11-(m\d)$/, "$1-13-$2").replace(/^(ipad-air)-13-(m\d)$/, "$1-11-$2");
+      let col = exSlug(i.color); if (/^ipad-pro/.test(sm)) col = col.replace(/^negro-espacial$/, "negro");
+      return "imágenes/existencias/" + i.seccion.toLowerCase() + "/" + sm + "-" + col;
     }
     if (/^Apple Watch SE ?3$/i.test(i.modelo || "")) { const c = String(i.color || "").match(/^(.+?)\s+Aluminio/i); return c ? "imágenes/existencias/watch/se3-" + exSlug(c[1]) : ""; }   // SE3: se3-medianoche, se3-blanco-estelar
     // Series 12 de aluminio con el nombre anterior: "Bronce Oscuro Aluminio Deportiva Oliva"
@@ -45,7 +45,16 @@ function exFotoBase(i) {
   const w = exWatchParse(i.modelo); if (!w) return "";
   return "imágenes/existencias/watch/" + [exSlug(w.familia.replace(/^Apple Watch\s+/i, "")), exSlug(w.acabado), exSlug(String(i.corr || "").replace(/^Correa\s+(Estilo\s+)?/i, ""))].join("-");
 }
-const EX_FOTO_V = "?v=3";   // sube el número si cambias las fotos, para que el teléfono las vuelva a bajar
+/* Fotos de iPhone / iPad que existen (la tarjeta usa la primera que tenga foto). Si agregas una foto nueva, súmala aquí. */
+const EX_FOTOS_LISTA = new Set([
+  ...["borgona", "glaciar", "plata", "negro"].map(c => "iphone/iphone-18-pro-max-" + c),
+  ...["plata", "azul-profundo", "naranja-cosmico"].map(c => "iphone/iphone-17-pro-max-" + c),
+  ...["blanco-estelar", "cielo-nocturno"].map(c => "iphone/iphone-duo-" + c),
+  ...["amarillo", "azul", "plata", "rosa"].map(c => "ipad/ipad-11-a16-" + c),
+  ...["azul", "blanco-estelar", "gris-espacial", "morado"].map(c => "ipad/ipad-air-11-m4-" + c),
+  ...["negro", "plata"].map(c => "ipad/ipad-pro-13-m5-" + c),
+].map(x => "imágenes/existencias/" + x));
+const EX_FOTO_V = "?v=4";   // sube el número si cambias las fotos, para que el teléfono las vuelva a bajar
 function exFotoImg(base) { return base ? `<img src="${base}.webp${EX_FOTO_V}" alt="" decoding="async" onload="this.parentNode.classList.add('has')" onerror="this.remove()">` : ""; }
 function exAbreFoto(base, nombre) {
   const bg = document.createElement("div"); bg.className = "ex-foto-bg";
@@ -339,6 +348,31 @@ function exEstilos() {
   html[data-mode="dark"] .ex-mt strong.ex-nm{ background:linear-gradient(135deg,color-mix(in srgb,var(--c1) 62%,#fff),color-mix(in srgb,var(--c2) 48%,#fff)); -webkit-background-clip:text; background-clip:text; }
   .ex-badge.hid.ok{ background:linear-gradient(135deg,#34c759,#1fa86a); color:#fff; padding:13px 16px; min-width:58px; border-radius:15px; box-shadow:0 4px 10px rgba(31,168,106,.3); }
   .ex-okb{ display:block; width:28px; height:28px; }
+
+  /* ===== Tarjetas de modelo: estilo oscuro con foto, divisor y puntos de color ===== */
+  .ex-sec{ display:block; margin:30px 4px 18px; padding-bottom:16px; border-bottom:1px solid var(--bx-line); }
+  .ex-sec h3{ font-size:46px; font-weight:850; letter-spacing:-.035em; line-height:1.02; }
+  .ex-sec em{ display:block; margin-top:6px; font-size:19px; font-weight:600; color:var(--text-secondary); }
+  .ex-model{ border-radius:28px; border:1px solid rgba(255,255,255,.1); }
+  .ex-mh{ --text:#fff; --text-secondary:#a3a3a9; --bx-card:#161618; --bx-line:rgba(255,255,255,.15); --bx-red:#ff6259; --bx-redbg:rgba(255,69,58,.26); --bx-fill:#2c2c2e;
+    color:#fff; gap:14px; padding:13px 14px 13px 12px; background:linear-gradient(155deg,#242427 0%,#131315 62%,#0c0c0d 100%); }
+  .ex-pic, .ex-pic.wpic{ flex:0 0 96px; width:96px; height:104px; border-radius:0; background:transparent; position:relative; display:grid; place-items:center; color:#8e8e93; }
+  .ex-pic::after{ content:""; position:absolute; right:0; top:10%; bottom:10%; width:1px; background:rgba(255,255,255,.16); }
+  .ex-pic > svg{ width:44px; height:44px; margin-right:12px; }
+  .ex-pic img, .ex-pic.wpic.has img{ inset:auto; left:0; top:0; width:calc(100% - 14px); height:100%; object-fit:contain; filter:drop-shadow(0 6px 10px rgba(0,0,0,.45)); }
+  .ex-brand{ font-size:13px; font-weight:700; letter-spacing:.2em; color:#a3a3a9; margin-bottom:3px; }
+  .ex-mt strong.ex-nm, html[data-mode="dark"] .ex-mt strong.ex-nm{ font-size:28px; font-weight:850; letter-spacing:-.035em; line-height:1.04; background:none; -webkit-text-fill-color:#fff; color:#fff; }
+  .ex-mt strong:not(.ex-nm){ color:#fff; }
+  .ex-mt .spec{ color:#b4b4ba; }
+  .ex-mt .sub{ margin-top:9px; gap:9px; font-size:15px; font-weight:600; color:#a3a3a9; white-space:nowrap; }
+  .ex-wsub{ white-space:normal; }
+  .ex-sws{ gap:4px; flex:0 0 auto; }
+  .ex-sws i{ width:19px; height:19px; margin-left:0; border:2px solid #161618; box-shadow:0 0 0 1px rgba(255,255,255,.3); }
+  .ex-sep{ width:1px; height:20px; background:rgba(255,255,255,.2); flex:0 0 auto; }
+  .ex-wsub .ex-sep{ display:none; }
+  .ex-chev{ width:11px; height:11px; border-right:2.5px solid #8e8e93; border-bottom:2.5px solid #8e8e93; transform:rotate(-45deg); margin:0 8px 0 0; }
+  .ex-model.open .ex-chev{ transform:rotate(45deg); margin:0 8px 4px 0; }
+  .ex-model.open .ex-mh{ border-bottom:1px solid rgba(255,255,255,.1); }
   `;
   document.head.appendChild(st);
 }
@@ -459,11 +493,11 @@ function buildExistencias() {
     const tot = items.reduce((s, i) => s + i.qty, 0), colores = [...new Set(items.map(i => i.color))];
     const abierto = texto || abiertos.has(clave);
     const p = items[0];
-    const pf = p.orden ? p : items.slice().sort(cmp)[0], fb = exFotoBase(pf);   // Series 12 (nombre anterior): foto principal = primer color
+    const ord = items.slice().sort(cmp), pf = p.orden ? p : (ord.find(x => EX_FOTOS_LISTA.has(exFotoBase(x))) || ord[0]), fb = exFotoBase(pf);   // Series 12 (nombre anterior): foto principal = primer color
     return `<div class="ex-model${abierto ? " open" : ""}" data-m="${exEsc(clave)}" style="--c1:${sec.c1};--c2:${sec.c2}">
       <button class="ex-mh" type="button"><div class="ex-pic${fb ? " wpic" : ""}">${exIcono(sec.id)}${fb ? exFotoImg(fb) : exImg(p.titulo)}</div>
         <div class="ex-mt">${exNombre(p.titulo)}${p.spec ? `<span class="spec">${exEsc(p.spec)}</span>` : ""}${p.orden ? `<div class="sub ex-wsub"><span class="ex-sws"><i style="background:${exColor(p.color, p.modelo)}"></i></span><span>${[...new Set(items.map(i => (i.corr || "").replace(/^Correa\s+/i, "")).filter(Boolean))].join(" · ")}</span></div>`
-        : `<div class="sub"><span class="ex-sws">${colores.slice(0, 6).map(c => `<i style="background:${exColor(c)}"></i>`).join("")}</span><span>${colores.length} color${colores.length === 1 ? "" : "es"}</span></div>`}</div>
+        : `<div class="sub"><span class="ex-sws">${colores.slice(0, 6).map(c => `<i style="background:${exColor(c)}"></i>`).join("")}</span><b class="ex-sep"></b><span>${colores.length} color${colores.length === 1 ? "" : "es"}</span></div>`}</div>
         ${badge(tot, "m:" + clave, sec.id)}<i class="ex-chev"></i></button>
       <div class="ex-rows">${bloques(items)}</div></div>`;
   };
@@ -483,7 +517,7 @@ function buildExistencias() {
     EX_SECCIONES.forEach(sec => {
       const ds = d.filter(i => i.seccion === sec.id); if (!ds.length) return;
       const g = agrupa(ds), piezas = ds.reduce((s, i) => s + i.qty, 0);
-      html += `<div class="ex-sec" style="--c1:${sec.c1};--c2:${sec.c2}"><h3>${exEsc(sec.label || sec.id)}</h3><em>${Object.keys(g).length + " modelo" + (Object.keys(g).length === 1 ? "" : "s")}</em></div>`;
+      html += `<div class="ex-sec" style="--c1:${sec.c1};--c2:${sec.c2}"><h3>${exEsc(sec.label || sec.id)}</h3><em>${Object.keys(g).length + (sec.id === "Mac" ? " configuración" : " modelo") + (Object.keys(g).length === 1 ? "" : (sec.id === "Mac" ? "es" : "s")) + " disponible" + (Object.keys(g).length === 1 ? "" : "s")}</em></div>`;
       ordenClaves(g).forEach(k => { html += tarjeta(k, g[k], sec); });
     });
     if (!html) {
@@ -648,7 +682,8 @@ function buildExistencias() {
   wrap.querySelector("#exVentas").addEventListener("click", async () => {
     try { if (window.ishopCargarHistorial) await Promise.race([window.ishopCargarHistorial(), new Promise(r => setTimeout(r, 3500))]); } catch (_) {}
     const est = bodegaLoad();
-    const ventas = (est.historial || []).filter(h => h.origen === "venta").slice(0, 40);
+    const hoy = new Date().toDateString();   // las ventas se borran solas al terminar el día: solo se ven las de hoy
+    const ventas = (est.historial || []).filter(h => h.origen === "venta" && new Date(h.ts).toDateString() === hoy).slice(0, 40);
     const bg = document.createElement("div"); bg.className = "ex-sheet-bg";
     const filas = ventas.map(h => {
       const x = (h.items || []).find(i => i.antes > i.ahora); if (!x) return "";
@@ -658,7 +693,7 @@ function buildExistencias() {
         <div class="ex-info"><span class="col">${exEsc(p.titulo)}</span><small>${exEsc([p.spec, it.color, it.capacidad && exCap(it.capacidad)].filter(Boolean).join(" · "))}</small><small>${exEsc(typeof bodegaFechaHora === "function" ? bodegaFechaHora(h.ts) : "")}${h.deshecha ? " · deshecha" : ""}</small></div>
         <button type="button" data-ts="${h.ts}" data-u="${x.code}">Deshacer</button></div>`;
     }).join("");
-    bg.innerHTML = `<div class="ex-sheet"><h3>Ventas recientes</h3><p>Si una venta no pasó en caja, deshazla aquí y la pieza regresa a bodega.</p>${filas || `<div class="ex-vacio"><b>Sin ventas registradas</b>Aquí aparecerán las piezas que marques como vendidas.</div>`}</div>`;
+    bg.innerHTML = `<div class="ex-sheet"><h3>Ventas de hoy</h3><p>Si una venta no pasó en caja, deshazla aquí y la pieza regresa a bodega. Se borran solas al terminar el día.</p>${filas || `<div class="ex-vacio"><b>Sin ventas hoy</b>Aquí aparecerán las piezas que marques como vendidas hoy.</div>`}</div>`;
     document.body.appendChild(bg);
     bg.addEventListener("click", e => {
       if (e.target === bg) { bg.remove(); return; }
