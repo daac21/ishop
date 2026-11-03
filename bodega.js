@@ -2059,6 +2059,32 @@ function bxEscModalUpc(actual, cb) {
   document.body.appendChild(bg); inp.focus(); if (inp.value) buscar();
 }
 
+/* ---- Editor de UPC dentro del mismo renglón (la foto se queda a la vista) ---- */
+function bxEscEditorInline(host, actual, cb, cancel) {
+  const cat = bodegaCatalogoEscaneo(), entradas = Object.entries(cat), nombre = c => bodegaNombre(cat, c);
+  host.innerHTML = `<input class="bxv-ei" inputmode="numeric" autocomplete="off" placeholder="UPC correcto o nombre del modelo" value="${bodegaEsc(/^\d+$/.test(actual) ? actual : "")}"><div class="bxv-er"></div>
+    <div class="bxv-eb"><button type="button" data-k="c">Cancelar</button><button type="button" data-k="ok" class="pri" disabled>Aplicar</button></div>`;
+  const inp = host.querySelector("input"), res = host.querySelector(".bxv-er"), ok = host.querySelector('[data-k="ok"]'); let sel = "";
+  const buscar = () => {
+    const t = inp.value.trim().replace(/\s+/g, " "); sel = ""; ok.disabled = true; res.innerHTML = "";
+    if (/^\d+$/.test(t)) {
+      if (t.length < 8) return; sel = t; ok.disabled = t.length > 14;
+      res.innerHTML = cat[t] ? `<div class="hit sel"><b>${bodegaEsc(nombre(t))}</b></div>` : `<div class="no">Ese UPC no está en el catálogo: se conserva como pendiente, sin producto.</div>`;
+    } else if (t.length >= 2) {
+      const ws = t.toLowerCase().split(" ");
+      const hit = entradas.filter(([k, v]) => { const h = (k + " " + v.modelo + " " + (v.color || "") + " " + bodegaCapTxt(v.capacidad) + " " + (v.capacidad || "")).toLowerCase(); return ws.every(w => h.includes(w)); }).slice(0, 5);
+      res.innerHTML = hit.length ? hit.map(([k]) => `<button type="button" class="hit" data-u="${k}"><b>${bodegaEsc(nombre(k))}</b><small>${k}</small></button>`).join("") : `<div class="no">Sin coincidencias.</div>`;
+    }
+  };
+  res.addEventListener("click", e => { const b = e.target.closest("[data-u]"); if (b) { inp.value = b.dataset.u; buscar(); } });
+  inp.addEventListener("input", buscar);
+  inp.addEventListener("keydown", e => { if (e.key === "Enter" && sel && !ok.disabled) { e.preventDefault(); inp.blur(); cb(sel); } });
+  host.querySelector('[data-k="c"]').addEventListener("click", cancel);
+  ok.addEventListener("click", () => { if (sel) cb(sel); });
+  host.addEventListener("click", e => e.stopPropagation());
+  setTimeout(() => { inp.focus(); inp.select(); buscar(); }, 30);
+}
+
 /* ---- Detalle (vista de verificación): foto fija arriba con línea guía, renglones grandes abajo ---- */
 function bxEscCss3() {
   if (document.getElementById("bxEscCss3")) return;
@@ -2096,6 +2122,21 @@ function bxEscCss3() {
   .bxv-r .q{ grid-area:q; align-self:start; } .bxv-r .q input{ width:100%; box-sizing:border-box; text-align:center; font:850 30px/1 inherit; padding:9px 2px; border:1px solid var(--bx-line); border-radius:12px; background:transparent; color:var(--text); }
   .bxv-r .a{ grid-area:a; display:flex; gap:6px; justify-content:flex-end; } .bxv-r .a button{ width:40px; height:36px; border:0; border-radius:10px; background:var(--bx-fill); color:var(--accent); padding:7px; } .bxv-r .a button svg{ width:100%; height:100%; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; } .bxv-r .a button[data-a=del]{ color:var(--bx-red,#ff453a); }
   .bxv-r.mod .n{ box-shadow:0 0 0 3px rgba(255,159,10,.4); } .bxv-r.del .u,.bxv-r.del .m,.bxv-r.del .q input{ text-decoration:line-through; opacity:.5; } .bxv-r.ign{ opacity:.55; } .bxv-r.pend{ background:rgba(255,159,10,.1); }
+  .bxv-r{ grid-template-areas:"n u q" "n m q" "n t a" "e e e"; }
+  .bxv-r .e{ grid-area:e; margin-top:8px; padding-top:10px; border-top:1px dashed var(--bx-line); }
+  .bxv-ei{ width:100%; box-sizing:border-box; font:800 22px ui-monospace,Menlo,monospace; padding:11px 12px; border:2px solid var(--accent); border-radius:12px; background:transparent; color:var(--text); }
+  .bxv-er .hit{ display:block; width:100%; text-align:left; margin-top:6px; padding:10px 12px; border:1px solid var(--bx-line); border-radius:12px; background:transparent; color:inherit; font:inherit; font-size:15px; }
+  .bxv-er .hit.sel{ border-color:var(--accent); background:rgba(120,120,128,.12); } .bxv-er .hit small{ display:block; font:12.5px ui-monospace,Menlo,monospace; color:var(--text-secondary); }
+  .bxv-er .no{ margin-top:6px; padding:9px 11px; border:1px solid var(--bx-orange); border-radius:12px; color:var(--bx-orange); font-size:13.5px; }
+  .bxv-eb{ display:flex; gap:8px; margin-top:10px; } .bxv-eb button{ flex:1; border:0; border-radius:12px; padding:12px; font:inherit; font-weight:800; font-size:15px; background:var(--bx-fill); color:inherit; } .bxv-eb button.pri{ background:var(--accent); color:#fff; } .bxv-eb button:disabled{ opacity:.4; }
+  .bxv-editando .bxv-act{ display:none; }
+  .bxv-editando .bxv-photo{ height:24vh; height:24dvh; min-height:130px; }
+  @media (min-width:700px) and (orientation:landscape), (min-width:900px){
+    .bxv{ display:grid; grid-template-columns:minmax(300px,46%) 1fr; column-gap:14px; align-items:start; }
+    .bxv > .bxv-top{ grid-column:1; grid-row:1 / span 5; top:0; }
+    .bxv > :not(.bxv-top){ grid-column:2; }
+    .bxv-photo, .bxv-editando .bxv-photo{ height:calc(100vh - 230px); height:calc(100dvh - 230px); }
+  }
   .bxv-act{ position:sticky; bottom:0; z-index:20; display:flex; gap:8px; padding:10px 0 calc(10px + env(safe-area-inset-bottom,0px)); margin-top:10px; background:var(--bg,#f2f2f7); }
   .bxv-act button{ flex:1; border:0; border-radius:14px; padding:13px 8px; font:inherit; font-size:15px; font-weight:800; background:var(--bx-fill); color:var(--text); } .bxv-act button.pri{ flex:1.5; background:var(--accent); color:#fff; } .bxv-act button:disabled{ opacity:.4; }
   `;
@@ -2103,8 +2144,8 @@ function bxEscCss3() {
 }
 function buildBodegaEscaneo(ts) {
   bodegaEstilos(); bxEscCss(); bxEscCss3();
-  const wrap = document.createElement("div"); wrap.className = "bod-wrap bx bx-t-morado";
-  let base = null, w = [], act = 0, zoom = 0;
+  const wrap = document.createElement("div"); wrap.className = "bod-wrap bx bx-t-morado bxv";
+  let base = null, w = [], act = 0, zoom = 0, editando = -1;
   const ZOOMS = [100, 160, 240], AKEY = "ishop_esc_linea_" + ts;
   let anchors = []; try { anchors = JSON.parse(localStorage.getItem(AKEY) || "[]") || []; } catch (_) { anchors = []; }
   const clon = o => JSON.parse(JSON.stringify(o));
@@ -2214,9 +2255,16 @@ function buildBodegaEscaneo(ts) {
       fila.querySelectorAll(".a button").forEach(b => b.addEventListener("click", () => {
         const i = +fila.dataset.i, r = w[i]; act = i;
         if (b.dataset.a === "del") { if (!r.del && !confirm(`¿Quitar el renglón ${i + 1}? Sus piezas se restan de Existencias al guardar.`)) return; r.del = r.del ? 0 : 1; pintarLista(); return; }
-        bxEscModalUpc(r.upc, nuevo => { r.upc = nuevo; if (r.estado === "pend") r.estado = ""; r.del = 0; pintarLista(); });
+        if (editando === i) { editando = -1; pintarLista(); return; }
+        editando = i; pintarLista();
       }));
     });
+    wrap.classList.toggle("bxv-editando", editando >= 0);
+    if (editando >= 0 && w[editando]) {
+      const fila = L.querySelector(`.bxv-r[data-i="${editando}"]`), r = w[editando];
+      if (fila) { const h = document.createElement("div"); h.className = "e"; fila.appendChild(h); setTimeout(() => { const tp = $("#bxvTop"); if (tp) scrollContenedor(fila.getBoundingClientRect().top - tp.getBoundingClientRect().bottom - 6); }, 60);
+        bxEscEditorInline(h, r.upc, nuevo => { r.upc = nuevo; if (r.estado === "pend") r.estado = ""; r.del = 0; editando = -1; pintarLista(); }, () => { editando = -1; pintarLista(); }); }
+    }
     resumen(); foco(); enfocarLinea(false);
     // la línea sigue al renglón que va quedando arriba al deslizar la lista
     if (!pintarLista.ya) { pintarLista.ya = 1; }
