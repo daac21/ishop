@@ -333,21 +333,12 @@ function exEstilos() {
   .ex-vr.hecha{ opacity:.55; }
   .ex-vr.hecha button{ display:none; }
 
-  /* ---- Tarjeta de modelo estilo Cotización: degradado del color de su categoría ---- */
-  .ex-model{ background:linear-gradient(135deg,var(--c1),var(--c2)); border:none; color:#fff; box-shadow:0 12px 26px color-mix(in srgb,var(--c2) 36%, transparent), inset 0 1px 0 rgba(255,255,255,.3); }
-  .ex-model::after{ content:""; position:absolute; top:-40%; right:-12%; width:200px; height:200px; background:radial-gradient(circle,rgba(255,255,255,.22),transparent 70%); pointer-events:none; }
-  html[data-mode="dark"] .ex-model{ box-shadow:0 12px 26px color-mix(in srgb,var(--c2) 30%, transparent), inset 0 1px 0 rgba(255,255,255,.18); }
-  .ex-mh{ color:#fff; position:relative; z-index:1; }
-  .ex-mt strong{ color:#fff; }
-  .ex-mt .spec, .ex-mt .sub{ color:rgba(255,255,255,.86); }
-  .ex-pic{ background:rgba(255,255,255,.22); color:#fff; }
-  .ex-sws i{ border-color:rgba(255,255,255,.75); }
-  .ex-chev{ border-color:rgba(255,255,255,.9); }
-  .ex-mh .ex-badge{ background:rgba(255,255,255,.94); }
-  .ex-mh .ex-badge.low{ color:var(--bx-orange); }
-  .ex-mh .ex-badge.zero{ color:var(--bx-red); }
-  .ex-rows{ background:var(--bx-card); color:var(--text); border-top:0; position:relative; z-index:1; }
-  .ex-badge.hid.ok{ background:linear-gradient(135deg,#34c759,#1fa86a); color:#fff; box-shadow:0 4px 10px rgba(31,168,106,.3); }
+  /* ---- Nombre del producto rediseñado + recuadro verde del mismo tamaño que el naranja ---- */
+  .ex-brand{ display:block; font-size:12px; font-weight:750; letter-spacing:.16em; text-transform:uppercase; color:var(--text-secondary); margin-bottom:2px; }
+  .ex-mt strong.ex-nm{ font-size:29px; font-weight:850; letter-spacing:-.035em; line-height:1.05; background:linear-gradient(135deg,var(--c1),var(--c2)); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; color:transparent; }
+  html[data-mode="dark"] .ex-mt strong.ex-nm{ background:linear-gradient(135deg,color-mix(in srgb,var(--c1) 62%,#fff),color-mix(in srgb,var(--c2) 48%,#fff)); -webkit-background-clip:text; background-clip:text; }
+  .ex-badge.hid.ok{ background:linear-gradient(135deg,#34c759,#1fa86a); color:#fff; padding:13px 16px; min-width:58px; border-radius:15px; box-shadow:0 4px 10px rgba(31,168,106,.3); }
+  .ex-okb{ display:block; width:28px; height:28px; }
   `;
   document.head.appendChild(st);
 }
@@ -358,6 +349,12 @@ const EX_EYE_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 const EX_EYE_ON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.8 12S6.2 6.2 12 6.2 21.2 12 21.2 12 17.8 17.8 12 17.8 2.8 12 2.8 12z"/><circle cx="12" cy="12" r="2.9" fill="currentColor" stroke="none"/></svg>';
 const EX_CHECK = '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 
+function exNombre(t) {
+  t = String(t || "");
+  const m = t.match(/^(Apple Watch|iPhone|iPad|MacBook Air|MacBook Pro|Mac mini|Mac Studio|iMac|AirPods|HomePod|Apple TV)\s+(.+)$/i);
+  if (!m) return `<strong>${exEsc(t)}</strong>`;
+  return `<span class="ex-brand">${exEsc(m[1])}</span><strong class="ex-nm">${exEsc(m[2])}</strong>`;
+}
 function buildExistencias() {
   exEstilos(); exCargaPrecios();
   const wrap = document.createElement("div");
@@ -431,8 +428,9 @@ function buildExistencias() {
   const demoHtml = (n) => n > 0 ? `<span class="ex-apa demo"><svg viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="11.5" rx="2" fill="none"/><path d="M8 20h8M12 16v4" fill="none"/></svg>${n} en demostración</span>` : "";
   const badge = (q, k, sec) => {
     if (q <= 0) return `<div class="ex-badge zero"><small>AGOTADO</small></div>`;
+    if (String(k).startsWith("m:")) return "";   // tarjeta del modelo: sin recuadro (ni verde ni naranja)
     const poca = q <= exPocas(sec);
-    if (!poca) return String(k).startsWith("m:") ? "" : `<div class="ex-badge hid ok" aria-label="Disponible"><small>HAY</small></div>`;   // hay suficiente: tarjeta del modelo sin recuadro; cada color/capacidad en verde, sin palomita ni número
+    if (!poca) return `<div class="ex-badge hid ok" aria-label="Disponible"><span class="ex-okb"></span></div>`;   // hay suficiente: recuadro verde, sin texto ni número
     if (!visto(k)) return `<div class="ex-badge hid low" data-eye="${exEsc(k)}" role="button" aria-label="Mostrar piezas">${EX_EYE_OFF}</div>`;
     return `<div class="ex-badge low" data-eye="${exEsc(k)}" role="button">${q}<small>POCAS</small></div>`;
   };
@@ -464,7 +462,7 @@ function buildExistencias() {
     const pf = p.orden ? p : items.slice().sort(cmp)[0], fb = exFotoBase(pf);   // Series 12 (nombre anterior): foto principal = primer color
     return `<div class="ex-model${abierto ? " open" : ""}" data-m="${exEsc(clave)}" style="--c1:${sec.c1};--c2:${sec.c2}">
       <button class="ex-mh" type="button"><div class="ex-pic${fb ? " wpic" : ""}">${exIcono(sec.id)}${fb ? exFotoImg(fb) : exImg(p.titulo)}</div>
-        <div class="ex-mt"><strong>${exEsc(p.titulo)}</strong>${p.spec ? `<span class="spec">${exEsc(p.spec)}</span>` : ""}${p.orden ? `<div class="sub ex-wsub"><span class="ex-sws"><i style="background:${exColor(p.color, p.modelo)}"></i></span><span>${[...new Set(items.map(i => (i.corr || "").replace(/^Correa\s+/i, "")).filter(Boolean))].join(" · ")}</span></div>`
+        <div class="ex-mt">${exNombre(p.titulo)}${p.spec ? `<span class="spec">${exEsc(p.spec)}</span>` : ""}${p.orden ? `<div class="sub ex-wsub"><span class="ex-sws"><i style="background:${exColor(p.color, p.modelo)}"></i></span><span>${[...new Set(items.map(i => (i.corr || "").replace(/^Correa\s+/i, "")).filter(Boolean))].join(" · ")}</span></div>`
         : `<div class="sub"><span class="ex-sws">${colores.slice(0, 6).map(c => `<i style="background:${exColor(c)}"></i>`).join("")}</span><span>${colores.length} color${colores.length === 1 ? "" : "es"}</span></div>`}</div>
         ${badge(tot, "m:" + clave, sec.id)}<i class="ex-chev"></i></button>
       <div class="ex-rows">${bloques(items)}</div></div>`;

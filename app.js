@@ -2359,13 +2359,16 @@ const REPAIR_CASOS = [
 function buildRepairCasos() {
   const sec = document.createElement("section");
   sec.className = "rep-casos";
-  sec.innerHTML = `<div class="rep-casos-head"><span class="rep-casos-eyebrow">Casos reales</span><h3>Un golpe cambia todo.</h3><p>Equipos reales con daño en el cuerpo. Desliza para verlos.</p></div><div class="rep-casos-track"></div>`;
+  sec.innerHTML = `<div class="rep-casos-head"><span class="rep-casos-eyebrow">Casos reales</span><h3>Un golpe cambia todo.</h3><p>Equipos reales con daño en el cuerpo. Desliza para verlos.</p></div><div class="rep-casos-track"></div><div class="rep-casos-dots"></div>`;
   const track = sec.querySelector(".rep-casos-track");
+  const dots = sec.querySelector(".rep-casos-dots");
+  const cards = [];
   REPAIR_CASOS.forEach((c, i) => {
     const b = document.createElement("button");
     b.type = "button"; b.className = "rep-caso";
     const img = document.createElement("img");
-    img.alt = c.t; img.decoding = "async"; img.loading = "lazy"; img.draggable = false;
+    img.alt = c.t; img.decoding = "async"; img.draggable = false;
+    if (i > 1) img.loading = "lazy";
     img.src = `reparaciones/casos/${c.img}.jpg`;
     img.addEventListener("error", () => { b.remove(); if (!track.children.length) sec.remove(); });
     const cap = document.createElement("div");
@@ -2374,11 +2377,27 @@ function buildRepairCasos() {
     cap.querySelector("b").textContent = c.t;
     cap.querySelector("small").textContent = c.d;
     const chip = document.createElement("span");
-    chip.className = "rep-caso-n"; chip.textContent = `Caso ${i + 1} de ${REPAIR_CASOS.length}`;
+    chip.className = "rep-caso-n"; chip.textContent = `${i + 1} / ${REPAIR_CASOS.length}`;
     b.append(img, chip, cap);
     b.addEventListener("click", () => openRepairViewer(img.currentSrc || img.src));
     track.appendChild(b);
+    cards.push(b);
+    const d = document.createElement("button");
+    d.type = "button"; d.setAttribute("aria-label", "Caso " + (i + 1));
+    d.addEventListener("click", () => b.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" }));
+    dots.appendChild(d);
   });
+  const mark = () => {
+    const mid = track.scrollLeft + track.clientWidth / 2;
+    let best = 0, bd = Infinity;
+    cards.forEach((c, i) => { const d = Math.abs(c.offsetLeft + c.offsetWidth / 2 - mid); if (d < bd) { bd = d; best = i; } });
+    cards.forEach((c, i) => c.classList.toggle("on", i === best));
+    [...dots.children].forEach((d, i) => d.classList.toggle("on", i === best));
+  };
+  let raf = 0;
+  track.addEventListener("scroll", () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(mark); }, { passive: true });
+  mark();
+  setTimeout(mark, 60);
   return sec;
 }
 
@@ -4080,7 +4099,7 @@ function buildFinanceResult(model, capacity, planType) {
   const banner = document.createElement("div");
   banner.className = "trade-banner";
   banner.classList.add("quote", "q-tint");
-  const bt = planType === "GET" ? ["#e96390", "#c84172"] : ["#7e61e6", "#5642b9"];
+  const bt = ["#1d2347", "#4a50b8"];   // degradado elegante: azul noche a índigo
   banner.style.setProperty("--b1", bt[0]); banner.style.setProperty("--b2", bt[1]);
   banner.innerHTML = `<span>${cfg.label}</span><strong class="q-total">${model} ${capacity}</strong>`;
   wrap.appendChild(banner);

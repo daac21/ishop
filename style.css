@@ -1680,18 +1680,33 @@ html .trade-banner.q-tint, html:not([data-mode="dark"]) .trade-banner.q-tint{
 }
 
 /* ---- Reparaciones: Casos reales ---- */
-.rep-casos{ margin:28px 0 8px; }
-.rep-casos-head{ padding:0 18px; }
-.rep-casos-eyebrow{ display:inline-block; padding:5px 12px; border-radius:999px; font-size:11.5px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:#fff; background:linear-gradient(135deg,#ff9f0a,#ff3b30); box-shadow:0 6px 16px rgba(255,59,48,.35); }
-.rep-casos-head h3{ margin:12px 0 4px; font-size:30px; line-height:1.1; font-weight:850; letter-spacing:-.025em; color:#f5f5f7; }
+.rep-casos{ margin:30px 0 10px; }
+.rep-casos-head{ padding:0 20px; }
+.rep-casos-eyebrow{ display:block; font-size:12px; font-weight:700; letter-spacing:.18em; text-transform:uppercase; color:#8e8e93; }
+.rep-casos-head h3{ margin:6px 0 6px; font-size:32px; line-height:1.08; font-weight:850; letter-spacing:-.03em; color:#f5f5f7; }
 .rep-casos-head p{ margin:0; font-size:15px; color:#a1a1a6; }
-.rep-casos-track{ display:flex; gap:12px; overflow-x:auto; scroll-snap-type:x mandatory; padding:16px 18px 10px; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+.rep-casos-track{ display:flex; gap:14px; overflow-x:auto; scroll-snap-type:x mandatory; padding:20px 13% 12px; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
 .rep-casos-track::-webkit-scrollbar{ display:none; }
-.rep-caso{ position:relative; flex:0 0 74%; max-width:310px; aspect-ratio:3/4; padding:0; border:0; border-radius:26px; overflow:hidden; background:#1c1c1e; scroll-snap-align:center; box-shadow:0 16px 34px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.08); }
-.rep-caso:active{ transform:scale(.985); }
-.rep-caso img{ width:100%; height:100%; object-fit:cover; display:block; }
-.rep-caso::after{ content:""; position:absolute; inset:0; background:linear-gradient(180deg,rgba(0,0,0,.28) 0%,transparent 28%,transparent 52%,rgba(0,0,0,.82) 100%); pointer-events:none; }
-.rep-caso-n{ position:absolute; top:14px; left:14px; z-index:2; padding:6px 12px; border-radius:999px; font-size:12px; font-weight:750; color:#fff; background:linear-gradient(135deg,#ff9f0a,#ff3b30); box-shadow:0 6px 14px rgba(255,59,48,.4); }
-.rep-caso-cap{ position:absolute; left:0; right:0; bottom:0; z-index:2; padding:16px 18px 18px; text-align:left; color:#fff; }
-.rep-caso-cap b{ display:block; font-size:21px; font-weight:800; letter-spacing:-.015em; }
-.rep-caso-cap small{ display:block; margin-top:3px; font-size:14px; color:rgba(255,255,255,.82); }
+.rep-caso{ position:relative; flex:0 0 100%; max-width:320px; aspect-ratio:3/4.2; padding:0; border:0; border-radius:30px; overflow:hidden; background:#1c1c1e; scroll-snap-align:center; transform:scale(.92); opacity:.55; transition:transform .35s ease, opacity .35s ease, box-shadow .35s ease; box-shadow:0 10px 24px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.07); }
+.rep-caso.on{ transform:scale(1); opacity:1; box-shadow:0 22px 44px rgba(0,0,0,.65), 0 0 0 1px rgba(255,255,255,.16); }
+.rep-caso img{ width:100%; height:100%; object-fit:cover; display:block; transition:transform .6s ease; }
+.rep-caso.on img{ transform:scale(1.04); }
+.rep-caso::after{ content:""; position:absolute; inset:0; background:linear-gradient(180deg,rgba(0,0,0,.35) 0%,transparent 24%,transparent 58%,rgba(0,0,0,.55) 100%); pointer-events:none; }
+.rep-caso-n{ position:absolute; top:14px; right:14px; z-index:2; padding:6px 12px; border-radius:999px; font-size:12.5px; font-weight:700; letter-spacing:.04em; color:#fff; background:rgba(20,20,22,.5); -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px); border:1px solid rgba(255,255,255,.2); }
+.rep-caso-cap{ position:absolute; left:12px; right:12px; bottom:12px; z-index:2; padding:13px 16px 14px; text-align:left; color:#fff; border-radius:20px; background:rgba(20,20,22,.5); -webkit-backdrop-filter:blur(18px) saturate(1.4); backdrop-filter:blur(18px) saturate(1.4); border:1px solid rgba(255,255,255,.16); }
+.rep-caso-cap b{ display:block; font-size:20px; font-weight:800; letter-spacing:-.02em; }
+.rep-caso-cap small{ display:block; margin-top:3px; font-size:14px; line-height:1.3; color:rgba(255,255,255,.8); }
+.rep-casos-dots{ display:flex; justify-content:center; gap:7px; padding:6px 0 0; }
+.rep-casos-dots button{ width:7px; height:7px; padding:0; border:0; border-radius:4px; background:rgba(255,255,255,.28); transition:width .3s ease, background .3s ease; }
+.rep-casos-dots button.on{ width:22px; background:#f5f5f7; }
+
+/* ---- Tarjetas de comparación (For Life / GET): grandes, en vertical, números grandes ---- */
+.finance-columns{ flex-direction:column; gap:16px; }
+.finance-col{ padding:20px 20px 0; border-radius:24px; overflow:hidden; }
+.finance-col h4{ margin:0 0 6px; font-size:15px; font-weight:750; letter-spacing:.01em; text-align:left; }
+.finance-row{ flex-direction:row; align-items:baseline; justify-content:space-between; gap:12px; padding:14px 0; font-size:14.5px; }
+.finance-row strong{ font-size:30px; font-weight:800; letter-spacing:-.025em; line-height:1.05; }
+.finance-row.total{ margin:8px -20px 0; padding:18px 20px 20px; border-top:0; background:linear-gradient(135deg,#1d2347,#4a50b8); align-items:center; }
+.finance-row.total span{ color:rgba(255,255,255,.85); font-size:15px; font-weight:650; }
+.finance-row.total strong{ font-size:36px; color:#fff; }
+.finance-col .pending{ margin:10px 0 20px; }
