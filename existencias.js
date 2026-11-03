@@ -33,7 +33,7 @@ function exFotoBase(i) {
     if (i.seccion === "iPad" || i.seccion === "iPhone") {   // ej. ipad/ipad-air-11-m4-azul · iphone/iphone-18-pro-max-borgona (sin Wi-Fi / Cellular / VNT en el nombre; si no existe la foto, se queda el punto de color)
       const mod = String(i.modelo || "").replace(/\s*\+\s*Cell(?:ular)?/i, "").replace(/\s*-\s*VNT/i, "").replace(/\s*Wi-?Fi/i, "");
       /* Misma foto para: iPhone 18 Pro = 18 Pro Max · iPhone 17 Pro = 17 Pro Max · iPad Pro 11 = Pro 13 · iPad Air 13 = Air 11 */
-      const sm = exSlug(mod).replace(/^(iphone-1[78]-pro)$/, "$1-max").replace(/^(ipad-pro)-11-(m\d)$/, "$1-13-$2").replace(/^(ipad-air)-13-(m\d)$/, "$1-11-$2");
+      const sm = exSlug(mod).replace(/^(iphone-1[78]-pro)$/, "$1-max").replace(/^iphone-16-plus$/, "iphone-16").replace(/^(ipad-pro)-11-(m\d)$/, "$1-13-$2").replace(/^(ipad-air)-13-(m\d)$/, "$1-11-$2");
       let col = exSlug(i.color); if (/^ipad-pro/.test(sm)) col = col.replace(/^negro-espacial$/, "negro");
       return "imágenes/existencias/" + i.seccion.toLowerCase() + "/" + sm + "-" + col;
     }
@@ -50,6 +50,11 @@ const EX_FOTOS_LISTA = new Set([
   ...["borgona", "glaciar", "plata", "negro"].map(c => "iphone/iphone-18-pro-max-" + c),
   ...["plata", "azul-profundo", "naranja-cosmico"].map(c => "iphone/iphone-17-pro-max-" + c),
   ...["blanco-estelar", "cielo-nocturno"].map(c => "iphone/iphone-duo-" + c),
+  ...["negro-espacial", "blanco-nube", "oro-claro", "azul-cielo"].map(c => "iphone/iphone-air-" + c),
+  ...["blanco", "negro", "azul-neblina", "lavanda", "salvia"].map(c => "iphone/iphone-17-" + c),
+  ...["blanco", "negro", "rosa-palido"].map(c => "iphone/iphone-17e-" + c),
+  ...["azul", "negro"].map(c => "iphone/iphone-15-" + c),
+  ...["blanco", "negro", "rosa"].map(c => "iphone/iphone-16-" + c),
   ...["amarillo", "azul", "plata", "rosa"].map(c => "ipad/ipad-11-a16-" + c),
   ...["azul", "blanco-estelar", "gris-espacial", "morado"].map(c => "ipad/ipad-air-11-m4-" + c),
   ...["negro", "plata"].map(c => "ipad/ipad-pro-13-m5-" + c),
