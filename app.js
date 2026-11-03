@@ -4098,10 +4098,7 @@ function buildFinanceResult(model, capacity, planType) {
 
   const banner = document.createElement("div");
   banner.className = "trade-banner";
-  banner.classList.add("quote", "q-tint");
-  const bt = ["#1d2347", "#4a50b8"];   // degradado elegante: azul noche a índigo
-  banner.style.setProperty("--b1", bt[0]); banner.style.setProperty("--b2", bt[1]);
-  banner.innerHTML = `<span>${cfg.label}</span><strong class="q-total">${model} ${capacity}</strong>`;
+  banner.innerHTML = `<span>${cfg.label}</span><strong>${model} ${capacity}</strong>`;
   wrap.appendChild(banner);
 
   if (!finData) {
