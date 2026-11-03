@@ -521,12 +521,10 @@ function buildScreen(entry) {
     el.appendChild(buildQuoteSelectNew(entry.path, entry.tradeIn));
   } else if (entry.screen === "quoteResult") {
     el.appendChild(buildQuoteResult(entry.tradeIn, entry.newModel, entry.newCapacity));
-  } else if (entry.screen === "switchCosto") {
-    el.appendChild(buildSwitchCosto());
   } else if (entry.screen === "switchSelect") {
-    el.appendChild(buildSwitchSelect(entry.path, entry.costo));
+    el.appendChild(buildSwitchSelect(entry.path));
   } else if (entry.screen === "switchResult") {
-    el.appendChild(buildSwitchResult(entry.newModel, entry.newCapacity, entry.costo));
+    el.appendChild(buildSwitchResult(entry.newModel, entry.newCapacity));
   } else if (entry.screen === "financeSelect") {
     el.appendChild(buildFinanceSelect(entry.path, entry.planType));
   } else if (entry.screen === "financeResult") {
@@ -656,8 +654,7 @@ function buildHome() {
       navigate({ screen: "tradeNode", path: [], title: item.label });
     } else if (item.id === "switchup") {
       if (!PRECIOS_IPHONE) await dataReady;
-      switchCostoUlt = "";
-      navigate({ screen: "switchCosto", title: item.label });
+      navigate({ screen: "switchSelect", path: [], title: item.label });
     } else if (item.id === "applecare") {
       if (!APPLECARE_INFO) await dataReady;
       navigate({ screen: "acCategories", title: item.label });
@@ -1983,40 +1980,7 @@ function buildTradeInAltFinancing(tradeIn, newModel, newCapacity, newPrice, ac) 
   return wrap;
 }
 
-let switchCostoUlt = "";   // lo último que se escribió en "Ingresar costo" (para poder regresar y corregirlo)
-function buildSwitchCosto() {
-  const wrap = document.createElement("div");
-  const heading = document.createElement("div");
-  heading.className = "section-heading";
-  heading.innerHTML = `<h2>Ingresar costo</h2>`;
-  wrap.appendChild(heading);
-
-  const card = document.createElement("div");
-  card.className = "sw-costo";
-  card.innerHTML = `
-    <label class="sw-costo-l" for="swCosto">Costo que da la plataforma por su equipo</label>
-    <div class="sw-costo-in"><span>$</span><input id="swCosto" type="text" inputmode="numeric" enterkeyhint="done" autocomplete="off" placeholder="0"></div>
-    <button type="button" class="primary-btn">Siguiente</button>`;
-  wrap.appendChild(card);
-
-  const input = card.querySelector("input");
-  const digits = () => input.value.replace(/\D/g, "");
-  input.value = switchCostoUlt;
-  input.addEventListener("input", () => {
-    const d = digits().replace(/^0+(?=\d)/, "").slice(0, 7);
-    input.value = d ? Number(d).toLocaleString("es-MX") : "";
-    switchCostoUlt = input.value;
-  });
-  const seguir = () => {
-    const costo = Number(digits()) || 0;
-    navigate({ screen: "switchSelect", path: [], costo, title: "Switch Up" });
-  };
-  card.querySelector("button").addEventListener("click", seguir);
-  input.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); input.blur(); seguir(); } });
-  return wrap;
-}
-
-function buildSwitchSelect(path, costo = 0) {
+function buildSwitchSelect(path) {
   const node = getNodeAtPathIn(PRECIOS_IPHONE, path);
   const wrap = document.createElement("div");
 
@@ -2040,13 +2004,13 @@ function buildSwitchSelect(path, costo = 0) {
       btn.className = "sub-btn";
       btn.innerHTML = `<span>${cap}</span><span style="font-weight:650;">${money(price)}</span>`;
       btn.addEventListener("click", () => {
-        navigate({ screen: "switchResult", newModel: path[path.length - 1], newCapacity: cap, costo, title: "Switch Up" });
+        navigate({ screen: "switchResult", newModel: path[path.length - 1], newCapacity: cap, title: "Switch Up" });
       });
       list.appendChild(btn);
     });
   } else if (path.length === 0) {
     buildModelPicker("iPhone", filteredModelKeys(node, path), wrap, (key) => {
-      navigate({ screen: "switchSelect", path: [...path, key], costo, title: modeloNombre(key) });
+      navigate({ screen: "switchSelect", path: [...path, key], title: modeloNombre(key) });
     }, { desc: true });
     return wrap;
   } else {
@@ -2055,7 +2019,7 @@ function buildSwitchSelect(path, costo = 0) {
       btn.className = "sub-btn";
       btn.innerHTML = `<span>${key}</span><span class="chev"></span>`;
       btn.addEventListener("click", () => {
-        navigate({ screen: "switchSelect", path: [...path, key], costo, title: key });
+        navigate({ screen: "switchSelect", path: [...path, key], title: key });
       });
       list.appendChild(btn);
     });
@@ -2064,7 +2028,8 @@ function buildSwitchSelect(path, costo = 0) {
   return wrap;
 }
 
-function buildSwitchResult(newModel, newCapacity, costo = 0) {
+function buildSwitchResult(newModel, newCapacity) {
+  let costo = 0;
   const wrap = document.createElement("div");
   const newPrice = PRECIOS_IPHONE?.[newModel]?.[newCapacity] ?? null;
   const ac = findApplecareForModel(newModel);
@@ -2110,6 +2075,22 @@ function buildSwitchResult(newModel, newCapacity, costo = 0) {
     <div class="sw-memb-head"><div><b>Incluir membresía Switch Up</b><small>Membresía Switch Up · ${money(MEMBRESIA_SWITCH)}</small></div></div>
     <div class="sw-memb-opts"><button type="button" class="on" data-v="1">Sí, incluir</button><button type="button" data-v="0">No, solo equipo</button></div>`;
   wrap.appendChild(memb);
+
+  // Recuadro: ingresar costo (lo que da la plataforma por el equipo del cliente)
+  const cs = document.createElement("div");
+  cs.className = "sw-costo";
+  cs.innerHTML = `<label class="sw-costo-l" for="swCosto">Ingresar costo</label>
+    <div class="sw-costo-in"><span>$</span><input id="swCosto" type="text" inputmode="numeric" enterkeyhint="done" autocomplete="off" placeholder="0"></div>`;
+  cs.style.marginBottom = "16px";
+  wrap.appendChild(cs);
+  const costoIn = cs.querySelector("input");
+  costoIn.addEventListener("input", () => {
+    const d = costoIn.value.replace(/\D/g, "").replace(/^0+(?=\d)/, "").slice(0, 7);
+    costoIn.value = d ? Number(d).toLocaleString("es-MX") : "";
+    costo = Number(d) || 0;
+    renderPlans();
+  });
+  costoIn.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); costoIn.blur(); } });
 
   const planHost = document.createElement("div");
   wrap.appendChild(planHost);
