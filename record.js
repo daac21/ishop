@@ -9,11 +9,11 @@
 
   // [id, nombre, puntos]
   const CATS = [
-    { n: "Mac", it: [["mac", "Mac", 6], ["acc-mac", "Accesorio Mac", 3], ["ac-mac", "AppleCare Mac", 10], ["flg-mac", "For Life-Get Mac", 4]] },
-    { n: "iPad", it: [["ipad", "iPad", 2], ["acc-ipad", "Accesorio iPad", 2], ["ac-ipad", "AppleCare iPad", 4], ["flg-ipad", "For Life-Get iPad", 4]] },
-    { n: "iPhone", it: [["iphone", "iPhone", 2], ["acc-iphone", "Accesorio iPhone", 2], ["ac-ios", "AppleCare iOS", 4], ["switch", "Switch Up iOS", 4], ["flg-iphone", "For Life-Get iPhone", 4], ["buyback", "Buyback", 10]] },
-    { n: "Watch (todas las series)", it: [["watch", "Watch", 2], ["acc-watch", "Accesorio Watch", 2], ["ac-watch", "AppleCare Watch", 4], ["flg-watch", "For Life-Get Watch", 4]] },
-    { n: "Audio y otros", it: [["asesorias", "Asesorías", 4], ["bocinas", "Bocinas o Audífonos (N/A AirPods)", 3], ["airpods", "AirPods", 0], ["ac-airpods", "AppleCare AirPods, HomePod y Apple TV", 5]] },
+    { n: "Mac", c: ["#5183e5", "#4247d5"], it: [["mac", "Mac", 6], ["acc-mac", "Accesorio Mac", 3], ["ac-mac", "AppleCare Mac", 10], ["flg-mac", "For Life-Get Mac", 4]] },
+    { n: "iPad", c: ["#ffb340", "#ff7a1a"], it: [["ipad", "iPad", 2], ["acc-ipad", "Accesorio iPad", 2], ["ac-ipad", "AppleCare iPad", 4], ["flg-ipad", "For Life-Get iPad", 4]] },
+    { n: "iPhone", c: ["#4cd98a", "#1fa86a"], it: [["iphone", "iPhone", 2], ["acc-iphone", "Accesorio iPhone", 2], ["ac-ios", "AppleCare iOS", 4], ["switch", "Switch Up iOS", 4], ["flg-iphone", "For Life-Get iPhone", 4], ["buyback", "Buyback", 10]] },
+    { n: "Watch (todas las series)", c: ["#8b7cf6", "#5856d6"], it: [["watch", "Watch", 2], ["acc-watch", "Accesorio Watch", 2], ["ac-watch", "AppleCare Watch", 4], ["flg-watch", "For Life-Get Watch", 4]] },
+    { n: "Audio y otros", c: ["#ff6b8b", "#e0245e"], it: [["asesorias", "Asesorías", 4], ["bocinas", "Bocinas o Audífonos (N/A AirPods)", 3], ["airpods", "AirPods", 0], ["ac-airpods", "AppleCare AirPods, HomePod y Apple TV", 5]] },
   ];
   const ITEMS = {};
   CATS.forEach(c => c.it.forEach(x => { ITEMS[x[0]] = { n: x[1], p: x[2] }; }));
@@ -54,6 +54,9 @@
   .rc-stat b{ display:block; font-size:34px; font-weight:750; letter-spacing:-0.03em; line-height:1.1; }
   .rc-stat.main{ background:linear-gradient(135deg,#5183e5,#4247d5); border:none; color:#fff; box-shadow:0 8px 20px rgba(66,71,213,.28); }
   .rc-stat.main small{ color:rgba(255,255,255,.85); }
+  .rc-stat.dayc{ background:linear-gradient(135deg,#4cd98a,#1fa8a0); border:none; color:#fff; box-shadow:0 8px 20px rgba(31,168,160,.28); }
+  .rc-stat.dayc small{ color:rgba(255,255,255,.88); }
+  .rc-stat.dayc b{ color:#fff; }
   .rc-days{ display:flex; gap:5px; margin:12px 0 2px; }
   .rc-day{ flex:1; min-width:0; padding:7px 0 6px; border-radius:12px; border:1px solid var(--border); background:var(--surface); color:var(--text-secondary); font:inherit; font-size:12px; text-align:center; }
   .rc-day b{ display:block; font-size:16px; font-weight:650; color:var(--text); }
@@ -61,26 +64,27 @@
   .rc-day.today b{ text-decoration:underline; text-underline-offset:3px; }
   .rc-day.on{ background:linear-gradient(135deg,#5183e5,#4247d5); border-color:transparent; color:rgba(255,255,255,.85); }
   .rc-day.on b{ color:#fff; }
-  .rc-cat{ font-size:13px; font-weight:650; color:var(--text-secondary); margin:18px 2px 8px; }
+  .rc-cat{ display:flex; align-items:center; gap:8px; font-size:15px; font-weight:750; color:var(--c1); margin:20px 2px 9px; }
+  .rc-cat::before{ content:""; width:5px; height:18px; border-radius:3px; background:linear-gradient(180deg,var(--c1),var(--c2)); }
   .rc-grid{ display:grid; grid-template-columns:1fr 1fr; gap:9px; }
-  .rc-tile{ position:relative; text-align:left; min-height:68px; padding:11px 12px; border-radius:16px; background:var(--surface); border:1px solid var(--border);
+  .rc-tile{ position:relative; text-align:left; min-height:68px; padding:11px 12px; border-radius:16px; background:color-mix(in srgb,var(--c1) 9%, var(--surface)); border:1px solid color-mix(in srgb,var(--c1) 35%, transparent);
     color:var(--text); font:inherit; display:flex; flex-direction:column; justify-content:space-between; gap:6px; -webkit-user-select:none; user-select:none; }
   .rc-tile:active{ transform:scale(.96); }
   .rc-n{ font-size:14px; font-weight:600; line-height:1.25; padding-right:28px; }
-  .rc-p{ font-size:13px; color:var(--text-secondary); }
+  .rc-p{ font-size:13px; font-weight:600; color:var(--c2); }
   .rc-c{ display:none; position:absolute; top:8px; right:8px; min-width:24px; height:24px; padding:0 7px; border-radius:12px; align-items:center; justify-content:center;
-    font-size:13px; font-weight:700; color:#fff; background:linear-gradient(135deg,#5183e5,#4247d5); }
-  .rc-tile.has{ border-color:#4247d5; background:color-mix(in srgb,#4247d5 10%, var(--surface)); }
+    font-size:13px; font-weight:800; color:var(--c2); background:#fff; box-shadow:0 2px 6px rgba(0,0,0,.2); }
+  .rc-tile.has{ border-color:transparent; background:linear-gradient(135deg,var(--c1),var(--c2)); color:#fff; box-shadow:0 6px 16px color-mix(in srgb,var(--c2) 38%, transparent); }
   .rc-tile.has .rc-c{ display:flex; }
-  .rc-tile.has .rc-p{ color:#4247d5; font-weight:600; }
-  html[data-mode="dark"] .rc-tile.has .rc-p{ color:#9aa2f7; }
+  .rc-tile.has .rc-n{ color:#fff; }
+  .rc-tile.has .rc-p{ color:rgba(255,255,255,.9); }
   .rc-tile.pop{ animation:rcPop .22s ease; }
   @keyframes rcPop{ 0%{ transform:scale(.94); } 60%{ transform:scale(1.03); } 100%{ transform:scale(1); } }
   .rc-undobar{ position:sticky; bottom:calc(var(--safe-bottom) + 8px); margin-top:18px; z-index:5; }
-  .rc-undo{ width:100%; padding:14px; border-radius:16px; border:1px solid var(--border); font:inherit; font-size:15px; font-weight:650; color:var(--text);
-    background:var(--surface); box-shadow:0 8px 22px rgba(0,0,0,.14); }
+  .rc-undo{ width:100%; padding:16px; border-radius:18px; border:none; font:inherit; font-size:16px; font-weight:750; color:#fff;
+    background:linear-gradient(135deg,#ff9f0a,#ff3b30); box-shadow:0 10px 24px rgba(255,59,48,.38), inset 0 1px 0 rgba(255,255,255,.3); }
   .rc-undo:active{ transform:scale(.985); }
-  .rc-undo.off{ color:var(--text-secondary); font-weight:500; }
+  .rc-undo.off{ color:var(--text-secondary); font-weight:500; background:var(--surface); border:1px solid var(--border); box-shadow:0 8px 22px rgba(0,0,0,.1); }
   `;
   const st = document.createElement("style");
   st.textContent = css;
@@ -100,10 +104,10 @@
       </div>
       <div class="rc-stats">
         <div class="rc-stat main"><small>Puntos de la semana</small><b class="rc-tot">0</b></div>
-        <div class="rc-stat"><small class="rc-daylbl">Hoy</small><b class="rc-day-tot">0</b></div>
+        <div class="rc-stat dayc"><small class="rc-daylbl">Hoy</small><b class="rc-day-tot">0</b></div>
       </div>
       <div class="rc-days"></div>
-      ${CATS.map(c => `<div class="rc-cat">${c.n}</div><div class="rc-grid">${c.it.map(x =>
+      ${CATS.map(c => `<div class="rc-cat" style="--c1:${c.c[0]};--c2:${c.c[1]}">${c.n}</div><div class="rc-grid" style="--c1:${c.c[0]};--c2:${c.c[1]}">${c.it.map(x =>
         `<button class="rc-tile" data-i="${x[0]}"><span class="rc-n">${x[1]}</span><span class="rc-p">+${x[2]} pts</span><span class="rc-c"></span></button>`
       ).join("")}</div>`).join("")}
       <div class="rc-undobar"><button class="rc-undo off">Nada que deshacer</button></div>`;
@@ -152,7 +156,7 @@
       if (log.length) {
         const last = log[log.length - 1];
         const nm = ITEMS[last.i] ? ITEMS[last.i].n : last.i;
-        undo.textContent = "Deshacer: " + nm + " (−" + last.p + ")";
+        undo.textContent = "↶  Deshacer: " + nm + " (−" + last.p + ")";
         undo.classList.remove("off");
       } else {
         undo.textContent = "Nada que deshacer";
