@@ -2049,13 +2049,15 @@ function buildSwitchResult(newModel, newCapacity) {
       return;
     }
     const base = baseActual();
-    let html = `<span>${newModel} ${newCapacity}</span><strong>${money(newPrice)}`;
-    if (incluir) html += ` + ${money(MEMBRESIA_SWITCH)} membresía`;
-    if (opt && opt.extra !== null && opt.extra !== undefined) {
-      html += ` + ${money(opt.extra)} ${opt.label} = ${money(base + opt.extra)}</strong>`;
-    } else {
-      html += ` = ${money(base)}</strong>`;
-    }
+    const extra = opt && opt.extra !== null && opt.extra !== undefined ? opt.extra : 0;
+    const line = (cls, label, val) => `<div class="q-line ${cls}"><i></i><em>${label}</em><b>${val}</b></div>`;
+    let html = `<span>${newModel} ${newCapacity}</span><strong class="q-total">${money(base + extra)}</strong><div class="q-lines">`;
+    html += line("q-eq", "Equipo nuevo", money(newPrice));
+    if (incluir) html += line("q-ti", "Membresía Switch Up", "+ " + money(MEMBRESIA_SWITCH));
+    if (extra) html += line("q-ac", opt.label, "+ " + money(extra));
+    html += `</div>`;
+    banner.classList.add("quote", "q-tint");
+    banner.style.setProperty("--b1", "#f6a850"); banner.style.setProperty("--b2", "#e8645e");
     banner.innerHTML = html;
   }
 
@@ -2344,6 +2346,42 @@ function setupRepairTrigger(el, onOpen) {
 }
 
 // Algunos modelos usan otros nombres en los datos (p. ej. iPhone Duo): se acepta una lista de nombres posibles.
+const REPAIR_CASOS = [
+  { img: "caso-1", t: "Vista trasera", d: "Chasis sin el vidrio trasero." },
+  { img: "caso-2", t: "Esquina superior", d: "Marco doblado y con desprendimiento." },
+  { img: "caso-3", t: "Marco deformado", d: "El aluminio cambia de forma con el golpe." },
+  { img: "caso-4", t: "Esquina inferior", d: "El daño se ve por fuera y por dentro." },
+  { img: "caso-5", t: "Esquina golpeada", d: "Pintura levantada y borde dañado." },
+  { img: "caso-6", t: "Borde inferior", d: "Daño cerca del puerto de carga." },
+  { img: "caso-7", t: "Interior expuesto", d: "Los componentes quedan al descubierto." },
+];
+
+function buildRepairCasos() {
+  const sec = document.createElement("section");
+  sec.className = "rep-casos";
+  sec.innerHTML = `<div class="rep-casos-head"><span class="rep-casos-eyebrow">Casos reales</span><h3>Un golpe cambia todo.</h3><p>Equipos reales con daño en el cuerpo. Desliza para verlos.</p></div><div class="rep-casos-track"></div>`;
+  const track = sec.querySelector(".rep-casos-track");
+  REPAIR_CASOS.forEach((c, i) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "rep-caso";
+    const img = document.createElement("img");
+    img.alt = c.t; img.decoding = "async"; img.loading = "lazy"; img.draggable = false;
+    img.src = `reparaciones/casos/${c.img}.jpg`;
+    img.addEventListener("error", () => { b.remove(); if (!track.children.length) sec.remove(); });
+    const cap = document.createElement("div");
+    cap.className = "rep-caso-cap";
+    cap.innerHTML = `<b></b><small></small>`;
+    cap.querySelector("b").textContent = c.t;
+    cap.querySelector("small").textContent = c.d;
+    const chip = document.createElement("span");
+    chip.className = "rep-caso-n"; chip.textContent = `Caso ${i + 1} de ${REPAIR_CASOS.length}`;
+    b.append(img, chip, cap);
+    b.addEventListener("click", () => openRepairViewer(img.currentSrc || img.src));
+    track.appendChild(b);
+  });
+  return sec;
+}
+
 const repairList = (x) => Array.isArray(x) ? x : [x];
 const repairSinKey = (part, info) => repairList(part.sin).find(k => typeof info?.sinAppleCare?.[k] === "number");
 
@@ -2504,6 +2542,7 @@ function buildRepair(category, model, variant) {
     (info.deducibles && Object.keys(info.deducibles).length ? block("Deducibles con AppleCare+", info.deducibles) : "")
     + block("Reparación sin AppleCare+", info.sinAppleCare);
   const more = $(".rep-more");
+  wrap.insertBefore(buildRepairCasos(), more);
   more.addEventListener("click", () => {
     const open = details.hidden;
     details.hidden = !open;
@@ -4040,7 +4079,10 @@ function buildFinanceResult(model, capacity, planType) {
 
   const banner = document.createElement("div");
   banner.className = "trade-banner";
-  banner.innerHTML = `<span>${cfg.label}</span><strong>${model} ${capacity}</strong>`;
+  banner.classList.add("quote", "q-tint");
+  const bt = planType === "GET" ? ["#e96390", "#c84172"] : ["#7e61e6", "#5642b9"];
+  banner.style.setProperty("--b1", bt[0]); banner.style.setProperty("--b2", bt[1]);
+  banner.innerHTML = `<span>${cfg.label}</span><strong class="q-total">${model} ${capacity}</strong>`;
   wrap.appendChild(banner);
 
   if (!finData) {

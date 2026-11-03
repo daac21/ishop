@@ -1671,3 +1671,27 @@ html:not([data-mode="dark"]) .ac-hero{ box-shadow:0 10px 24px -8px color-mix(in 
 html:not([data-mode="dark"]) .trade-banner{ box-shadow:0 12px 26px color-mix(in srgb, var(--accent) 34%, transparent), var(--lt-glint); }
 html:not([data-mode="dark"]) .home-tile.light{ box-shadow:0 1px 2px rgba(60,70,110,.06), 0 8px 18px -4px rgba(60,70,110,.14), inset 0 1px 0 rgba(255,255,255,.8); }
 html:not([data-mode="dark"]) .primary-btn{ box-shadow:0 6px 16px color-mix(in srgb, var(--accent) 30%, transparent), var(--lt-glint); }
+
+
+/* ---- Banner de resumen con el color de cada menú (Switch Up, For Life, GET) ---- */
+html .trade-banner.q-tint, html:not([data-mode="dark"]) .trade-banner.q-tint{
+  background:linear-gradient(135deg,var(--b1),var(--b2));
+  box-shadow:0 12px 26px color-mix(in srgb,var(--b2) 40%, transparent), inset 0 1px 0 rgba(255,255,255,.3);
+}
+
+/* ---- Reparaciones: Casos reales ---- */
+.rep-casos{ margin:28px 0 8px; }
+.rep-casos-head{ padding:0 18px; }
+.rep-casos-eyebrow{ display:inline-block; padding:5px 12px; border-radius:999px; font-size:11.5px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:#fff; background:linear-gradient(135deg,#ff9f0a,#ff3b30); box-shadow:0 6px 16px rgba(255,59,48,.35); }
+.rep-casos-head h3{ margin:12px 0 4px; font-size:30px; line-height:1.1; font-weight:850; letter-spacing:-.025em; color:#f5f5f7; }
+.rep-casos-head p{ margin:0; font-size:15px; color:#a1a1a6; }
+.rep-casos-track{ display:flex; gap:12px; overflow-x:auto; scroll-snap-type:x mandatory; padding:16px 18px 10px; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+.rep-casos-track::-webkit-scrollbar{ display:none; }
+.rep-caso{ position:relative; flex:0 0 74%; max-width:310px; aspect-ratio:3/4; padding:0; border:0; border-radius:26px; overflow:hidden; background:#1c1c1e; scroll-snap-align:center; box-shadow:0 16px 34px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.08); }
+.rep-caso:active{ transform:scale(.985); }
+.rep-caso img{ width:100%; height:100%; object-fit:cover; display:block; }
+.rep-caso::after{ content:""; position:absolute; inset:0; background:linear-gradient(180deg,rgba(0,0,0,.28) 0%,transparent 28%,transparent 52%,rgba(0,0,0,.82) 100%); pointer-events:none; }
+.rep-caso-n{ position:absolute; top:14px; left:14px; z-index:2; padding:6px 12px; border-radius:999px; font-size:12px; font-weight:750; color:#fff; background:linear-gradient(135deg,#ff9f0a,#ff3b30); box-shadow:0 6px 14px rgba(255,59,48,.4); }
+.rep-caso-cap{ position:absolute; left:0; right:0; bottom:0; z-index:2; padding:16px 18px 18px; text-align:left; color:#fff; }
+.rep-caso-cap b{ display:block; font-size:21px; font-weight:800; letter-spacing:-.015em; }
+.rep-caso-cap small{ display:block; margin-top:3px; font-size:14px; color:rgba(255,255,255,.82); }

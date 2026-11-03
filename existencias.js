@@ -266,7 +266,8 @@ function exEstilos() {
   .ex-mt strong{ font-size:23px; font-weight:850; }
   .ex-mt .spec{ font-size:14.5px; font-weight:650; }
   .ex-badge.hid{ background:var(--bx-fill); color:var(--text-secondary); padding:13px 16px; min-width:58px; }
-  .ex-badge.hid.ok{ background:var(--bx-greenbg); color:var(--bx-green); }
+  .ex-badge.hid.ok{ background:var(--bx-greenbg); color:var(--bx-green); min-width:0; padding:9px 13px; border-radius:12px; }
+  .ex-badge.hid.ok small{ margin:0; font-size:12px; letter-spacing:.08em; }
   .ex-badge.hid.low{ background:var(--bx-orangebg); color:var(--bx-orange); }
   .ex-badge svg{ width:28px; height:28px; display:block; margin:0 auto; }
   .ex-badge[data-eye]{ cursor:pointer; -webkit-tap-highlight-color:transparent; }
@@ -331,6 +332,22 @@ function exEstilos() {
   .ex-vr button{ border:0; border-radius:12px; padding:10px 14px; font:inherit; font-weight:800; font-size:14px; background:#ff9f0a; color:#1c1c1e; }
   .ex-vr.hecha{ opacity:.55; }
   .ex-vr.hecha button{ display:none; }
+
+  /* ---- Tarjeta de modelo estilo Cotización: degradado del color de su categoría ---- */
+  .ex-model{ background:linear-gradient(135deg,var(--c1),var(--c2)); border:none; color:#fff; box-shadow:0 12px 26px color-mix(in srgb,var(--c2) 36%, transparent), inset 0 1px 0 rgba(255,255,255,.3); }
+  .ex-model::after{ content:""; position:absolute; top:-40%; right:-12%; width:200px; height:200px; background:radial-gradient(circle,rgba(255,255,255,.22),transparent 70%); pointer-events:none; }
+  html[data-mode="dark"] .ex-model{ box-shadow:0 12px 26px color-mix(in srgb,var(--c2) 30%, transparent), inset 0 1px 0 rgba(255,255,255,.18); }
+  .ex-mh{ color:#fff; position:relative; z-index:1; }
+  .ex-mt strong{ color:#fff; }
+  .ex-mt .spec, .ex-mt .sub{ color:rgba(255,255,255,.86); }
+  .ex-pic{ background:rgba(255,255,255,.22); color:#fff; }
+  .ex-sws i{ border-color:rgba(255,255,255,.75); }
+  .ex-chev{ border-color:rgba(255,255,255,.9); }
+  .ex-mh .ex-badge{ background:rgba(255,255,255,.94); }
+  .ex-mh .ex-badge.low{ color:var(--bx-orange); }
+  .ex-mh .ex-badge.zero{ color:var(--bx-red); }
+  .ex-rows{ background:var(--bx-card); color:var(--text); border-top:0; position:relative; z-index:1; }
+  .ex-badge.hid.ok{ background:linear-gradient(135deg,#34c759,#1fa86a); color:#fff; box-shadow:0 4px 10px rgba(31,168,106,.3); }
   `;
   document.head.appendChild(st);
 }
@@ -415,7 +432,7 @@ function buildExistencias() {
   const badge = (q, k, sec) => {
     if (q <= 0) return `<div class="ex-badge zero"><small>AGOTADO</small></div>`;
     const poca = q <= exPocas(sec);
-    if (!poca) return `<div class="ex-badge hid ok" aria-label="Disponible">${EX_OK}</div>`;   // hay suficiente: solo recuadro verde, sin ojito ni número
+    if (!poca) return String(k).startsWith("m:") ? "" : `<div class="ex-badge hid ok" aria-label="Disponible"><small>HAY</small></div>`;   // hay suficiente: tarjeta del modelo sin recuadro; cada color/capacidad en verde, sin palomita ni número
     if (!visto(k)) return `<div class="ex-badge hid low" data-eye="${exEsc(k)}" role="button" aria-label="Mostrar piezas">${EX_EYE_OFF}</div>`;
     return `<div class="ex-badge low" data-eye="${exEsc(k)}" role="button">${q}<small>POCAS</small></div>`;
   };
