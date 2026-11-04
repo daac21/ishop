@@ -147,6 +147,17 @@ const NV_KEY = "ishop_bodega_nv_v1";       // misma llave que usa bodega.js (Apa
     const ref = F.doc(db, "limpieza", id);
     return await F.runTransaction(db, async tx => { const s = await tx.get(ref); if (s.exists()) return s.data(); tx.set(ref, data); return data; });
   };
+  window.ishopLimAcceso = async function (id, dev, max) {   // mesa fija: solo "max" teléfonos distintos por mes
+    const ref = F.doc(db, "limpieza", id);
+    return await F.runTransaction(db, async tx => { const s = await tx.get(ref), acc = (s.exists() && s.data().accesos) || {}; if (acc[dev]) return true; if (Object.keys(acc).length >= max) return false; tx.set(ref, { accesos: { ...acc, [dev]: Date.now() } }, { merge: true }); return true; });
+  };
+  window.ishopLimpiarFotos = async function (dias) {   // borra fotos de escaneos más viejas que "dias" (el id del doc es la fecha en milisegundos)
+    const corte = String(Date.now() - dias * 864e5);
+    const snap = await F.getDocs(F.query(F.collection(db, "escaneos_fotos"), F.where(F.documentId(), "<", corte), F.limit(25)));
+    await Promise.all(snap.docs.map(d => F.deleteDoc(d.ref)));
+    return snap.size;
+  };
+  window.ishopLimBorrar = function (id) { return F.deleteDoc(F.doc(db, "limpieza", id)); };
   try { window.dispatchEvent(new Event("ishop-lim-listo")); } catch (_) {}
 
   /* ---- Subir cambios: bodegaSave(prev → d) ---- */

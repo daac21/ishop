@@ -1727,3 +1727,7 @@ html .trade-banner.q-tint, html:not([data-mode="dark"]) .trade-banner.q-tint{
 .ac-menu[hidden]{ display:none; }
 .ac-menu button{ display:block; width:100%; border:0; background:transparent; font:inherit; font-size:15px; font-weight:650; color:var(--text); text-align:left; padding:11px 12px; border-radius:10px; }
 .ac-menu button:active{ background:color-mix(in srgb, var(--accent) 14%, transparent); }
+
+/* Colores propios de Registros y Asesores */
+.home-reg.reg-registros{ background:linear-gradient(120deg,#0e4f63,#17768a 55%,#0c3f50); box-shadow:0 12px 26px rgba(14,79,99,.32), inset 0 1px 0 rgba(255,255,255,.18); }
+.home-reg.reg-asesores{ background:linear-gradient(120deg,#5a2a86,#7d3fae 55%,#4a2270); box-shadow:0 12px 26px rgba(90,42,134,.34), inset 0 1px 0 rgba(255,255,255,.18); }

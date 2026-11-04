@@ -2082,7 +2082,7 @@ function bxEscEditorInline(host, actual, cb, cancel) {
   host.querySelector('[data-k="c"]').addEventListener("click", cancel);
   ok.addEventListener("click", () => { if (sel) cb(sel); });
   host.addEventListener("click", e => e.stopPropagation());
-  setTimeout(() => { inp.focus(); inp.select(); buscar(); }, 30);
+  setTimeout(() => { try { inp.focus({ preventScroll: true }); } catch (_) { inp.focus(); } buscar(); }, 30);
 }
 
 /* ---- Detalle (vista de verificación): foto fija arriba con línea guía, renglones grandes abajo ---- */
@@ -2130,6 +2130,8 @@ function bxEscCss3() {
   .bxv-er .no{ margin-top:6px; padding:9px 11px; border:1px solid var(--bx-orange); border-radius:12px; color:var(--bx-orange); font-size:13.5px; }
   .bxv-eb{ display:flex; gap:8px; margin-top:10px; } .bxv-eb button{ flex:1; border:0; border-radius:12px; padding:12px; font:inherit; font-weight:800; font-size:15px; background:var(--bx-fill); color:inherit; } .bxv-eb button.pri{ background:var(--accent); color:#fff; } .bxv-eb button:disabled{ opacity:.4; }
   .bxv-editando .bxv-act{ display:none; }
+  .bxv-editando .bxv-r:not(.editando), .bxv-editando .bxv-sum, .bxv-editando .bxv-focus, .bxv-editando .bxv-tools span, .bxv-editando .bxe-log, .bxv-editando #bxeAv{ display:none; }
+  .bxv-editando .bxv-photo{ height:36vh; height:36dvh; }
   .bxv-editando .bxv-photo{ height:24vh; height:24dvh; min-height:130px; }
   @media (min-width:700px) and (orientation:landscape), (min-width:900px){
     .bxv{ display:grid; grid-template-columns:minmax(300px,46%) 1fr; column-gap:14px; align-items:start; }
@@ -2261,7 +2263,7 @@ function buildBodegaEscaneo(ts) {
     });
     wrap.classList.toggle("bxv-editando", editando >= 0);
     if (editando >= 0 && w[editando]) {
-      const fila = L.querySelector(`.bxv-r[data-i="${editando}"]`), r = w[editando];
+      const fila = L.querySelector(`.bxv-r[data-i="${editando}"]`), r = w[editando]; if (fila) fila.classList.add("editando");
       if (fila) { const h = document.createElement("div"); h.className = "e"; fila.appendChild(h); setTimeout(() => { const tp = $("#bxvTop"); if (tp) scrollContenedor(fila.getBoundingClientRect().top - tp.getBoundingClientRect().bottom - 6); }, 60);
         bxEscEditorInline(h, r.upc, nuevo => { r.upc = nuevo; if (r.estado === "pend") r.estado = ""; r.del = 0; editando = -1; pintarLista(); }, () => { editando = -1; pintarLista(); }); }
     }
@@ -2284,7 +2286,7 @@ function buildBodegaEscaneo(ts) {
   const pintar = () => { if (wrap.querySelector("#bxvList")) pintarLista(); else armar(); };
   const cargarFoto = async () => {
     if (base.foto || !base.hayFoto || typeof window.ishopEscaneoFoto !== "function") return;
-    try { const f = await window.ishopEscaneoFoto(base.ts); if (f) { base.foto = f; await bxEscPon(base); const sc = sucio(); const keep = sc ? clon(w) : null; armar(); if (keep) { w = keep; pintarLista(); } } } catch (e) { const c = wrap.querySelector("#bxeCarga"); if (c) c.textContent = "No se pudo descargar la foto (revisa tu conexión)."; }
+    try { const f = await window.ishopEscaneoFoto(base.ts); if (f) { base.foto = f; await bxEscPon(base); const sc = sucio(); const keep = sc ? clon(w) : null; armar(); if (keep) { w = keep; pintarLista(); } } } catch (e) { const c = wrap.querySelector("#bxeCarga"); if (c) c.textContent = Date.now() - base.ts > 55 * 864e5 ? "La foto se borró automáticamente (tenía más de 60 días). Los datos del escaneo se conservan." : "No se pudo descargar la foto (revisa tu conexión)."; }
   };
   async function guardar(revisado) {
     const eff0 = bxEscEfec(base.rows), eff1 = bxEscEfec(w), quien = bxQuien(), ahora = Date.now(), cat = bodegaCatalogoEscaneo(), log = [];
@@ -2362,3 +2364,20 @@ function buildBodegaDetalle(ts) {
 }
 
 if (typeof module !== "undefined") module.exports = { bodegaFilasDeTexto, bodegaLeerTexto, bodegaResolver, bodegaRenglones, bodegaLeerRenglon, bodegaFilasDePalabras, bodegaComparar, bodegaTextoReporte, bodegaUpcOk, bodegaFecha, bodegaMezclar };
+
+
+/* ---- Limpieza diaria de fotos viejas (más de 60 días): en Firebase y en este teléfono. Una vez al día. ---- */
+async function bxEscLimpiezaDiaria() {
+  const hoy = new Date().toDateString();
+  try { if (localStorage.getItem("ishop_foto_limpieza") === hoy) return; } catch (_) {}
+  const DIAS = 60, corte = Date.now() - DIAS * 864e5;
+  try {
+    const todos = await bxEscTodos();
+    for (const d of todos) if (d.foto && d.ts < corte) { const c = { ...d }; delete c.foto; await bxEscPon(c); }
+    if (typeof window.ishopLimpiarFotos === "function") await window.ishopLimpiarFotos(DIAS);
+    else return;                                  // sin Firebase todavía: se intenta otra vez después
+    localStorage.setItem("ishop_foto_limpieza", hoy);
+  } catch (_) {}
+}
+window.addEventListener("load", () => setTimeout(bxEscLimpiezaDiaria, 9000));
+window.addEventListener("ishop-lim-listo", () => setTimeout(bxEscLimpiezaDiaria, 4000));

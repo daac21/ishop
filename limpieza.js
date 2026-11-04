@@ -10,7 +10,7 @@ const LIM_COL = { "1": "#f07800", "2": "#ffaa00", "3y4": "#0a7ac8", "5y6": "#8b1
 const LIM_NOM = { "1": "1", "2": "2", "3y4": "3 y 4", "5y6": "5 y 6", "7y8": "7 y 8", "9": "9", "10": "10", "11": "11", "12": "12", "13y14": "13 y 14", "15y16": "15 y 16" };
 const LIM_ORDEN = ["1", "2", "3y4", "5y6", "7y8", "9", "10", "11", "12", "13y14", "15y16"];
 const LIM_FIJA = "15y16";
-const LIM_PRUEBA = true;   // PRUEBA: el PDF rellena con firmas inventadas las que falten. Poner false cuando todos firmen de verdad.
+const LIM_PRUEBA = false;   // (apagado) firmas inventadas solo para pruebas
 const LIM_NO_VEND = ["angel", "juan", "juan carlos", "fabian", "omar", "sahib", "daniel", "dani"];   // entran sin mesa de limpieza
 const limNorm = t => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 const limMesActual = (d = new Date()) => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
@@ -48,8 +48,11 @@ async function limRol(mes) {
   try { if (typeof window.ishopLimCrear === "function") { const pub = await window.ishopLimCrear("rol_" + mes, { titulo: rol.titulo, mesas: JSON.stringify(rol.mesas) }); if (pub && pub.mesas) return { titulo: pub.titulo || rol.titulo, mesas: JSON.parse(pub.mesas) }; } } catch (_) {}
   return rol;
 }
-const limYoKey = mes => "ishop_lim_firmado_" + mes;
+const limYoKey = mes => "ishop_lim_f2_" + mes;          // f2: obliga a firmar de nuevo (las firmas anteriores no llegaron a Firebase)
+const limViejo = mes => { try { return localStorage.getItem("ishop_lim_firmado_" + mes) || ""; } catch (_) { return ""; } };
 const limFirmado = mes => { try { return localStorage.getItem(limYoKey(mes)) || ""; } catch (_) { return ""; } };
+const limDev = () => { try { let d = localStorage.getItem("ishop_lim_dev"); if (!d) { d = "d" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36); localStorage.setItem("ishop_lim_dev", d); } return d; } catch (_) { return "x"; } };
+async function limFirmasDe(mes) { try { if (typeof window.ishopLimGet === "function") { const d = await window.ishopLimGet("firmas_" + mes); return (d && d.firmas) || {}; } } catch (_) {} return null; }
 const limPendKey = "ishop_lim_pend";
 function limPersonas(rol) { const out = []; (rol.mesas || []).forEach(m => m.asesores.forEach(a => out.push({ nombre: a, mesa: m.mesa, fija: m.mesa === LIM_FIJA }))); return out; }
 
@@ -80,13 +83,24 @@ let limGateAbierto = false;
 async function limGate() {
   if (limGateAbierto) return;
   const mes = limMesActual();
-  if (limFirmado(mes)) { limReintentar(); return; }
   const rol = await limRol(mes);
   if (!rol) return;
+  const f = limFirmado(mes);
+  if (f) {
+    limReintentar();
+    const pers = limPersonas(rol).find(p => limNorm(p.nombre) === limNorm(f));
+    if (!pers || pers.fija) return;                       // no vendedor o mesa fija: ya entró
+    const hoy = new Date().toDateString(), kc = "ishop_lim_chk_" + mes;   // la revisión en Firebase se hace una sola vez al día
+    try { if (localStorage.getItem(kc) === hoy) return; } catch (_) {}
+    const fs = await limFirmasDe(mes);                    // si su firma no está en Firebase, se vuelve a pedir
+    if (!fs) return;
+    if (fs[pers.nombre] && fs[pers.nombre].img) { try { localStorage.setItem(kc, hoy); } catch (_) {} return; }
+    try { localStorage.removeItem(limYoKey(mes)); } catch (_) {}
+  }
   limGateAbierto = true;
   limCss();
   const personas = limPersonas(rol), nombreApp = (typeof ishopAjustes === "function" ? ishopAjustes().nombre : "") || "";
-  const previo = personas.find(p => limNorm(p.nombre) === limNorm(nombreApp) || limNorm(nombreApp).split(" ")[0] === limNorm(p.nombre));
+  const ant = limNorm(limViejo(mes)), previo = personas.find(p => ant && limNorm(p.nombre) === ant) || personas.find(p => limNorm(p.nombre) === limNorm(nombreApp) || limNorm(nombreApp).split(" ")[0] === limNorm(p.nombre));
   const ov = document.createElement("div"); ov.className = "lim-ov";
   ov.innerHTML = `<div class="lim-card"><h2>Rol de limpieza · ${limEsc(rol.titulo || limTitulo(mes))}</h2>
     <p class="lim-sub">Elige tu nombre, revisa tu mesa y firma para continuar.</p>
@@ -98,7 +112,7 @@ async function limGate() {
   const elegir = (p) => {
     sel = p; ov.querySelectorAll(".lim-fila").forEach(f => f.classList.toggle("on", f.dataset.m === p.mesa));
     yo.hidden = false;
-    if (p.fija) { tu.innerHTML = `<b>${limEsc(p.nombre)}</b>: la mesa ${LIM_NOM[p.mesa]} es fija, no necesitas firmar.`; ov.querySelector(".lim-pad").style.display = "none"; go.disabled = false; go.textContent = "Continuar"; return; }
+    if (p.fija) { tu.innerHTML = `<b>${limEsc(p.nombre)}</b>: la mesa ${LIM_NOM[p.mesa]} es fija, no necesitas firmar.<div class="lim-err" id="limFijaErr" hidden></div>`; ov.querySelector(".lim-pad").style.display = "none"; go.disabled = false; go.textContent = "Continuar"; return; }
     tu.innerHTML = `Soy <b>${limEsc(p.nombre)}</b> y me toca la mesa <b>${LIM_NOM[p.mesa]}</b>.`;
     const padHost = ov.querySelector(".lim-pad"); padHost.style.display = ""; pad = limPad(padHost); go.textContent = "Firmar y continuar"; go.disabled = true;
     padHost.addEventListener("cambio", () => { go.disabled = pad.vacia(); });
@@ -122,6 +136,10 @@ async function limGate() {
   if (previo) elegir(previo);
   go.addEventListener("click", async () => {
     if (!sel) return; go.disabled = true;
+    if (sel.fija) {
+      let ok = true; try { if (typeof window.ishopLimAcceso === "function") ok = await window.ishopLimAcceso("fija_" + mes, limDev(), 3); } catch (_) { ok = true; }
+      if (!ok) { const e = ov.querySelector("#limFijaErr"); if (e) { e.hidden = false; e.textContent = "Acceso denegado: ya se usaron los 3 accesos de la mesa " + LIM_NOM[sel.mesa] + "."; } go.disabled = false; return; }
+    }
     if (!sel.fija) { if (pad.vacia()) { go.disabled = false; return; } await limSubirFirma(mes, sel.nombre, pad.png(), Date.now()); }
     try { localStorage.setItem(limYoKey(mes), sel.nombre); } catch (_) {}
     ov.remove(); limGateAbierto = false;
@@ -139,32 +157,116 @@ function limEscuchar(mes, cb) {
 /* ---- Pantallas ---- */
 function buildAsesores() {
   limCss();
-  const wrap = document.createElement("div");
-  wrap.innerHTML = `<div class="home-heading"><h2>Asesores</h2><p>Herramientas del equipo.</p></div>`;
-  const b = document.createElement("button"); b.className = "home-reg";
-  b.innerHTML = `<span class="home-reg-icon">🧹</span><span class="home-reg-text"><strong>Limpieza</strong></span><span class="home-tile-chev"></span>`;
-  b.addEventListener("click", () => navigate({ screen: "limpieza", title: "Limpieza" }));
-  wrap.appendChild(b);
+  const wrap = document.createElement("div"); wrap.className = "lim-wrap";
+  wrap.innerHTML = `<div class="ase-hero"><small>EQUIPO</small><h2>Asesores</h2><p>Todo lo del equipo en un solo lugar.</p></div>
+    <button type="button" class="ase-card" id="aseLim"><span class="ase-ic">🧹</span><span class="ase-tx"><b>Limpieza</b><small>Tu mueble del mes y tu firma</small></span><i></i></button>`;
+  wrap.querySelector("#aseLim").addEventListener("click", () => navigate({ screen: "limpieza", title: "Limpieza" }));
   return wrap;
 }
 
+function limImg(src) { return new Promise(r => { const i = new Image(); i.onload = () => r(i); i.onerror = () => r(null); i.src = src; }); }
+/* Imagen del PDF (para la previa): misma distribución que el PDF. */
+async function limPreview(rol, firmas, ancho, calidad) {
+  const k = ancho / 792, cv = document.createElement("canvas"); cv.width = ancho; cv.height = Math.round(612 * k); const x = cv.getContext("2d");
+  x.fillStyle = "#fff"; x.fillRect(0, 0, cv.width, cv.height); x.scale(k, k);
+  const logo = await limImg("imágenes/limpieza/logo.jpg"), plano = await limImg("imágenes/limpieza/plano.jpg");
+  if (logo) x.drawImage(logo, 50, 14, 118, 38);
+  x.fillStyle = "#000"; x.font = "bold 21px Helvetica, Arial, sans-serif"; x.textBaseline = "alphabetic"; x.fillText("ROL DE LIMPIEZA " + (rol.titulo || ""), 195, 40);
+  const filas = rol.mesas.slice().sort((a, b) => LIM_ORDEN.indexOf(a.mesa) - LIM_ORDEN.indexOf(b.mesa)), RH = 24, w = [58, 118, 160];
+  const col = async (lista, x0) => {
+    x.fillStyle = "#222"; x.font = "9px Helvetica, Arial, sans-serif"; let cx = x0; ["MESA", "ASESOR", "FIRMA"].forEach((t, i) => { x.fillText(t, cx + w[i] / 2 - x.measureText(t).width / 2, 66 + 8); cx += w[i]; });
+    for (let r = 0; r < lista.length; r++) {
+      const m = lista[r], y = 82 + r * RH;
+      x.fillStyle = r % 2 ? "#f5f5f5" : "#fff"; x.fillRect(x0, y, w[0] + w[1] + w[2], RH); x.strokeStyle = "#ccc"; x.lineWidth = .5; x.strokeRect(x0, y, w[0] + w[1] + w[2], RH);
+      x.fillStyle = LIM_COL[m.mesa]; x.fillRect(x0, y, w[0], RH);
+      x.font = "bold 9px Helvetica, Arial, sans-serif"; x.fillStyle = ["9", "5y6", "13y14", "7y8", "10"].includes(m.mesa) ? "#fff" : "#000"; const t = LIM_NOM[m.mesa]; x.fillText(t, x0 + w[0] / 2 - x.measureText(t).width / 2, y + RH / 2 + 3);
+      x.fillStyle = "#000"; const nom = m.asesores.join(", "); x.font = (nom.length > 22 ? 8 : 10) + "px Helvetica, Arial, sans-serif"; x.fillText(nom, x0 + w[0] + w[1] / 2 - x.measureText(nom).width / 2, y + RH / 2 + 3);
+      if (m.mesa !== LIM_FIJA) {
+        const cw = w[2] / Math.max(1, m.asesores.length);
+        for (let i = 0; i < m.asesores.length; i++) { const f = firmas[m.asesores[i]]; if (!f || !f.img) continue; const im = await limImg(f.img); if (!im) continue; const h = RH - 4, ww = Math.min(cw - 4, h * im.width / im.height); x.drawImage(im, x0 + w[0] + w[1] + i * cw + (cw - ww) / 2, y + 2, ww, h); }
+      }
+    }
+  };
+  await col(filas.slice(0, 6), 50); await col(filas.slice(6), 50 + 336 + 20);
+  if (plano) { const pw = 640, ph = pw * plano.height / plano.width; x.drawImage(plano, (792 - pw) / 2, 234, pw, ph); }
+  return cv.toDataURL("image/jpeg", calidad);
+}
+function limVisor(rol, firmas) {
+  const ov = document.createElement("div"); ov.className = "lim-vis"; ov.innerHTML = `<button type="button" class="lim-x">✕</button><div class="lim-vp"><img alt=""></div>`;
+  document.body.appendChild(ov); const img = ov.querySelector("img"); let z = false;
+  limPreview(rol, firmas, 1500, .6).then(u => { img.src = u; });
+  img.addEventListener("click", () => { z = !z; img.style.width = z ? "230%" : "100%"; });
+  ov.querySelector(".lim-x").addEventListener("click", () => ov.remove());
+}
+/* Cuadro: previa + PDF de un mes (se usa en Limpieza y en Registros) */
+function limCuadroPrevia(host, getRol, getFirmas) {
+  host.innerHTML = `<div class="lim-prev"><img alt="Previa del rol de limpieza"><small>Toca la imagen para verla grande</small></div>`;
+  const img = host.querySelector("img"); let tmr = 0, ultima = "";
+  const pinta = async () => { const rol = getRol(); if (!rol) return; const f = getFirmas(), sig = JSON.stringify([rol.titulo, Object.keys(f).map(n => n + (f[n] && f[n].ts))]); if (sig === ultima) return; ultima = sig; img.src = await limPreview(rol, f, 700, .4); };
+  img.addEventListener("click", () => { const rol = getRol(); if (rol) limVisor(rol, getFirmas()); });
+  return () => { clearTimeout(tmr); tmr = setTimeout(pinta, 120); };
+}
 function buildLimpieza() {
   limCss();
   const mes = limMesActual();
   const wrap = document.createElement("div"); wrap.className = "lim-wrap";
-  wrap.innerHTML = `<div class="home-heading"><h2>Rol de limpieza</h2><p id="limSub">Cargando…</p></div><div id="limMesas"></div><div class="lim-bar"><button type="button" class="lim-pdf" id="limPdf" disabled>Generar PDF</button></div>`;
+  wrap.innerHTML = `<div class="lim-hero"><span>🧹</span><div><h2>Rol de limpieza</h2><p id="limSub">Cargando…</p></div></div><div id="limMesas"></div><div class="lim-bar"><button type="button" class="lim-pdf" id="limPdf">Generar PDF</button></div><div id="limPrev"></div><button type="button" class="lim-reg" id="limReg"><b>Registros</b><small>Meses anteriores guardados</small><i></i></button>`;
   let rol = null, firmas = {};
+  const refrescarPrev = limCuadroPrevia(wrap.querySelector("#limPrev"), () => rol, () => firmas);
   const pinta = () => {
     if (!rol) return;
-    const req = limPersonas(rol).filter(p => !p.fija), ok = req.filter(p => firmas[p.nombre] && firmas[p.nombre].img);
-    wrap.querySelector("#limSub").textContent = `${rol.titulo || limTitulo(mes)} · firmaron ${ok.length} de ${req.length}`;
-    wrap.querySelector("#limMesas").innerHTML = rol.mesas.slice().sort((a, b) => LIM_ORDEN.indexOf(a.mesa) - LIM_ORDEN.indexOf(b.mesa)).map(m => `<div class="lim-fila fix"><i style="background:${LIM_COL[m.mesa]}">${LIM_NOM[m.mesa]}</i><span>${m.asesores.map(a => `<b>${limEsc(a)}</b>`).join(", ")}</span><em class="${m.mesa === LIM_FIJA ? "fi" : m.asesores.every(a => firmas[a] && firmas[a].img) ? "ok" : "no"}">${m.mesa === LIM_FIJA ? "Fija" : m.asesores.every(a => firmas[a] && firmas[a].img) ? "Firmado ✓" : "Pendiente"}</em></div>`).join("");
-    const btn = wrap.querySelector("#limPdf"), falta = req.length - ok.length; btn.disabled = falta > 0 && !LIM_PRUEBA; btn.textContent = falta > 0 ? (LIM_PRUEBA ? `Generar PDF (prueba, faltan ${falta} firmas)` : `Faltan ${falta} firma${falta === 1 ? "" : "s"}`) : "Generar PDF";
+    const req = limPersonas(rol).filter(p => !p.fija), ok = req.filter(p => firmas[p.nombre] && firmas[p.nombre].img), falta = req.length - ok.length;
+    wrap.querySelector("#limSub").textContent = `${rol.titulo || limTitulo(mes)} · firmaron ${ok.length} de ${req.length}` + (falta ? ` · faltan ${falta}` : " · completo ✓");
+    const pend = rol.mesas.filter(m => m.mesa !== LIM_FIJA).map(m => ({ mesa: m.mesa, asesores: m.asesores.filter(a => !(firmas[a] && firmas[a].img)) })).filter(m => m.asesores.length).sort((a, b) => LIM_ORDEN.indexOf(a.mesa) - LIM_ORDEN.indexOf(b.mesa));
+    wrap.querySelector("#limMesas").innerHTML = pend.length ? `<h3 class="lim-h3">Faltan por firmar</h3>` + pend.map(m => `<div class="lim-fila fix"><i style="background:${LIM_COL[m.mesa]}">${LIM_NOM[m.mesa]}</i><span>${m.asesores.map(a => `<b>${limEsc(a)}</b>`).join(", ")}</span><em class="no">Pendiente</em></div>`).join("") : "";
+    wrap.querySelector("#limPdf").textContent = falta ? `Generar PDF (faltan ${falta} firma${falta === 1 ? "" : "s"})` : "Generar PDF";
+    refrescarPrev();
   };
   limRol(mes).then(r => { rol = r; if (!r) wrap.querySelector("#limSub").textContent = "Todavía no hay rol para este mes."; pinta(); });
   const stop = limEscuchar(mes, f => { firmas = f; pinta(); });
   const obs = new MutationObserver(() => { if (!wrap.isConnected) { stop(); obs.disconnect(); } }); obs.observe(document.body, { childList: true, subtree: true });
-  wrap.querySelector("#limPdf").addEventListener("click", async () => { const b = wrap.querySelector("#limPdf"); b.disabled = true; b.textContent = "Generando…"; try { await limPdf(rol, mes, firmas); } catch (e) { alert("No se pudo generar el PDF."); } pinta(); });
+  wrap.querySelector("#limPdf").addEventListener("click", async () => { if (!rol) return; const b = wrap.querySelector("#limPdf"); b.disabled = true; b.textContent = "Generando…"; try { await limPdf(rol, mes, firmas); } catch (e) { alert("No se pudo generar el PDF."); } b.disabled = false; pinta(); });
+  wrap.querySelector("#limReg").addEventListener("click", () => navigate({ screen: "limregistros", title: "Registros" }));
+  return wrap;
+}
+
+/* ---- Registros: meses guardados (ver, descargar, borrar con nombre autorizado) ---- */
+function buildLimRegistros() {
+  limCss();
+  const wrap = document.createElement("div"); wrap.className = "lim-wrap";
+  wrap.innerHTML = `<div class="lim-hero"><span>🗂️</span><div><h2>Registros</h2><p>Roles de limpieza guardados mes con mes.</p></div></div><div id="limRegL"><p class="lim-sub">Buscando…</p></div>`;
+  (async () => {
+    const hoy = limMesActual(), y0 = +hoy.split("-")[0], out = [];
+    for (let y = y0; y >= y0 - 1; y--) for (let m = 12; m >= 1; m--) {
+      const mes = y + "-" + String(m).padStart(2, "0"); if (mes > hoy) continue;
+      const f = await limFirmasDe(mes), j = await limCargarJson();
+      if ((f && Object.keys(f).length) || (j.meses && j.meses[mes] && mes === hoy)) out.push({ mes, n: f ? Object.keys(f).length : 0 });
+    }
+    wrap.querySelector("#limRegL").innerHTML = out.length ? out.map(o => `<button type="button" class="lim-reg" data-m="${o.mes}"><b>${limTitulo(o.mes)}</b><small>${o.n} firma${o.n === 1 ? "" : "s"} guardada${o.n === 1 ? "" : "s"}</small><i></i></button>`).join("") : `<p class="lim-sub">Todavía no hay registros guardados.</p>`;
+    wrap.querySelectorAll("[data-m]").forEach(b => b.addEventListener("click", () => navigate({ screen: "limregistro", mes: b.dataset.m, title: limTitulo(b.dataset.m) })));
+  })();
+  return wrap;
+}
+function buildLimRegistro(mes) {
+  limCss();
+  const wrap = document.createElement("div"); wrap.className = "lim-wrap";
+  wrap.innerHTML = `<div class="lim-hero"><span>🧾</span><div><h2>${limTitulo(mes)}</h2><p id="limRs">Cargando…</p></div></div><div class="lim-bar"><button type="button" class="lim-pdf" id="limRp">Descargar PDF</button></div><div id="limRv"></div><button type="button" class="lim-del" id="limRb">Borrar este registro</button>`;
+  let rol = null, firmas = {};
+  const ref = limCuadroPrevia(wrap.querySelector("#limRv"), () => rol, () => firmas);
+  (async () => {
+    rol = await limBuscar(mes); firmas = (await limFirmasDe(mes)) || {};
+    if (!rol) { wrap.querySelector("#limRs").textContent = "Sin datos del rol."; return; }
+    const req = limPersonas(rol).filter(p => !p.fija); wrap.querySelector("#limRs").textContent = `Firmaron ${req.filter(p => firmas[p.nombre] && firmas[p.nombre].img).length} de ${req.length}`; ref();
+  })();
+  wrap.querySelector("#limRp").addEventListener("click", async () => { if (rol) try { await limPdf(rol, mes, firmas); } catch (_) { alert("No se pudo generar el PDF."); } });
+  wrap.querySelector("#limRb").addEventListener("click", async () => {
+    const n = prompt("Para borrar este registro escribe tu nombre (solo personal autorizado):");
+    if (n === null) return;
+    if (!LIM_NO_VEND.includes(limNorm(n))) { alert("Ese nombre no está autorizado para borrar."); return; }
+    if (!confirm("¿Borrar el registro de " + limTitulo(mes) + "? No se puede deshacer.")) return;
+    try { if (typeof window.ishopLimBorrar === "function") { await window.ishopLimBorrar("firmas_" + mes); await window.ishopLimBorrar("rol_" + mes); } localStorage.removeItem("ishop_lim_rol_" + mes); localStorage.removeItem(limYoKey(mes)); alert("Registro borrado."); history.back(); }
+    catch (_) { alert("No se pudo borrar (revisa tu conexión)."); }
+  });
   return wrap;
 }
 
@@ -259,7 +361,19 @@ function limCss() {
   .lim-borrar{ position:absolute; right:8px; top:8px; border:0; border-radius:9px; padding:6px 10px; background:rgba(120,120,128,.18); color:#333; font:inherit; font-size:13px; font-weight:700; }
   .lim-go,.lim-pdf{ width:100%; margin-top:12px; border:0; border-radius:14px; padding:15px; font:inherit; font-size:17px; font-weight:800; background:var(--accent,#0071e3); color:#fff; } .lim-go:disabled,.lim-pdf:disabled{ opacity:.45; }
   .lim-bar{ display:flex; gap:8px; margin-top:12px; } .lim-bar button{ flex:1; margin-top:0; } .lim-sec{ border:0; border-radius:14px; padding:15px 8px; font:inherit; font-size:15px; font-weight:800; background:rgba(120,120,128,.28); color:var(--text,#111); }
-  .lim-prop{ margin-top:18px; } .lim-prop h3{ margin:0 2px 4px; }`;
+  .lim-hero{ display:flex; align-items:center; gap:14px; padding:18px 16px; margin:6px 0 14px; border-radius:22px; color:#fff; background:linear-gradient(125deg,#0f5c6e,#168a9b 60%,#0d4a5a); box-shadow:0 12px 26px rgba(15,92,110,.32), inset 0 1px 0 rgba(255,255,255,.2); }
+  .lim-hero span{ font-size:34px; } .lim-hero h2{ margin:0; font-size:26px; letter-spacing:-.02em; } .lim-hero p{ margin:3px 0 0; font-size:14px; opacity:.88; }
+  .lim-h3{ margin:4px 4px 6px; font-size:15px; color:var(--text-secondary); text-transform:uppercase; letter-spacing:.06em; }
+  .lim-prev{ margin-top:14px; } .lim-prev img{ display:block; width:100%; min-height:120px; border-radius:14px; border:1px solid var(--border,#d1d1d6); background:#fff; box-shadow:0 6px 16px rgba(0,0,0,.1); } .lim-prev small{ display:block; margin-top:6px; text-align:center; color:var(--text-secondary); font-size:12.5px; }
+  .lim-reg{ display:flex; align-items:center; width:100%; text-align:left; gap:2px; margin-top:12px; padding:14px 16px; border:0; border-radius:16px; background:var(--surface,#fff); color:var(--text); font:inherit; box-shadow:0 1px 0 rgba(0,0,0,.08); flex-wrap:wrap; position:relative; }
+  .lim-reg b{ flex-basis:100%; font-size:17px; } .lim-reg small{ color:var(--text-secondary); font-size:13px; } .lim-reg i{ position:absolute; right:16px; top:50%; width:8px; height:8px; border-right:2px solid currentColor; border-bottom:2px solid currentColor; transform:translateY(-50%) rotate(-45deg); opacity:.5; }
+  .lim-del{ width:100%; margin-top:16px; padding:13px; border:0; border-radius:14px; background:rgba(255,69,58,.14); color:#e5392e; font:inherit; font-weight:800; font-size:15px; }
+  .lim-vis{ position:fixed; inset:0; z-index:99998; background:rgba(0,0,0,.92); display:flex; flex-direction:column; } .lim-vp{ flex:1; overflow:auto; -webkit-overflow-scrolling:touch; padding:56px 8px 20px; } .lim-vp img{ width:100%; display:block; background:#fff; border-radius:8px; max-width:none; }
+  .lim-x{ position:absolute; top:calc(env(safe-area-inset-top,0px) + 10px); right:12px; z-index:2; width:40px; height:40px; border:0; border-radius:50%; background:rgba(255,255,255,.2); color:#fff; font-size:20px; }
+  .ase-hero{ margin:8px 2px 18px; } .ase-hero small{ font-size:12px; font-weight:800; letter-spacing:.22em; color:#8e5bd0; } .ase-hero h2{ margin:2px 0 4px; font-size:40px; font-weight:850; letter-spacing:-.035em; background:linear-gradient(120deg,#7a3fb0,#b5539c 70%,#e0707a); -webkit-background-clip:text; background-clip:text; color:transparent; } .ase-hero p{ margin:0; color:var(--text-secondary); font-size:15px; }
+  .ase-card{ position:relative; display:flex; align-items:center; gap:14px; width:100%; text-align:left; padding:16px; border:0; border-radius:22px; color:#fff; font:inherit; background:linear-gradient(125deg,#0f5c6e,#168a9b 60%,#0d4a5a); box-shadow:0 12px 26px rgba(15,92,110,.32), inset 0 1px 0 rgba(255,255,255,.2); }
+  .ase-card:active{ transform:scale(.985); } .ase-ic{ width:50px; height:50px; border-radius:15px; background:rgba(255,255,255,.18); display:grid; place-items:center; font-size:26px; } .ase-tx{ flex:1; display:flex; flex-direction:column; gap:2px; } .ase-tx b{ font-size:19px; } .ase-tx small{ font-size:13px; opacity:.85; }
+  .ase-card i{ width:9px; height:9px; border-right:2px solid #fff; border-bottom:2px solid #fff; transform:rotate(-45deg); opacity:.7; }`;
   document.head.appendChild(s);
 }
 window.addEventListener("load", () => { setTimeout(limGate, 600); });

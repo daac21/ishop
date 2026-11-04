@@ -525,6 +525,10 @@ function buildScreen(entry) {
     el.appendChild(buildAsesores());
   } else if (entry.screen === "limpieza") {
     el.appendChild(buildLimpieza());
+  } else if (entry.screen === "limregistros") {
+    el.appendChild(buildLimRegistros());
+  } else if (entry.screen === "limregistro") {
+    el.appendChild(buildLimRegistro(entry.mes));
   } else if (entry.screen === "switchSelect") {
     el.appendChild(buildSwitchSelect(entry.path));
   } else if (entry.screen === "switchResult") {
@@ -641,7 +645,7 @@ function buildHome() {
   wrap.appendChild(grid);
 
   const reg = document.createElement("button");
-  reg.className = "home-reg";
+  reg.className = "home-reg reg-registros";
   reg.innerHTML = `
     <span class="home-reg-icon">${ISHOP_ICONS.registros}</span>
     <span class="home-reg-text"><strong>Registros</strong></span>
@@ -650,7 +654,7 @@ function buildHome() {
   wrap.appendChild(reg);
 
   const ase = document.createElement("button");
-  ase.className = "home-reg";
+  ase.className = "home-reg reg-asesores";
   ase.innerHTML = `
     <span class="home-reg-icon">👥</span>
     <span class="home-reg-text"><strong>Asesores</strong></span>
