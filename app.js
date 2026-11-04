@@ -521,6 +521,10 @@ function buildScreen(entry) {
     el.appendChild(buildQuoteSelectNew(entry.path, entry.tradeIn));
   } else if (entry.screen === "quoteResult") {
     el.appendChild(buildQuoteResult(entry.tradeIn, entry.newModel, entry.newCapacity));
+  } else if (entry.screen === "asesores") {
+    el.appendChild(buildAsesores());
+  } else if (entry.screen === "limpieza") {
+    el.appendChild(buildLimpieza());
   } else if (entry.screen === "switchSelect") {
     el.appendChild(buildSwitchSelect(entry.path));
   } else if (entry.screen === "switchResult") {
@@ -644,6 +648,15 @@ function buildHome() {
     <span class="home-tile-chev"></span>`;
   reg.addEventListener("click", () => navigate({ screen: "registros", title: "Registros" }));
   wrap.appendChild(reg);
+
+  const ase = document.createElement("button");
+  ase.className = "home-reg";
+  ase.innerHTML = `
+    <span class="home-reg-icon">👥</span>
+    <span class="home-reg-text"><strong>Asesores</strong></span>
+    <span class="home-tile-chev"></span>`;
+  ase.addEventListener("click", () => navigate({ screen: "asesores", title: "Asesores" }));
+  wrap.appendChild(ase);
 
   async function handleMenuClick(item) {
     if (item.id === "cubre") {

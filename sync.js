@@ -139,6 +139,12 @@ const NV_KEY = "ishop_bodega_nv_v1";       // misma llave que usa bodega.js (Apa
     }, e => console.warn("Escaneos sin sync", e));
   };
 
+  /* ---- Limpieza: rol del mes y firmas (colección "limpieza": rol_YYYY-MM y firmas_YYYY-MM) ---- */
+  window.ishopLimGet = async function (id) { const s = await F.getDoc(F.doc(db, "limpieza", id)); return s.exists() ? s.data() : null; };
+  window.ishopLimSet = function (id, patch) { return F.setDoc(F.doc(db, "limpieza", id), patch, { merge: true }); };
+  window.ishopLimEscuchar = function (id, cb) { return F.onSnapshot(F.doc(db, "limpieza", id), s => cb(s.exists() ? s.data() : null), e => console.warn("Limpieza sin sync", e)); };
+  try { window.dispatchEvent(new Event("ishop-lim-listo")); } catch (_) {}
+
   /* ---- Subir cambios: bodegaSave(prev → d) ---- */
   window.ishopSyncPush = function (prev, d) {
     if (!F || !listo || pausaDesde()) return;     // modo pruebas: no se sube nada

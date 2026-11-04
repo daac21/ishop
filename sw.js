@@ -1,4 +1,4 @@
-const CACHE_NAME = "ishop-tools-v53";
+const CACHE_NAME = "ishop-tools-v54";
 const ASSETS = [
   "./index.html",
   "./style.css",
@@ -8,6 +8,10 @@ const ASSETS = [
   "./lectorpantalla.js",
   "./datos/lector_pantalla.js",
   "./existencias.js",
+  "./limpieza.js",
+  "./datos/limpieza.json",
+  "./imágenes/limpieza/plano.jpg",
+  "./imágenes/limpieza/logo.jpg",
   "./games/games.css",
   "./games/minesweeper.js",
   "./games/snake.js",
