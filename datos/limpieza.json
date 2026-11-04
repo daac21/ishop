@@ -1,0 +1,292 @@
+{
+ "meses": {
+  "2026-11": {
+   "titulo": "Noviembre 2026",
+   "mesas": [
+    {
+     "mesa": "1",
+     "asesores": [
+      "Montserrat"
+     ]
+    },
+    {
+     "mesa": "2",
+     "asesores": [
+      "Carlos"
+     ]
+    },
+    {
+     "mesa": "3y4",
+     "asesores": [
+      "Raul"
+     ]
+    },
+    {
+     "mesa": "5y6",
+     "asesores": [
+      "Dani"
+     ]
+    },
+    {
+     "mesa": "7y8",
+     "asesores": [
+      "Ceci"
+     ]
+    },
+    {
+     "mesa": "9",
+     "asesores": [
+      "Lalo"
+     ]
+    },
+    {
+     "mesa": "10",
+     "asesores": [
+      "Jesus"
+     ]
+    },
+    {
+     "mesa": "11",
+     "asesores": [
+      "Jorge"
+     ]
+    },
+    {
+     "mesa": "12",
+     "asesores": [
+      "Mari"
+     ]
+    },
+    {
+     "mesa": "13y14",
+     "asesores": [
+      "Kolaz"
+     ]
+    },
+    {
+     "mesa": "15y16",
+     "asesores": [
+      "Pau",
+      "R. Pau",
+      "Dimas"
+     ]
+    }
+   ]
+  }
+ },
+ "historial": {
+  "2026-03": [
+   {
+    "mesa": "1",
+    "asesores": [
+     "Omar"
+    ]
+   },
+   {
+    "mesa": "2",
+    "asesores": [
+     "Kolaz"
+    ]
+   },
+   {
+    "mesa": "3y4",
+    "asesores": [
+     "Ceci"
+    ]
+   },
+   {
+    "mesa": "5y6",
+    "asesores": [
+     "Dani"
+    ]
+   },
+   {
+    "mesa": "7y8",
+    "asesores": [
+     "Jorge"
+    ]
+   },
+   {
+    "mesa": "9",
+    "asesores": [
+     "Montserrat"
+    ]
+   },
+   {
+    "mesa": "10",
+    "asesores": [
+     "Raul"
+    ]
+   },
+   {
+    "mesa": "11",
+    "asesores": [
+     "Lalo"
+    ]
+   },
+   {
+    "mesa": "12",
+    "asesores": [
+     "Perez"
+    ]
+   },
+   {
+    "mesa": "13y14",
+    "asesores": [
+     "Abraham"
+    ]
+   },
+   {
+    "mesa": "15y16",
+    "asesores": [
+     "Jesus"
+    ]
+   }
+  ],
+  "2026-07": [
+   {
+    "mesa": "1",
+    "asesores": [
+     "Ceci"
+    ]
+   },
+   {
+    "mesa": "2",
+    "asesores": [
+     "Dani"
+    ]
+   },
+   {
+    "mesa": "3y4",
+    "asesores": [
+     "Jorge"
+    ]
+   },
+   {
+    "mesa": "5y6",
+    "asesores": [
+     "Perez"
+    ]
+   },
+   {
+    "mesa": "7y8",
+    "asesores": [
+     "Lalo"
+    ]
+   },
+   {
+    "mesa": "9",
+    "asesores": [
+     "Fernando"
+    ]
+   },
+   {
+    "mesa": "10",
+    "asesores": [
+     "Jesus"
+    ]
+   },
+   {
+    "mesa": "11",
+    "asesores": [
+     "Montserrat"
+    ]
+   },
+   {
+    "mesa": "12",
+    "asesores": [
+     "Kolaz"
+    ]
+   },
+   {
+    "mesa": "13y14",
+    "asesores": [
+     "Raul"
+    ]
+   },
+   {
+    "mesa": "15y16",
+    "asesores": [
+     "Cajas"
+    ]
+   }
+  ],
+  "2026-09": [
+   {
+    "mesa": "1",
+    "asesores": [
+     "Dani"
+    ]
+   },
+   {
+    "mesa": "2",
+    "asesores": [
+     "Jorge"
+    ]
+   },
+   {
+    "mesa": "3y4",
+    "asesores": [
+     "Montserrat"
+    ]
+   },
+   {
+    "mesa": "5y6",
+    "asesores": [
+     "Fernando"
+    ]
+   },
+   {
+    "mesa": "7y8",
+    "asesores": [
+     "Carlos"
+    ]
+   },
+   {
+    "mesa": "9",
+    "asesores": [
+     "Raul"
+    ]
+   },
+   {
+    "mesa": "10",
+    "asesores": [
+     "Lalo"
+    ]
+   },
+   {
+    "mesa": "11",
+    "asesores": [
+     "Mari"
+    ]
+   },
+   {
+    "mesa": "12",
+    "asesores": [
+     "Chucho"
+    ]
+   },
+   {
+    "mesa": "13y14",
+    "asesores": [
+     "Kolaz",
+     "Ceci"
+    ]
+   },
+   {
+    "mesa": "15y16",
+    "asesores": [
+     "Pau",
+     "R. Pau",
+     "Dimas"
+    ]
+   }
+  ]
+ },
+ "alias": {
+  "cecilia": "Ceci",
+  "daniel": "Dani",
+  "montse": "Montserrat",
+  "eduardo": "Lalo"
+ }
+}
