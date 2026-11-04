@@ -143,6 +143,10 @@ const NV_KEY = "ishop_bodega_nv_v1";       // misma llave que usa bodega.js (Apa
   window.ishopLimGet = async function (id) { const s = await F.getDoc(F.doc(db, "limpieza", id)); return s.exists() ? s.data() : null; };
   window.ishopLimSet = function (id, patch) { return F.setDoc(F.doc(db, "limpieza", id), patch, { merge: true }); };
   window.ishopLimEscuchar = function (id, cb) { return F.onSnapshot(F.doc(db, "limpieza", id), s => cb(s.exists() ? s.data() : null), e => console.warn("Limpieza sin sync", e)); };
+  window.ishopLimCrear = async function (id, data) {   // crea solo si no existe (si dos teléfonos lo intentan, gana el primero)
+    const ref = F.doc(db, "limpieza", id);
+    return await F.runTransaction(db, async tx => { const s = await tx.get(ref); if (s.exists()) return s.data(); tx.set(ref, data); return data; });
+  };
   try { window.dispatchEvent(new Event("ishop-lim-listo")); } catch (_) {}
 
   /* ---- Subir cambios: bodegaSave(prev → d) ---- */
