@@ -10,6 +10,8 @@ const LIM_COL = { "1": "#f07800", "2": "#ffaa00", "3y4": "#0a7ac8", "5y6": "#8b1
 const LIM_NOM = { "1": "1", "2": "2", "3y4": "3 y 4", "5y6": "5 y 6", "7y8": "7 y 8", "9": "9", "10": "10", "11": "11", "12": "12", "13y14": "13 y 14", "15y16": "15 y 16" };
 const LIM_ORDEN = ["1", "2", "3y4", "5y6", "7y8", "9", "10", "11", "12", "13y14", "15y16"];
 const LIM_FIJA = "15y16";
+const LIM_CC_MES = "2026-11";   // arreglo de UNA sola vez: Carlos C firma como Kolaz (solo este mes; el 1 del mes siguiente ya no aplica)
+const limEsCC = () => { const t = limNorm((typeof ishopAjustes === "function" ? ishopAjustes().nombre : "") || "").split(" "); return t[0] === "carlos" && !!t[1] && t[1][0] === "c"; };
 const LIM_PRUEBA = false;   // (apagado) firmas inventadas solo para pruebas
 const LIM_NO_VEND = ["angel", "juan", "juan carlos", "fabian", "omar", "sahib", "daniel", "dani"];   // entran sin mesa de limpieza
 const limNorm = t => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
@@ -85,7 +87,16 @@ async function limGate() {
   const mes = limMesActual();
   const rol = await limRol(mes);
   if (!rol) return;
-  const f = limFirmado(mes);
+  let soloKolaz = false;
+  if (mes === LIM_CC_MES && limEsCC()) {                   // Carlos C = Kolaz (solo este mes)
+    const kol = limPersonas(rol).find(p => limNorm(p.nombre) === "kolaz");
+    if (kol) {
+      const fsK = await limFirmasDe(mes);
+      if (fsK && fsK[kol.nombre] && fsK[kol.nombre].img) { try { localStorage.setItem(limYoKey(mes), kol.nombre); } catch (_) {} return; }   // ya firmó como Kolaz
+      if (fsK) soloKolaz = true;                           // sin firma de Kolaz: se le pide solo a él
+    }
+  }
+  const f = soloKolaz ? "" : limFirmado(mes);
   if (f) {
     limReintentar();
     const pers = limPersonas(rol).find(p => limNorm(p.nombre) === limNorm(f));
@@ -100,14 +111,15 @@ async function limGate() {
   limGateAbierto = true;
   limCss();
   const personas = limPersonas(rol), nombreApp = (typeof ishopAjustes === "function" ? ishopAjustes().nombre : "") || "";
-  const ant = limNorm(limViejo(mes)), previo = personas.find(p => ant && limNorm(p.nombre) === ant) || personas.find(p => limNorm(p.nombre) === limNorm(nombreApp) || limNorm(nombreApp).split(" ")[0] === limNorm(p.nombre));
+  const ant = limNorm(limViejo(mes)), previo = soloKolaz ? personas.find(p => limNorm(p.nombre) === "kolaz") : personas.find(p => ant && limNorm(p.nombre) === ant) || personas.find(p => limNorm(p.nombre) === limNorm(nombreApp) || limNorm(nombreApp).split(" ")[0] === limNorm(p.nombre));
   const ov = document.createElement("div"); ov.className = "lim-ov";
   ov.innerHTML = `<div class="lim-card"><h2>Rol de limpieza · ${limEsc(rol.titulo || limTitulo(mes))}</h2>
     <p class="lim-sub">Elige tu nombre, revisa tu mesa y firma para continuar.</p>
-    <div class="lim-lista">${rol.mesas.slice().sort((a, b) => LIM_ORDEN.indexOf(a.mesa) - LIM_ORDEN.indexOf(b.mesa)).map(m => `<button type="button" class="lim-fila" data-m="${m.mesa}"><i style="background:${LIM_COL[m.mesa]}">${LIM_NOM[m.mesa]}</i><span>${m.asesores.map(a => `<b data-n="${limEsc(a)}">${limEsc(a)}</b>`).join(", ")}</span></button>`).join("")}</div>
+    <div class="lim-lista">${rol.mesas.filter(m => !soloKolaz || m.asesores.some(a => limNorm(a) === "kolaz")).sort((a, b) => LIM_ORDEN.indexOf(a.mesa) - LIM_ORDEN.indexOf(b.mesa)).map(m => `<button type="button" class="lim-fila" data-m="${m.mesa}"><i style="background:${LIM_COL[m.mesa]}">${LIM_NOM[m.mesa]}</i><span>${m.asesores.map(a => `<b data-n="${limEsc(a)}">${limEsc(a)}</b>`).join(", ")}</span></button>`).join("")}</div>
     <div class="lim-nov"><b>No soy vendedor</b><p>Escribe tu nombre para entrar (sin mesa de limpieza).</p><input type="text" class="lim-in" placeholder="Tu nombre" autocomplete="off" autocapitalize="words"><div class="lim-err" hidden></div><button type="button" class="lim-go lim-gonv">Entrar</button></div>
     <div class="lim-yo" hidden><div class="lim-tu"></div><div class="lim-pad"></div><button type="button" class="lim-go" disabled>Firmar y continuar</button></div></div>`;
   document.body.appendChild(ov);
+  if (soloKolaz) { const nv = ov.querySelector(".lim-nov"); if (nv) nv.style.display = "none"; }
   const yo = ov.querySelector(".lim-yo"), tu = ov.querySelector(".lim-tu"), go = ov.querySelector(".lim-go"); let sel = null, pad = null;
   const elegir = (p) => {
     sel = p; ov.querySelectorAll(".lim-fila").forEach(f => f.classList.toggle("on", f.dataset.m === p.mesa));
@@ -158,8 +170,8 @@ function limEscuchar(mes, cb) {
 function buildAsesores() {
   limCss();
   const wrap = document.createElement("div"); wrap.className = "lim-wrap";
-  wrap.innerHTML = `<div class="ase-hero"><small>EQUIPO</small><h2>Asesores</h2><p>Todo lo del equipo en un solo lugar.</p></div>
-    <button type="button" class="ase-card" id="aseLim"><span class="ase-ic">🧹</span><span class="ase-tx"><b>Limpieza</b><small>Tu mueble del mes y tu firma</small></span><i></i></button>`;
+  wrap.innerHTML = `<div class="ase-hero"><h2>Asesores</h2></div>
+    <button type="button" class="ase-card" id="aseLim"><span class="ase-ic">🧹</span><span class="ase-tx"><b>Limpieza</b></span><i></i></button>`;
   wrap.querySelector("#aseLim").addEventListener("click", () => navigate({ screen: "limpieza", title: "Limpieza" }));
   return wrap;
 }
@@ -370,7 +382,7 @@ function limCss() {
   .lim-del{ width:100%; margin-top:16px; padding:13px; border:0; border-radius:14px; background:rgba(255,69,58,.14); color:#e5392e; font:inherit; font-weight:800; font-size:15px; }
   .lim-vis{ position:fixed; inset:0; z-index:99998; background:rgba(0,0,0,.92); display:flex; flex-direction:column; } .lim-vp{ flex:1; overflow:auto; -webkit-overflow-scrolling:touch; padding:56px 8px 20px; } .lim-vp img{ width:100%; display:block; background:#fff; border-radius:8px; max-width:none; }
   .lim-x{ position:absolute; top:calc(env(safe-area-inset-top,0px) + 10px); right:12px; z-index:2; width:40px; height:40px; border:0; border-radius:50%; background:rgba(255,255,255,.2); color:#fff; font-size:20px; }
-  .ase-hero{ margin:8px 2px 18px; } .ase-hero small{ font-size:12px; font-weight:800; letter-spacing:.22em; color:#8e5bd0; } .ase-hero h2{ margin:2px 0 4px; font-size:40px; font-weight:850; letter-spacing:-.035em; background:linear-gradient(120deg,#7a3fb0,#b5539c 70%,#e0707a); -webkit-background-clip:text; background-clip:text; color:transparent; } .ase-hero p{ margin:0; color:var(--text-secondary); font-size:15px; }
+  .ase-hero{ margin:8px 2px 18px; } .ase-hero small{ font-size:12px; font-weight:800; letter-spacing:.22em; color:#8e5bd0; } .ase-hero h2{ margin:2px 0 4px; font-size:40px; font-weight:850; letter-spacing:-.035em; background:linear-gradient(120deg,#0a84ff,#12b5c9 55%,#2fcf8a); -webkit-background-clip:text; background-clip:text; color:transparent; } .ase-hero p{ margin:0; color:var(--text-secondary); font-size:15px; }
   .ase-card{ position:relative; display:flex; align-items:center; gap:14px; width:100%; text-align:left; padding:16px; border:0; border-radius:22px; color:#fff; font:inherit; background:linear-gradient(125deg,#0f5c6e,#168a9b 60%,#0d4a5a); box-shadow:0 12px 26px rgba(15,92,110,.32), inset 0 1px 0 rgba(255,255,255,.2); }
   .ase-card:active{ transform:scale(.985); } .ase-ic{ width:50px; height:50px; border-radius:15px; background:rgba(255,255,255,.18); display:grid; place-items:center; font-size:26px; } .ase-tx{ flex:1; display:flex; flex-direction:column; gap:2px; } .ase-tx b{ font-size:19px; } .ase-tx small{ font-size:13px; opacity:.85; }
   .ase-card i{ width:9px; height:9px; border-right:2px solid #fff; border-bottom:2px solid #fff; transform:rotate(-45deg); opacity:.7; }`;
