@@ -83,6 +83,7 @@ const ARCADE_GAMES = [
   { id: "snake",  icon: "🐍", label: "Snake",      color: "#34c759" },
   { id: "mines",  icon: "💣", label: "Buscaminas", color: "#3a3a3c" },
   { id: "dino",   icon: "🦖", label: "Dino Run",   color: "#ff9500" },
+  { id: "doom",   icon: "👹", label: "Doom",       color: "#b3261e" },
 ];
 
 // Iconos y color por categoría de cobertura
@@ -495,7 +496,7 @@ function render(isForward) {
 
   const node = buildScreen(entry);
   node.classList.add("screen");
-  if (!/^(scanner|arcade|minesweeper|tetris|snake|dino|repair)$/.test(entry.screen)) {
+  if (!/^(scanner|arcade|minesweeper|tetris|snake|dino|doom|repair)$/.test(entry.screen)) {
     node.classList.add("has-wm");
     node.appendChild(dsWatermark());
   }
@@ -598,6 +599,18 @@ function buildScreen(entry) {
     el.appendChild(buildSnake());
   } else if (entry.screen === "dino") {
     el.appendChild(buildDino());
+  } else if (entry.screen === "doom") {
+    // Doom corre aislado en un iframe que solo se crea al abrir esta pantalla
+    // (al salir, la pantalla se destruye y el iframe deja de consumir). No usa
+    // Firebase, ni datos/*.json, ni el almacenamiento de la app.
+    el.style.padding = "0";
+    el.style.background = "#000";
+    const fr = document.createElement("iframe");
+    fr.src = "games/doom/index.html";
+    fr.title = "Doom";
+    fr.setAttribute("allow", "fullscreen");
+    fr.style.cssText = "position:absolute;inset:0;width:100%;height:100%;border:0;background:#000";
+    el.appendChild(fr);
   } else if (entry.screen === "tool") {
     el.appendChild(buildPlaceholder(entry.title, "🛠️", "Esta sección estará disponible próximamente."));
   }
