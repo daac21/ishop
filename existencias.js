@@ -27,6 +27,10 @@ function exIcono(id) { return `<svg viewBox="0 0 24 24" fill="none" stroke="curr
 function exSlug(t) { return String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""); }
 function exImg(nombre) { return `<img src="imágenes/existencias/${exSlug(nombre)}.png" alt="" loading="lazy" onload="this.parentNode.classList.add('has')" onerror="this.remove()">`; }
 /* Fotos de Watch: imágenes/existencias/watch/<modelo>-<acabado>-<correa>.webp (miniatura ~3 KB) y ...-grande.webp (solo se baja al tocar) */
+/* PRÓXIMAMENTE: modelos nuevos. Con piezas en Bodega salen con la marca amarilla y el UPC oculto; sin piezas no se muestran.
+   Cuando un modelo ya sea oficial, borra su línea de esta lista. */
+const EX_PROX = ["iPad mini A20 Pro", "MacBook Pro 14\" M6", "MacBook Pro 14\" PROLED", "MacBook Pro 16\" PROLED", "iMac De 24 M6"];
+const exProx = m => { m = String(m || "").toLowerCase(); return EX_PROX.some(p => m.startsWith(p.toLowerCase())); };
 function exFotoBase(i) {
   if (!i) return "";
   if (!i.orden) {
@@ -36,6 +40,13 @@ function exFotoBase(i) {
       const sm = exSlug(mod).replace(/^(iphone-1[78]-pro)$/, "$1-max").replace(/^iphone-16-plus$/, "iphone-16").replace(/^(ipad-pro)-11-(m\d)$/, "$1-13-$2").replace(/^(ipad-air)-13-(m\d)$/, "$1-11-$2");
       let col = exSlug(i.color); if (/^ipad-pro/.test(sm)) col = col.replace(/^negro-espacial$/, "negro");
       return "imágenes/existencias/" + i.seccion.toLowerCase() + "/" + sm + "-" + col;
+    }
+    if (i.seccion === "Mac") {   // mac/imac-24-m6-azul · mac/macbook-pro-14-m6-plata · mac/macbook-pro-proled-negro-espacial
+      const mo = String(i.modelo || ""), col = exSlug(i.color);
+      if (/^imac/i.test(mo) && /\bM6\b/i.test(mo)) return "imágenes/existencias/mac/imac-24-m6-" + col;
+      if (/macbook\s*pro/i.test(mo) && /\bM6\b/i.test(mo)) return "imágenes/existencias/mac/macbook-pro-14-m6-" + col;
+      if (/macbook\s*pro/i.test(mo) && /proled/i.test(mo)) return "imágenes/existencias/mac/macbook-pro-proled-" + col;
+      return "";
     }
     if (/^Apple Watch SE ?3$/i.test(i.modelo || "")) { const c = String(i.color || "").match(/^(.+?)\s+Aluminio/i); return c ? "imágenes/existencias/watch/se3-" + exSlug(c[1]) : ""; }   // SE3: se3-medianoche, se3-blanco-estelar
     // Series 12 de aluminio con el nombre anterior: "Bronce Oscuro Aluminio Deportiva Oliva"
@@ -58,6 +69,10 @@ const EX_FOTOS_LISTA = new Set([
   ...["amarillo", "azul", "plata", "rosa"].map(c => "ipad/ipad-11-a16-" + c),
   ...["azul", "blanco-estelar", "gris-espacial", "morado"].map(c => "ipad/ipad-air-11-m4-" + c),
   ...["negro", "plata"].map(c => "ipad/ipad-pro-13-m5-" + c),
+  ...["medianoche", "blanco-estelar"].map(c => "ipad/ipad-mini-a20-pro-" + c),
+  ...["negro-espacial", "plata"].map(c => "mac/macbook-pro-14-m6-" + c),
+  ...["negro-espacial", "plata"].map(c => "mac/macbook-pro-proled-" + c),
+  ...["azul", "plata", "rosa", "verde"].map(c => "mac/imac-24-m6-" + c),
 ].map(x => "imágenes/existencias/" + x));
 const EX_FOTO_V = "?v=4";   // sube el número si cambias las fotos, para que el teléfono las vuelva a bajar
 function exFotoImg(base) { return base ? `<img src="${base}.webp${EX_FOTO_V}" alt="" decoding="async" onload="this.parentNode.classList.add('has')" onerror="this.remove()">` : ""; }
@@ -378,6 +393,11 @@ function exEstilos() {
   .ex-chev{ width:11px; height:11px; border-right:2.5px solid #8e8e93; border-bottom:2.5px solid #8e8e93; transform:rotate(-45deg); margin:0 8px 0 0; }
   .ex-model.open .ex-chev{ transform:rotate(45deg); margin:0 8px 4px 0; }
   .ex-model.open .ex-mh{ border-bottom:1px solid rgba(255,255,255,.1); }
+  /* Próximamente: marca de agua amarilla sobre la tarjeta */
+  .ex-model.prox::after{ content:"PRÓXIMAMENTE"; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; text-align:center; pointer-events:none; z-index:4;
+    font:900 clamp(26px,9vw,44px)/1 -apple-system,system-ui,sans-serif; letter-spacing:.04em; color:#ffd60a; transform:rotate(-12deg); opacity:.93;
+    text-shadow:0 2px 3px rgba(0,0,0,.6), 0 0 16px rgba(0,0,0,.45); -webkit-text-stroke:1px rgba(0,0,0,.35); }
+  .ex-model.prox .ex-upc{ filter:blur(5px); user-select:none; -webkit-user-select:none; }
   `;
   document.head.appendChild(st);
 }
@@ -420,6 +440,9 @@ function buildExistencias() {
       const p = exParse(todos[k].modelo, todos[k].seccion);
       const it = { upc: k, ...todos[k], titulo: p.titulo, spec: p.spec, orden: p.orden, qty: libre(k), demo: Math.min(demo[k] || 0, stock[k] || 0) };
       if (p.orden) Object.assign(it, exCorrea(it.color));   // Watch nuevo: correa + talla
+      it.prox = exProx(it.modelo);
+      if (it.prox && /\bM6\b/.test(it.modelo) && !/M6/.test(it.titulo)) it.titulo += " M6";   // tarjeta aparte del iMac / MacBook Pro anteriores
+      if (it.prox && it.qty <= 0) return;   // nuevo y sin piezas: aún no se muestra
       (it.qty > 0 ? disp : agot).push(it);
     });
   }
@@ -460,7 +483,7 @@ function buildExistencias() {
 
   const coincide = (i) => {
     if (!texto) return true;
-    const hay = (i.titulo + " " + i.spec + " " + i.modelo + " " + i.color + " " + i.capacidad + " " + i.upc).toLowerCase();
+    const hay = (i.titulo + " " + i.spec + " " + i.modelo + " " + i.color + " " + i.capacidad + (i.prox ? "" : " " + i.upc)).toLowerCase();
     return texto.toLowerCase().split(/\s+/).filter(Boolean).every(w => hay.includes(w));
   };
   const apaHtml = (n, u) => n > 0 ? `<span class="ex-apa" data-ap="${exEsc(u || "")}"><svg viewBox="0 0 24 24"><path d="M7 4h10v16l-5-3.5L7 20z"/></svg>${n} apartado${n === 1 ? "" : "s"}</span>` : "";
@@ -477,12 +500,12 @@ function buildExistencias() {
     const pr = exPrecio(i);
     const row = `<div class="ex-row" data-u="${i.upc}">
       ${exFotoBase(i) ? `<div class="ex-dot ex-thumb" data-foto="${exEsc(exFotoBase(i))}" data-n="${exEsc(i.modelo + " · " + i.color + (i.capacidad ? " · " + i.capacidad : ""))}" style="background:${exColor(i.color, i.modelo)}">${exFotoImg(exFotoBase(i))}</div>` : `<div class="ex-dot" style="background:${exColor(i.color, i.modelo)}"></div>`}
-      ${i.orden ? `<div class="ex-info"><span class="col">${exEsc(i.corr || "Sin correa")}</span><span class="ex-wl">${i.talla ? `<b class="ex-talla">${exEsc(i.talla)}</b>` : ""}<span class="ex-upc">${exEsc(i.upc)}</span></span>${apaHtml(apart[i.upc] || 0, i.upc)}${demoHtml(i.demo)}</div>`
-      : `<div class="ex-info"><span class="col">${exEsc(i.color || "Sin color")}</span><span class="ex-upc">${exEsc(i.upc)}</span>${apaHtml(apart[i.upc] || 0, i.upc)}${demoHtml(i.demo)}</div>`}
+      ${i.orden ? `<div class="ex-info"><span class="col">${exEsc(i.corr || "Sin correa")}</span><span class="ex-wl">${i.talla ? `<b class="ex-talla">${exEsc(i.talla)}</b>` : ""}<span class="ex-upc">${exEsc(i.prox ? "•••• •••• ••••" : i.upc)}</span></span>${apaHtml(apart[i.upc] || 0, i.upc)}${demoHtml(i.demo)}</div>`
+      : `<div class="ex-info"><span class="col">${exEsc(i.color || "Sin color")}</span><span class="ex-upc">${exEsc(i.prox ? "•••• •••• ••••" : i.upc)}</span>${apaHtml(apart[i.upc] || 0, i.upc)}${demoHtml(i.demo)}</div>`}
       ${pr != null ? `<span class="ex-price">${exMoney(pr)}</span>` : ""}
       ${badge(i.qty, "u:" + i.upc, i.seccion)}
     </div>`;
-    return i.qty > 0 ? `<div class="ex-sw"><button class="ex-sell" type="button" data-u="${i.upc}" tabindex="-1">${EX_CHECK}Vendido</button>${row}</div>` : row;
+    return i.qty > 0 && !i.prox ? `<div class="ex-sw"><button class="ex-sell" type="button" data-u="${i.upc}" tabindex="-1">${EX_CHECK}Vendido</button>${row}</div>` : row;
   };
   /* filas agrupadas por capacidad, con su franja "256 GB · 3 colores · 18 pzas" */
   const bloques = (items) => {
@@ -499,7 +522,7 @@ function buildExistencias() {
     const abierto = texto || abiertos.has(clave);
     const p = items[0];
     const ord = items.slice().sort(cmp), pf = p.orden ? p : (ord.find(x => EX_FOTOS_LISTA.has(exFotoBase(x))) || ord[0]), fb = exFotoBase(pf);   // Series 12 (nombre anterior): foto principal = primer color
-    return `<div class="ex-model${abierto ? " open" : ""}" data-m="${exEsc(clave)}" style="--c1:${sec.c1};--c2:${sec.c2}">
+    return `<div class="ex-model${abierto ? " open" : ""}${items.length && items.every(x => x.prox) ? " prox" : ""}" data-m="${exEsc(clave)}" style="--c1:${sec.c1};--c2:${sec.c2}">
       <button class="ex-mh" type="button"><div class="ex-pic${fb ? " wpic" : ""}">${exIcono(sec.id)}${fb ? exFotoImg(fb) : exImg(p.titulo)}</div>
         <div class="ex-mt">${exNombre(p.titulo)}${p.spec ? `<span class="spec">${exEsc(p.spec)}</span>` : ""}${p.orden ? `<div class="sub ex-wsub"><span class="ex-sws"><i style="background:${exColor(p.color, p.modelo)}"></i></span><span>${[...new Set(items.map(i => (i.corr || "").replace(/^Correa\s+/i, "")).filter(Boolean))].join(" · ")}</span></div>`
         : `<div class="sub"><span class="ex-sws">${colores.slice(0, 6).map(c => `<i style="background:${exColor(c)}"></i>`).join("")}</span><b class="ex-sep"></b><span>${colores.length} color${colores.length === 1 ? "" : "es"}</span></div>`}</div>

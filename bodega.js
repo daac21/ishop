@@ -1848,7 +1848,7 @@ function buildBodegaDemo() {
 const BX_TABS = ["iPhone", "Mac", "iPad", "Watch"];
 let bxEscTab = "iPhone";
 function bxEscDb() { return new Promise((ok, fail) => { const r = indexedDB.open("ishop_escaneos_v1", 1); r.onupgradeneeded = () => r.result.createObjectStore("e", { keyPath: "ts" }); r.onsuccess = () => ok(r.result); r.onerror = () => fail(r.error); }); }
-async function bxEscTodos() { const db = await bxEscDb(); return new Promise(ok => { const q = db.transaction("e").objectStore("e").getAll(); q.onsuccess = () => ok((q.result || []).map(bxEscNorm).sort((a, b) => b.ts - a.ts)); q.onerror = () => ok([]); }); }
+async function bxEscTodos() { const db = await bxEscDb(); return new Promise(ok => { const q = db.transaction("e").objectStore("e").getAll(); q.onsuccess = () => ok((q.result || []).filter(d => !d.borrado).map(bxEscNorm).sort((a, b) => b.ts - a.ts)); q.onerror = () => ok([]); }); }
 async function bxEscGet(ts) { const db = await bxEscDb(); return new Promise(ok => { const q = db.transaction("e").objectStore("e").get(ts); q.onsuccess = () => ok(bxEscNorm(q.result) || null); q.onerror = () => ok(null); }); }
 async function bxEscPon(d) { const db = await bxEscDb(); return new Promise(ok => { const t = db.transaction("e", "readwrite"); t.objectStore("e").put(d); t.oncomplete = () => ok(true); t.onerror = () => ok(false); }); }
 
@@ -1938,6 +1938,8 @@ function bxEscEscuchar() {
     let cambio = false;
     for (const r of docs) {
       const loc = await bxEscGet(r.ts), rr = bxEscNorm({ ...r, nube: true });
+      if (r.borrado) { if (loc && !loc.borrado) { const db = await bxEscDb(); await new Promise(ok => { const t = db.transaction("e", "readwrite"); t.objectStore("e").delete(r.ts); t.oncomplete = () => ok(); t.onerror = () => ok(); }); cambio = true; } continue; }   // borrado en otro equipo
+      if (loc && loc.borrado) continue;                                                                       // este equipo lo borró y falta avisar a la nube
       if (!loc) { await bxEscPon(rr); cambio = true; }
       else if ((rr.rev || 1) > (loc.rev || 1)) { await bxEscPon({ ...rr, foto: rr.foto || loc.foto }); cambio = true; }
       else if (!loc.nube) { loc.nube = true; await bxEscPon(loc); cambio = true; }
@@ -1945,7 +1947,19 @@ function bxEscEscuchar() {
     if (cambio) bxEscOyentes.forEach(f => { try { f(); } catch (e) {} });
   });
 }
+/* Borrar un escaneo: se quita de este equipo y de la nube (si no hay internet, queda pendiente y se borra solo después) */
+async function bxEscBorrar(d) {
+  const db = await bxEscDb();
+  const quitar = () => new Promise(ok => { const t = db.transaction("e", "readwrite"); t.objectStore("e").delete(d.ts); t.oncomplete = () => ok(); t.onerror = () => ok(); });
+  let hecho = !d.nube;
+  if (d.nube && typeof window.ishopEscaneoBorrar === "function") { try { await window.ishopEscaneoBorrar(d.ts); hecho = true; } catch (e) {} }
+  if (hecho) await quitar(); else await bxEscPon({ ts: d.ts, seccion: d.seccion, rows: [], rev: 1, borrado: true, pendBorrar: true });
+}
 async function bxEscSincronizar() {
+  try {   // borrados que quedaron pendientes por falta de internet
+    const db = await bxEscDb(), raw = await new Promise(ok => { const q = db.transaction("e").objectStore("e").getAll(); q.onsuccess = () => ok(q.result || []); q.onerror = () => ok([]); });
+    for (const d of raw.filter(x => x.pendBorrar)) { try { await window.ishopEscaneoBorrar(d.ts); await new Promise(ok => { const t = db.transaction("e", "readwrite"); t.objectStore("e").delete(d.ts); t.oncomplete = () => ok(); t.onerror = () => ok(); }); } catch (e) {} }
+  } catch (e) {}
   const todos = await bxEscTodos();
   for (const d of todos) if (!d.nube) await bxEscSubir(d);                    // los que quedaron pendientes
   bxEscEscuchar();
@@ -1959,6 +1973,8 @@ function bxEscCss() {
   .bxe-th{ flex:0 0 76px; height:76px; border-radius:14px; background:var(--bx-fill); overflow:hidden; display:grid; place-items:center; font-size:12px; color:var(--text-secondary); }
   .bxe-th img{ width:100%; height:100%; object-fit:cover; display:block; }
   .bxe-item .t{ flex:1; min-width:0; } .bxe-item .t b{ display:block; font-size:19px; } .bxe-item .t small{ display:block; margin-top:3px; font-size:14px; color:var(--text-secondary); }
+  .bxe-w{ position:relative; } .bxe-w .bxe-item{ padding-right:64px; }
+  .bxe-del{ position:absolute; right:12px; top:50%; transform:translateY(-35%); width:40px; height:40px; border:0; border-radius:12px; background:rgba(255,69,58,.14); color:#ff453a; display:flex; align-items:center; justify-content:center; cursor:pointer; }
   .bxe-tag{ display:inline-block; white-space:nowrap; margin:6px 6px 0 0; font-size:12px; font-weight:700; padding:2px 9px; border-radius:999px; background:var(--bx-fill); color:var(--text-secondary); }
   .bxe-tag.ok{ background:rgba(48,209,88,.18); color:var(--bx-green); } .bxe-tag.pend{ background:rgba(255,159,10,.2); color:var(--bx-orange); }
   .bxe-tabs{ display:flex; gap:8px; overflow-x:auto; padding:12px 2px 4px; scrollbar-width:none; } .bxe-tabs::-webkit-scrollbar{ display:none; }
@@ -2021,7 +2037,12 @@ function buildBodegaEscaneos() {
           <small>${d.rows.length} renglones · ${piezas} pieza${piezas === 1 ? "" : "s"}${d.fecha ? " · lista " + bodegaEsc(d.fecha) : ""}</small>
           ${d.revisado ? `<span class="bxe-tag ok">Revisado</span>` : ""}${d.editado ? `<span class="bxe-tag">Editado</span>` : ""}${np ? `<span class="bxe-tag pend">${np} por identificar</span>` : ""}${d.nube ? "" : `<span class="bxe-tag pend">Solo en este equipo</span>`}</div><i class="bx-ch">${BX_ICON.chev}</i>`;
       b.addEventListener("click", () => navigate({ screen: "bodegaEscaneo", title: "Escaneo", ts: d.ts }));
-      l.appendChild(b);
+      const w = document.createElement("div"); w.className = "bxe-w"; w.appendChild(b);
+      const x = document.createElement("button"); x.type = "button"; x.className = "bxe-del"; x.setAttribute("aria-label", "Borrar escaneo");
+      x.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>';
+      x.addEventListener("click", async e => { e.stopPropagation(); if (!confirm("¿Borrar este escaneo? No se puede deshacer.")) return; await bxEscBorrar(d); pintar(); });
+      w.appendChild(x);
+      l.appendChild(w);
     });
   };
   wrap.querySelector("#bxeTabs").addEventListener("click", e => { const b = e.target.closest("[data-t]"); if (b) { bxEscTab = b.dataset.t; pintar(); } });

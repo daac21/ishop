@@ -27,11 +27,12 @@ let limDatos = LIM_BASE;
 async function limCargarJson() { return limDatos; }
 /* Rol del mes: publicado en Firebase > archivo/base > guardado en el teléfono. */
 async function limBuscar(mes) {
-  const k = "ishop_lim_rol_" + mes;
+  const k = "ishop_lim_rol_" + mes, kh = "ishop_lim_rolchk_" + mes, hoy = new Date().toDateString();
+  try { const c = JSON.parse(localStorage.getItem(k)); if (c && c.mesas && localStorage.getItem(kh) === hoy) return c; } catch (_) {}   // el rol se consulta en Firebase máximo una vez al día
   try {
     if (typeof window.ishopLimGet === "function") {
       const d = await window.ishopLimGet("rol_" + mes);
-      if (d && d.mesas) { const r = { titulo: d.titulo || limTitulo(mes), mesas: JSON.parse(d.mesas) }; try { localStorage.setItem(k, JSON.stringify(r)); } catch (_) {} return r; }
+      if (d && d.mesas) { const r = { titulo: d.titulo || limTitulo(mes), mesas: JSON.parse(d.mesas) }; try { localStorage.setItem(k, JSON.stringify(r)); localStorage.setItem(kh, hoy); } catch (_) {} return r; }
     }
   } catch (_) {}
   const j = await limCargarJson();
@@ -84,15 +85,17 @@ function limPad(host) {
 let limGateAbierto = false;
 async function limGate() {
   if (limGateAbierto) return;
-  const mes = limMesActual();
+  const mes = limMesActual(), esCCmes = mes === LIM_CC_MES && limEsCC();
+  try { if (localStorage.getItem(esCCmes ? "ishop_lim_ccok_" + mes : "ishop_lim_ok_" + mes) === "1") return; } catch (_) {}   // ya verificado este mes: cero lecturas a Firebase hasta el día 1
   const rol = await limRol(mes);
   if (!rol) return;
+  const okMes = () => { try { localStorage.setItem("ishop_lim_ok_" + mes, "1"); if (esCCmes) localStorage.setItem("ishop_lim_ccok_" + mes, "1"); } catch (_) {} };
   let soloKolaz = false;
   if (mes === LIM_CC_MES && limEsCC()) {                   // Carlos C = Kolaz (solo este mes)
     const kol = limPersonas(rol).find(p => limNorm(p.nombre) === "kolaz");
     if (kol) {
       const fsK = await limFirmasDe(mes);
-      if (fsK && fsK[kol.nombre] && fsK[kol.nombre].img) { try { localStorage.setItem(limYoKey(mes), kol.nombre); } catch (_) {} return; }   // ya firmó como Kolaz
+      if (fsK && fsK[kol.nombre] && fsK[kol.nombre].img) { try { localStorage.setItem(limYoKey(mes), kol.nombre); } catch (_) {} okMes(); return; }   // ya firmó como Kolaz
       if (fsK) soloKolaz = true;                           // sin firma de Kolaz: se le pide solo a él
     }
   }
@@ -100,12 +103,12 @@ async function limGate() {
   if (f) {
     limReintentar();
     const pers = limPersonas(rol).find(p => limNorm(p.nombre) === limNorm(f));
-    if (!pers || pers.fija) return;                       // no vendedor o mesa fija: ya entró
+    if (!pers || pers.fija) { okMes(); return; }           // no vendedor o mesa fija: ya entró
     const hoy = new Date().toDateString(), kc = "ishop_lim_chk_" + mes;   // la revisión en Firebase se hace una sola vez al día
     try { if (localStorage.getItem(kc) === hoy) return; } catch (_) {}
     const fs = await limFirmasDe(mes);                    // si su firma no está en Firebase, se vuelve a pedir
     if (!fs) return;
-    if (fs[pers.nombre] && fs[pers.nombre].img) { try { localStorage.setItem(kc, hoy); } catch (_) {} return; }
+    if (fs[pers.nombre] && fs[pers.nombre].img) { try { localStorage.setItem(kc, hoy); } catch (_) {} okMes(); return; }
     try { localStorage.removeItem(limYoKey(mes)); } catch (_) {}
   }
   limGateAbierto = true;
@@ -152,7 +155,9 @@ async function limGate() {
       let ok = true; try { if (typeof window.ishopLimAcceso === "function") ok = await window.ishopLimAcceso("fija_" + mes, limDev(), 3); } catch (_) { ok = true; }
       if (!ok) { const e = ov.querySelector("#limFijaErr"); if (e) { e.hidden = false; e.textContent = "Acceso denegado: ya se usaron los 3 accesos de la mesa " + LIM_NOM[sel.mesa] + "."; } go.disabled = false; return; }
     }
-    if (!sel.fija) { if (pad.vacia()) { go.disabled = false; return; } await limSubirFirma(mes, sel.nombre, pad.png(), Date.now()); }
+    let subido = true;
+    if (!sel.fija) { if (pad.vacia()) { go.disabled = false; return; } subido = await limSubirFirma(mes, sel.nombre, pad.png(), Date.now()); }
+    if (subido) okMes();
     try { localStorage.setItem(limYoKey(mes), sel.nombre); } catch (_) {}
     ov.remove(); limGateAbierto = false;
   });
@@ -234,8 +239,9 @@ function buildLimpieza() {
     wrap.querySelector("#limPdf").textContent = falta ? `Generar PDF (faltan ${falta} firma${falta === 1 ? "" : "s"})` : "Generar PDF";
     refrescarPrev();
   };
+  try { const c = JSON.parse(localStorage.getItem("ishop_lim_fc_" + mes)); if (c && typeof c === "object") firmas = c; } catch (_) {}   // muestra al instante las firmas guardadas mientras llegan las nuevas
   limRol(mes).then(r => { rol = r; if (!r) wrap.querySelector("#limSub").textContent = "Todavía no hay rol para este mes."; pinta(); });
-  const stop = limEscuchar(mes, f => { firmas = f; pinta(); });
+  const stop = limEscuchar(mes, f => { firmas = f; try { localStorage.setItem("ishop_lim_fc_" + mes, JSON.stringify(f)); } catch (_) {} pinta(); });
   const obs = new MutationObserver(() => { if (!wrap.isConnected) { stop(); obs.disconnect(); } }); obs.observe(document.body, { childList: true, subtree: true });
   wrap.querySelector("#limPdf").addEventListener("click", async () => { if (!rol) return; const b = wrap.querySelector("#limPdf"); b.disabled = true; b.textContent = "Generando…"; try { await limPdf(rol, mes, firmas); } catch (e) { alert("No se pudo generar el PDF."); } b.disabled = false; pinta(); });
   wrap.querySelector("#limReg").addEventListener("click", () => navigate({ screen: "limregistros", title: "Registros" }));
@@ -276,7 +282,7 @@ function buildLimRegistro(mes) {
     if (n === null) return;
     if (!LIM_NO_VEND.includes(limNorm(n))) { alert("Ese nombre no está autorizado para borrar."); return; }
     if (!confirm("¿Borrar el registro de " + limTitulo(mes) + "? No se puede deshacer.")) return;
-    try { if (typeof window.ishopLimBorrar === "function") { await window.ishopLimBorrar("firmas_" + mes); await window.ishopLimBorrar("rol_" + mes); } localStorage.removeItem("ishop_lim_rol_" + mes); localStorage.removeItem(limYoKey(mes)); alert("Registro borrado."); history.back(); }
+    try { if (typeof window.ishopLimBorrar === "function") { await window.ishopLimBorrar("firmas_" + mes); await window.ishopLimBorrar("rol_" + mes); } localStorage.removeItem("ishop_lim_rol_" + mes); localStorage.removeItem("ishop_lim_ok_" + mes); localStorage.removeItem("ishop_lim_ccok_" + mes); localStorage.removeItem("ishop_lim_fc_" + mes); localStorage.removeItem(limYoKey(mes)); alert("Registro borrado."); history.back(); }
     catch (_) { alert("No se pudo borrar (revisa tu conexión)."); }
   });
   return wrap;

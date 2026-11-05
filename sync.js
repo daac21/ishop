@@ -130,6 +130,12 @@ const NV_KEY = "ishop_bodega_nv_v1";       // misma llave que usa bodega.js (Apa
       return nuevo;
     });
   };
+  window.ishopEscaneoBorrar = async function (ts) {   // quita la foto y deja una marca "borrado" para que los demás equipos también lo quiten
+    if (!syncOn()) throw new Error("sin sync");
+    try { await F.deleteDoc(F.doc(db, "escaneos_fotos", String(ts))); } catch (e) {}
+    const ref = F.doc(db, "escaneos", String(ts));
+    await F.runTransaction(db, async tx => { const s = await tx.get(ref); if (!s.exists()) return; const cur = s.data(); tx.set(ref, { ts: cur.ts, seccion: cur.seccion || "", borrado: true, rows: [], rev: (cur.rev || 1) + 1 }); });
+  };
   window.ishopEscaneosEscuchar = function (cb) {
     const q = F.query(F.collection(db, "escaneos"), F.orderBy("ts", "desc"), F.limit(80));
     return F.onSnapshot(q, snap => {
