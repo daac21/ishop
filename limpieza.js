@@ -123,7 +123,7 @@ async function limGate() {
     <div class="lim-yo" hidden><div class="lim-tu"></div><div class="lim-pad"></div><button type="button" class="lim-go" disabled>Firmar y continuar</button></div></div>`;
   document.body.appendChild(ov);
   if (soloKolaz) { const nv = ov.querySelector(".lim-nov"); if (nv) nv.style.display = "none"; }
-  const yo = ov.querySelector(".lim-yo"), tu = ov.querySelector(".lim-tu"), go = ov.querySelector(".lim-go"); let sel = null, pad = null;
+  const yo = ov.querySelector(".lim-yo"), tu = ov.querySelector(".lim-tu"), go = ov.querySelector(".lim-yo .lim-go"); let sel = null, pad = null;
   const elegir = (p) => {
     sel = p; ov.querySelectorAll(".lim-fila").forEach(f => f.classList.toggle("on", f.dataset.m === p.mesa));
     yo.hidden = false;
