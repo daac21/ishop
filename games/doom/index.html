@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<title>Doom</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;user-select:none;-webkit-user-select:none}
+  html,body{margin:0;height:100%;background:#000;color:#eee;font-family:-apple-system,system-ui,sans-serif;overflow:hidden;touch-action:none}
+  #wrap{display:flex;flex-direction:column;height:100%}
+  #screen{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative}
+  canvas{width:100%;height:100%;object-fit:contain;background:#000;image-rendering:pixelated;display:none}
+  #start{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:20px}
+  #start button{font:600 18px inherit;font-family:inherit;padding:14px 28px;border-radius:14px;border:0;background:#b3261e;color:#fff}
+  #msg{font-size:13px;opacity:.7;min-height:18px}
+  #pad{display:none;justify-content:space-between;align-items:center;padding:8px 8px calc(8px + env(safe-area-inset-bottom));gap:8px}
+  .grp{display:grid;gap:6px}
+  #dpad{grid-template-columns:repeat(3,42px);grid-template-rows:repeat(2,50px)}
+  #acts{grid-template-columns:66px;grid-template-rows:repeat(2,50px)}
+  .b{border:1px solid #444;background:#1c1c1e;color:#eee;border-radius:12px;font:600 15px inherit;font-family:inherit;display:flex;align-items:center;justify-content:center}
+  .b.on{background:#b3261e}
+  .mid{display:flex;flex-direction:column;gap:6px;align-items:center}
+  .mid .row{display:flex;gap:5px}
+  .mid .b{width:30px;height:32px;font-size:13px;border-radius:9px}
+  #fire{grid-row:auto;background:#7a1a15}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="screen">
+    <canvas id="cv" width="320" height="200"></canvas>
+    <div id="start">
+      <div style="font-size:34px">DOOM</div>
+      <div id="msg">Shareware · se descarga solo al jugar (~4.5 MB)</div>
+      <button id="go">Toca para jugar</button>
+      <div style="font-size:12px;opacity:.5">Teclado: flechas/WASD · Ctrl o F = disparar · Espacio = abrir · Enter · Esc</div>
+    </div>
+  </div>
+  <div id="pad">
+    <div class="grp" id="dpad">
+      <div></div><div class="b" data-k="up">▲</div><div></div>
+      <div class="b" data-k="left">◀</div><div class="b" data-k="down">▼</div><div class="b" data-k="right">▶</div>
+    </div>
+    <div class="mid">
+      <div class="row"><div class="b" data-k="esc">Esc</div><div class="b" data-k="enter">↵</div><div class="b" data-k="y">Y</div></div>
+      <div class="row"><div class="b" data-k="1">1</div><div class="b" data-k="2">2</div><div class="b" data-k="3">3</div><div class="b" data-k="4">4</div></div>
+      <div class="row"><div class="b" data-k="sl">«</div><div class="b" data-k="sr">»</div><div class="b" data-k="run">⇧</div></div>
+    </div>
+    <div class="grp" id="acts">
+      <div class="b" id="fire" data-k="fire">FUEGO</div>
+      <div class="b" data-k="use">ABRIR</div>
+    </div>
+  </div>
+</div>
+<script src="doom.js"></script>
+<script>
+(function(){
+  var W=1280,H=800, SW=320, SH=200;
+  var cv=document.getElementById('cv'), ctx=cv.getContext('2d');
+  var img=ctx.createImageData(SW,SH), out32=new Uint32Array(img.data.buffer);
+  var msg=document.getElementById('msg'), startBox=document.getElementById('start'), pad=document.getElementById('pad');
+  var M=null, fbPtr=0, running=false, last=0;
+
+  var CODE={up:0xad,down:0xaf,left:0xac,right:0xae,sl:0xa0,sr:0xa1,fire:0xa3,use:32,enter:13,esc:27,run:0x80+0x36,y:121};
+  function code(k){ if(CODE[k]!==undefined) return CODE[k]; if(k.length===1) return k.charCodeAt(0); return 0; }
+  var down={};
+  function press(k,on){
+    if(!M||down[k]===on) return; down[k]=on;
+    var c=code(k); if(c) M._DG_PushKeyEvent(on?1:0,c);
+  }
+
+  // Teclado
+  var KM={ArrowUp:'up',ArrowDown:'down',ArrowLeft:'left',ArrowRight:'right',w:'up',s:'down',a:'sl',d:'sr',
+          Control:'fire',f:'fire',' ':'use',Enter:'enter',Escape:'esc',Shift:'run',y:'y',n:'n',Tab:'tab'};
+  function kmap(e){ var k=KM[e.key]||KM[e.key.toLowerCase&&e.key.toLowerCase()]; if(!k&&/^[0-9]$/.test(e.key)) k=e.key; return k; }
+  addEventListener('keydown',function(e){var k=kmap(e); if(k){e.preventDefault();press(k,true);}});
+  addEventListener('keyup',function(e){var k=kmap(e); if(k){e.preventDefault();press(k,false);}});
+
+  // Táctil
+  [].forEach.call(document.querySelectorAll('[data-k]'),function(el){
+    var k=el.getAttribute('data-k'), ids={};
+    function dn(e){e.preventDefault();el.classList.add('on');press(k,true);}
+    function up(e){e.preventDefault();el.classList.remove('on');press(k,false);}
+    el.addEventListener('pointerdown',dn);
+    el.addEventListener('pointerup',up);
+    el.addEventListener('pointercancel',up);
+    el.addEventListener('pointerleave',up);
+    el.addEventListener('contextmenu',function(e){e.preventDefault();});
+  });
+
+  function frame(t){
+    if(!running) return;
+    requestAnimationFrame(frame);
+    if(t-last<27) return;
+    last=t;
+    M._doomgeneric_Tick();
+    var src=new Uint32Array(M.HEAPU8.buffer, fbPtr, W*H);
+    var i=0;
+    for(var y=0;y<SH;y++){
+      var row=y*4*W;
+      for(var x=0;x<SW;x++,i++){
+        var p=src[row+x*4];
+        out32[i]=0xff000000|((p&0xff)<<16)|(p&0xff00)|((p>>16)&0xff);
+      }
+    }
+    ctx.putImageData(img,0,0);
+  }
+
+  document.addEventListener('visibilitychange',function(){
+    if(!M) return;
+    if(document.hidden){running=false;}
+    else if(!running){running=true;requestAnimationFrame(frame);}
+  });
+
+  async function get(url,label){
+    msg.textContent='Descargando '+label+'…';
+    var r=await fetch(url); if(!r.ok) throw new Error(url+' '+r.status);
+    return new Uint8Array(await r.arrayBuffer());
+  }
+
+  document.getElementById('go').addEventListener('click',async function(){
+    this.disabled=true;
+    try{
+      var wasm=await get('doom.wasm','motor');
+      var wad=await get('doom1.wad','datos del juego');
+      msg.textContent='Iniciando…';
+      M=await createDoomModule({
+        wasmBinary:wasm,
+        print:function(){}, printErr:function(){},
+        initAudio:function(){}, shutdownAudio:function(){}, playSound:function(){},
+        playMusic:function(){}, stopMusic:function(){}, setMusicVolume:function(){},
+        quitGame:function(){ running=false; startBox.style.display='flex'; cv.style.display='none'; },
+        preRun:[function(m){
+          m.FS_createPath('/','doom',true,true);
+          m.FS_createDataFile('/doom','doom1.wad',wad,true,false);
+          m.FS_createPath('/','.savegame',true,true);
+        }]
+      });
+      var args=['doom','-iwad','/doom/doom1.wad'], ptrs=[];
+      args.forEach(function(a){var p=M._malloc(a.length+1);for(var i=0;i<a.length;i++)M.setValue(p+i,a.charCodeAt(i),'i8');M.setValue(p+a.length,0,'i8');ptrs.push(p);});
+      var argv=M._malloc(ptrs.length*4); ptrs.forEach(function(p,i){M.setValue(argv+i*4,p,'i32');});
+      M._doomgeneric_Create(args.length,argv);
+      fbPtr=M._DG_GetFrameBuffer();
+      startBox.style.display='none'; cv.style.display='block';
+      if(matchMedia('(pointer:coarse)').matches||'ontouchstart' in window) pad.style.display='flex';
+      running=true; requestAnimationFrame(frame);
+    }catch(err){
+      msg.textContent='No se pudo cargar: '+err.message; this.disabled=false;
+    }
+  });
+  window.__doomDebug=function(){return {M:M,fbPtr:fbPtr};};
+})();
+</script>
+</body>
+</html>
