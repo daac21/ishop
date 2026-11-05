@@ -27,7 +27,7 @@ function exIcono(id) { return `<svg viewBox="0 0 24 24" fill="none" stroke="curr
 function exSlug(t) { return String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""); }
 function exImg(nombre) { return `<img src="imágenes/existencias/${exSlug(nombre)}.png" alt="" loading="lazy" onload="this.parentNode.classList.add('has')" onerror="this.remove()">`; }
 /* Fotos de Watch: imágenes/existencias/watch/<modelo>-<acabado>-<correa>.webp (miniatura ~3 KB) y ...-grande.webp (solo se baja al tocar) */
-/* PRÓXIMAMENTE: modelos nuevos. Con piezas en Bodega salen con la marca amarilla y el UPC oculto; sin piezas no se muestran.
+/* PRÓXIMAMENTE: modelos nuevos. Salen siempre con la marca amarilla y el UPC oculto (con o sin piezas en Bodega).
    Cuando un modelo ya sea oficial, borra su línea de esta lista. */
 const EX_PROX = ["iPad mini A20 Pro", "MacBook Pro 14\" M6", "MacBook Pro 14\" PROLED", "MacBook Pro 16\" PROLED", "iMac De 24 M6"];
 const exProx = m => { m = String(m || "").toLowerCase(); return EX_PROX.some(p => m.startsWith(p.toLowerCase())); };
@@ -397,6 +397,7 @@ function exEstilos() {
   .ex-model.prox::after{ content:"PRÓXIMAMENTE"; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; text-align:center; pointer-events:none; z-index:4;
     font:900 clamp(26px,9vw,44px)/1 -apple-system,system-ui,sans-serif; letter-spacing:.04em; color:#ffd60a; transform:rotate(-12deg); opacity:.93;
     text-shadow:0 2px 3px rgba(0,0,0,.6), 0 0 16px rgba(0,0,0,.45); -webkit-text-stroke:1px rgba(0,0,0,.35); }
+  .ex-model.prox .ex-badge.zero{ display:none; }
   .ex-model.prox .ex-upc{ filter:blur(5px); user-select:none; -webkit-user-select:none; }
   `;
   document.head.appendChild(st);
@@ -442,8 +443,7 @@ function buildExistencias() {
       if (p.orden) Object.assign(it, exCorrea(it.color));   // Watch nuevo: correa + talla
       it.prox = exProx(it.modelo);
       if (it.prox && /\bM6\b/.test(it.modelo) && !/M6/.test(it.titulo)) it.titulo += " M6";   // tarjeta aparte del iMac / MacBook Pro anteriores
-      if (it.prox && it.qty <= 0) return;   // nuevo y sin piezas: aún no se muestra
-      (it.qty > 0 ? disp : agot).push(it);
+      (it.qty > 0 || it.prox ? disp : agot).push(it);   // los nuevos siempre se ven (con su marca "Próximamente"), aunque aún no haya piezas
     });
   }
   calc();
