@@ -3189,5 +3189,335 @@
     "color": "Correa Deportiva (Talla M/L)",
     "capacidad": "",
     "applecare": 1749
+  },
+  "195951205304": {
+    "modelo": "iPad mini A20 Pro Wi-Fi",
+    "color": "Medianoche",
+    "capacidad": "128",
+    "applecare": 1999
+  },
+  "195951206189": {
+    "modelo": "iPad mini A20 Pro Wi-Fi",
+    "color": "Medianoche",
+    "capacidad": "256",
+    "applecare": 1999
+  },
+  "195951207063": {
+    "modelo": "iPad mini A20 Pro Wi-Fi",
+    "color": "Medianoche",
+    "capacidad": "512",
+    "applecare": 1999
+  },
+  "195951205526": {
+    "modelo": "iPad mini A20 Pro Wi-Fi",
+    "color": "Blanco Estelar",
+    "capacidad": "128",
+    "applecare": 1999
+  },
+  "195951206400": {
+    "modelo": "iPad mini A20 Pro Wi-Fi",
+    "color": "Blanco Estelar",
+    "capacidad": "256",
+    "applecare": 1999
+  },
+  "195951207285": {
+    "modelo": "iPad mini A20 Pro Wi-Fi",
+    "color": "Blanco Estelar",
+    "capacidad": "512",
+    "applecare": 1999
+  },
+  "195951268378": {
+    "modelo": "iPad mini A20 Pro Wi-Fi + Cellular",
+    "color": "Medianoche",
+    "capacidad": "128",
+    "applecare": 1999
+  },
+  "195951268811": {
+    "modelo": "iPad mini A20 Pro Wi-Fi + Cellular",
+    "color": "Medianoche",
+    "capacidad": "256",
+    "applecare": 1999
+  },
+  "195951269252": {
+    "modelo": "iPad mini A20 Pro Wi-Fi + Cellular",
+    "color": "Medianoche",
+    "capacidad": "512",
+    "applecare": 1999
+  },
+  "195951268590": {
+    "modelo": "iPad mini A20 Pro Wi-Fi + Cellular",
+    "color": "Blanco Estelar",
+    "capacidad": "128",
+    "applecare": 1999
+  },
+  "195951269030": {
+    "modelo": "iPad mini A20 Pro Wi-Fi + Cellular",
+    "color": "Blanco Estelar",
+    "capacidad": "256",
+    "applecare": 1999
+  },
+  "195951269474": {
+    "modelo": "iPad mini A20 Pro Wi-Fi + Cellular",
+    "color": "Blanco Estelar",
+    "capacidad": "512",
+    "applecare": 1999
+  },
+  "195951403755": {
+    "modelo": "iPad mini A20 Pro Wi-Fi - VNT",
+    "color": "Medianoche",
+    "capacidad": "256",
+    "applecare": 1999
+  },
+  "195951207506": {
+    "modelo": "iPad mini A20 Pro Wi-Fi - VNT",
+    "color": "Medianoche",
+    "capacidad": "512",
+    "applecare": 1999
+  },
+  "195951403977": {
+    "modelo": "iPad mini A20 Pro Wi-Fi - VNT",
+    "color": "Blanco Estelar",
+    "capacidad": "256",
+    "applecare": 1999
+  },
+  "195951207728": {
+    "modelo": "iPad mini A20 Pro Wi-Fi - VNT",
+    "color": "Blanco Estelar",
+    "capacidad": "512",
+    "applecare": 1999
+  },
+  "195951422763": {
+    "modelo": "iPad mini A20 Pro Wi-Fi + Cellular - VNT",
+    "color": "Medianoche",
+    "capacidad": "256",
+    "applecare": 1999
+  },
+  "195951269696": {
+    "modelo": "iPad mini A20 Pro Wi-Fi + Cellular - VNT",
+    "color": "Medianoche",
+    "capacidad": "512",
+    "applecare": 1999
+  },
+  "195951422961": {
+    "modelo": "iPad mini A20 Pro Wi-Fi + Cellular - VNT",
+    "color": "Blanco Estelar",
+    "capacidad": "256",
+    "applecare": 1999
+  },
+  "195951269917": {
+    "modelo": "iPad mini A20 Pro Wi-Fi + Cellular - VNT",
+    "color": "Blanco Estelar",
+    "capacidad": "512",
+    "applecare": 1999
+  },
+  "195951080178": {
+    "modelo": "MacBook Pro 14\" M6 16GB CPU 12 / GPU 12",
+    "color": "Negro Espacial",
+    "capacidad": "1 TB",
+    "applecare": 7199
+  },
+  "195951081588": {
+    "modelo": "MacBook Pro 14\" M6 16GB CPU 12 / GPU 12",
+    "color": "Plata",
+    "capacidad": "1 TB",
+    "applecare": 7199
+  },
+  "195951080642": {
+    "modelo": "MacBook Pro 14\" M6 24GB CPU 12 / GPU 12",
+    "color": "Negro Espacial",
+    "capacidad": "1 TB",
+    "applecare": 7199
+  },
+  "195951082059": {
+    "modelo": "MacBook Pro 14\" M6 24GB CPU 12 / GPU 12",
+    "color": "Plata",
+    "capacidad": "1 TB",
+    "applecare": 7199
+  },
+  "195951081113": {
+    "modelo": "MacBook Pro 14\" M6 32GB CPU 12 / GPU 12",
+    "color": "Negro Espacial",
+    "capacidad": "1 TB",
+    "applecare": 7199
+  },
+  "195951082523": {
+    "modelo": "MacBook Pro 14\" M6 32GB CPU 12 / GPU 12",
+    "color": "Plata",
+    "capacidad": "1 TB",
+    "applecare": 7199
+  },
+  "195951196626": {
+    "modelo": "MacBook Pro 14\" PROLED M5 Pro 24GB CPU 15 / GPU 16",
+    "color": "Negro Espacial",
+    "capacidad": "1 TB",
+    "applecare": 9599
+  },
+  "195951195216": {
+    "modelo": "MacBook Pro 14\" PROLED M5 Pro 24GB CPU 15 / GPU 16",
+    "color": "Plata",
+    "capacidad": "1 TB",
+    "applecare": 9599
+  },
+  "195951644745": {
+    "modelo": "MacBook Pro 14\" PROLED M5 Pro 48GB CPU 18 / GPU 20",
+    "color": "Negro Espacial",
+    "capacidad": "1 TB",
+    "applecare": 9599
+  },
+  "195951644271": {
+    "modelo": "MacBook Pro 14\" PROLED M5 Pro 48GB CPU 18 / GPU 20",
+    "color": "Plata",
+    "capacidad": "1 TB",
+    "applecare": 9599
+  },
+  "195951197562": {
+    "modelo": "MacBook Pro 14\" PROLED M5 Max 36GB CPU 18 / GPU 32",
+    "color": "Negro Espacial",
+    "capacidad": "2 TB",
+    "applecare": 9599
+  },
+  "195951196152": {
+    "modelo": "MacBook Pro 14\" PROLED M5 Max 36GB CPU 18 / GPU 32",
+    "color": "Plata",
+    "capacidad": "2 TB",
+    "applecare": 9599
+  },
+  "195951199504": {
+    "modelo": "MacBook Pro 16\" PROLED M5 Pro 24GB CPU 18 / GPU 20",
+    "color": "Negro Espacial",
+    "capacidad": "1 TB",
+    "applecare": 11399
+  },
+  "195951198095": {
+    "modelo": "MacBook Pro 16\" PROLED M5 Pro 24GB CPU 18 / GPU 20",
+    "color": "Plata",
+    "capacidad": "1 TB",
+    "applecare": 11399
+  },
+  "195951199979": {
+    "modelo": "MacBook Pro 16\" PROLED M5 Max 36GB CPU 18 / GPU 32",
+    "color": "Negro Espacial",
+    "capacidad": "2 TB",
+    "applecare": 11399
+  },
+  "195951198569": {
+    "modelo": "MacBook Pro 16\" PROLED M5 Max 36GB CPU 18 / GPU 32",
+    "color": "Plata",
+    "capacidad": "2 TB",
+    "applecare": 11399
+  },
+  "195951200446": {
+    "modelo": "MacBook Pro 16\" PROLED M5 Max 48GB CPU 18 / GPU 40",
+    "color": "Negro Espacial",
+    "capacidad": "2 TB",
+    "applecare": 11399
+  },
+  "195951199030": {
+    "modelo": "MacBook Pro 16\" PROLED M5 Max 48GB CPU 18 / GPU 40",
+    "color": "Plata",
+    "capacidad": "2 TB",
+    "applecare": 11399
+  },
+  "195950844979": {
+    "modelo": "iMac De 24 M6 24GB CPU 12 / GPU 12",
+    "color": "Azul",
+    "capacidad": "512 Gb",
+    "applecare": 4499
+  },
+  "195950840834": {
+    "modelo": "iMac De 24 M6 24GB CPU 12 / GPU 12",
+    "color": "Plata",
+    "capacidad": "512 Gb",
+    "applecare": 4499
+  },
+  "195950846355": {
+    "modelo": "iMac De 24 M6 24GB CPU 12 / GPU 12",
+    "color": "Rosa",
+    "capacidad": "512 Gb",
+    "applecare": 4499
+  },
+  "195950843590": {
+    "modelo": "iMac De 24 M6 24GB CPU 12 / GPU 12",
+    "color": "Verde",
+    "capacidad": "512 Gb",
+    "applecare": 4499
+  },
+  "195950837988": {
+    "modelo": "iMac De 24 M6 16GB CPU 10 / GPU 10",
+    "color": "Azul",
+    "capacidad": "256 Gb",
+    "applecare": 4499
+  },
+  "195950836608": {
+    "modelo": "iMac De 24 M6 16GB CPU 10 / GPU 10",
+    "color": "Plata",
+    "capacidad": "256 Gb",
+    "applecare": 4499
+  },
+  "195950838442": {
+    "modelo": "iMac De 24 M6 16GB CPU 10 / GPU 10",
+    "color": "Rosa",
+    "capacidad": "256 Gb",
+    "applecare": 4499
+  },
+  "195950837520": {
+    "modelo": "iMac De 24 M6 16GB CPU 10 / GPU 10",
+    "color": "Verde",
+    "capacidad": "256 Gb",
+    "applecare": 4499
+  },
+  "195950844054": {
+    "modelo": "iMac De 24 M6 16GB CPU 12 / GPU 12",
+    "color": "Azul",
+    "capacidad": "256 Gb",
+    "applecare": 4499
+  },
+  "195950839913": {
+    "modelo": "iMac De 24 M6 16GB CPU 12 / GPU 12",
+    "color": "Plata",
+    "capacidad": "256 Gb",
+    "applecare": 4499
+  },
+  "195950845433": {
+    "modelo": "iMac De 24 M6 16GB CPU 12 / GPU 12",
+    "color": "Rosa",
+    "capacidad": "256 Gb",
+    "applecare": 4499
+  },
+  "195950842678": {
+    "modelo": "iMac De 24 M6 16GB CPU 12 / GPU 12",
+    "color": "Verde",
+    "capacidad": "256 Gb",
+    "applecare": 4499
+  },
+  "195950844511": {
+    "modelo": "iMac De 24 M6 16GB CPU 12 / GPU 12",
+    "color": "Azul",
+    "capacidad": "512 Gb",
+    "applecare": 4499
+  },
+  "195950840377": {
+    "modelo": "iMac De 24 M6 16GB CPU 12 / GPU 12",
+    "color": "Plata",
+    "capacidad": "512 Gb",
+    "applecare": 4499
+  },
+  "195950845891": {
+    "modelo": "iMac De 24 M6 16GB CPU 12 / GPU 12",
+    "color": "Rosa",
+    "capacidad": "512 Gb",
+    "applecare": 4499
+  },
+  "195950843132": {
+    "modelo": "iMac De 24 M6 16GB CPU 12 / GPU 12",
+    "color": "Verde",
+    "capacidad": "512 Gb",
+    "applecare": 4499
+  },
+  "195950849783": {
+    "modelo": "iMac De 24 M6 16GB CPU 12 / GPU 12 nano texturizado",
+    "color": "Plata",
+    "capacidad": "256 Gb",
+    "applecare": 4499
   }
 }

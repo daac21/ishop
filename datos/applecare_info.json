@@ -406,6 +406,24 @@
         ]
       }
     },
+    "iPad mini A20 Pro": {
+      "AppleCare+": {
+        "precio": 1999,
+        "deducibles": {
+          "Pantalla": 559,
+          "Otros daños": 1899,
+          "Apple Pencil": 559,
+          "Magic Keyboard": 559
+        },
+        "cubre": [
+          "Daños accidentales ilimitados.",
+          "Reparaciones con piezas originales Apple.",
+          "Cobertura de batería cuando conserve menos del 80 % de su capacidad original.",
+          "Cobertura para Apple Pencil y Magic Keyboard incluidos en el plan.",
+          "Soporte técnico prioritario."
+        ]
+      }
+    },
     "iPad Air 11 M4": {
       "AppleCare+": {
         "precio": 1999,
@@ -525,6 +543,21 @@
         ]
       }
     },
+    "iMac M6": {
+      "AppleCare+": {
+        "precio": 4499,
+        "deducibles": {
+          "Pantalla o carcasa": 1899,
+          "Otros daños": 6499
+        },
+        "cubre": [
+          "Daños accidentales ilimitados.",
+          "Reparaciones con piezas originales Apple.",
+          "Cobertura de batería cuando conserve menos del 80 % de su capacidad original (si aplica).",
+          "Soporte técnico prioritario."
+        ]
+      }
+    },
     "MacBook Neo": {
       "AppleCare+": {
         "precio": 3299,
@@ -585,9 +618,54 @@
         ]
       }
     },
+    "MacBook Pro 14 M6": {
+      "AppleCare+": {
+        "precio": 7199,
+        "deducibles": {
+          "Pantalla o carcasa": 1899,
+          "Otros daños": 6499
+        },
+        "cubre": [
+          "Daños accidentales ilimitados.",
+          "Reparaciones con piezas originales Apple.",
+          "Cobertura de batería cuando conserve menos del 80 % de su capacidad original.",
+          "Soporte técnico prioritario."
+        ]
+      }
+    },
+    "MacBook Pro 14 PROLED": {
+      "AppleCare+": {
+        "precio": 9599,
+        "deducibles": {
+          "Pantalla o carcasa": 1899,
+          "Otros daños": 6499
+        },
+        "cubre": [
+          "Daños accidentales ilimitados.",
+          "Reparaciones con piezas originales Apple.",
+          "Cobertura de batería cuando conserve menos del 80 % de su capacidad original.",
+          "Soporte técnico prioritario."
+        ]
+      }
+    },
     "MacBook Pro 16": {
       "AppleCare+": {
         "precio": 8799,
+        "deducibles": {
+          "Pantalla o carcasa": 1899,
+          "Otros daños": 6499
+        },
+        "cubre": [
+          "Daños accidentales ilimitados.",
+          "Reparaciones con piezas originales Apple.",
+          "Cobertura de batería cuando conserve menos del 80 % de su capacidad original.",
+          "Soporte técnico prioritario."
+        ]
+      }
+    },
+    "MacBook Pro 16 PROLED": {
+      "AppleCare+": {
+        "precio": 11399,
         "deducibles": {
           "Pantalla o carcasa": 1899,
           "Otros daños": 6499
