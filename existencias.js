@@ -440,8 +440,8 @@ function buildExistencias() {
       const p = exParse(todos[k].modelo, todos[k].seccion);
       const it = { upc: k, ...todos[k], titulo: p.titulo, spec: p.spec, orden: p.orden, qty: libre(k), demo: Math.min(demo[k] || 0, stock[k] || 0) };
       if (p.orden) Object.assign(it, exCorrea(it.color));   // Watch nuevo: correa + talla
-      it.prox = exProx(it.modelo);
-      if (it.prox && /\bM6\b/.test(it.modelo) && !/M6/.test(it.titulo)) it.titulo += " M6";   // tarjeta aparte del iMac / MacBook Pro anteriores
+      it.prox = false;   // ya no hay tarjetas "Próximamente": todas desbloqueadas (EX_PROX se conserva solo para nombrar las tarjetas M6)
+      if (exProx(it.modelo) && /\bM6\b/.test(it.modelo) && !/M6/.test(it.titulo)) it.titulo += " M6";   // tarjeta aparte del iMac / MacBook Pro anteriores
       (it.qty > 0 ? disp : agot).push(it);   // disponibles y agotados como siempre; los nuevos llevan además la marca "Próximamente"
     });
   }
