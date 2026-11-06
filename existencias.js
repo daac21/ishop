@@ -46,6 +46,7 @@ function exFotoBase(i) {
       if (/^imac/i.test(mo) && /\bM6\b/i.test(mo)) return "imágenes/existencias/mac/imac-24-m6-" + col;
       if (/macbook\s*pro/i.test(mo) && /\bM6\b/i.test(mo)) return "imágenes/existencias/mac/macbook-pro-14-m6-" + col;
       if (/macbook\s*pro/i.test(mo) && /proled/i.test(mo)) return "imágenes/existencias/mac/macbook-pro-proled-" + col;
+      if (/macbook\s*air/i.test(mo) && /\bM5\b/i.test(mo)) return "imágenes/existencias/mac/macbook-air-m5-" + col;   // misma foto para 13" y 15", cualquier memoria/CPU/GPU/SSD
       return "";
     }
     if (/^Apple Watch SE ?3$/i.test(i.modelo || "")) { const c = String(i.color || "").match(/^(.+?)\s+Aluminio/i); return c ? "imágenes/existencias/watch/se3-" + exSlug(c[1]) : ""; }   // SE3: se3-medianoche, se3-blanco-estelar
@@ -73,6 +74,7 @@ const EX_FOTOS_LISTA = new Set([
   ...["negro-espacial", "plata"].map(c => "mac/macbook-pro-14-m6-" + c),
   ...["negro-espacial", "plata"].map(c => "mac/macbook-pro-proled-" + c),
   ...["azul", "plata", "rosa", "verde"].map(c => "mac/imac-24-m6-" + c),
+  ...["azul-cielo", "blanco-estelar", "medianoche", "plata"].map(c => "mac/macbook-air-m5-" + c),
 ].map(x => "imágenes/existencias/" + x));
 const EX_FOTO_V = "?v=4";   // sube el número si cambias las fotos, para que el teléfono las vuelva a bajar
 function exFotoImg(base) { return base ? `<img src="${base}.webp${EX_FOTO_V}" alt="" decoding="async" onload="this.parentNode.classList.add('has')" onerror="this.remove()">` : ""; }
