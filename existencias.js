@@ -46,6 +46,9 @@ function exFotoBase(i) {
       if (/^imac/i.test(mo) && /\bM6\b/i.test(mo)) return "imágenes/existencias/mac/imac-24-m6-" + col;
       if (/macbook\s*pro/i.test(mo) && /\bM6\b/i.test(mo)) return "imágenes/existencias/mac/macbook-pro-14-m6-" + col;
       if (/macbook\s*pro/i.test(mo) && /proled/i.test(mo)) return "imágenes/existencias/mac/macbook-pro-proled-" + col;
+      if (/^mac\s*mini/i.test(mo)) return "imágenes/existencias/mac/mac-mini";   // una sola foto para todas las configuraciones
+      if (/macbook\s*neo/i.test(mo)) return "imágenes/existencias/mac/macbook-neo-" + col;   // plata, amarillo-citrico, indigo, rosa-rubor
+      if (/macbook\s*pro\s*14/i.test(mo) && /\bM5\b/i.test(mo)) return "imágenes/existencias/mac/macbook-pro-14-m5-" + col;   // M5 / M5 Pro / M5 Max
       if (/macbook\s*air/i.test(mo) && /\bM5\b/i.test(mo)) return "imágenes/existencias/mac/macbook-air-m5-" + col;   // misma foto para 13" y 15", cualquier memoria/CPU/GPU/SSD
       return "";
     }
@@ -75,6 +78,9 @@ const EX_FOTOS_LISTA = new Set([
   ...["negro-espacial", "plata"].map(c => "mac/macbook-pro-proled-" + c),
   ...["azul", "plata", "rosa", "verde"].map(c => "mac/imac-24-m6-" + c),
   ...["azul-cielo", "blanco-estelar", "medianoche", "plata"].map(c => "mac/macbook-air-m5-" + c),
+  "mac/mac-mini",
+  ...["plata", "amarillo-citrico", "indigo", "rosa-rubor"].map(c => "mac/macbook-neo-" + c),
+  ...["negro-espacial", "plata"].map(c => "mac/macbook-pro-14-m5-" + c),
 ].map(x => "imágenes/existencias/" + x));
 const EX_FOTO_V = "?v=4";   // sube el número si cambias las fotos, para que el teléfono las vuelva a bajar
 function exFotoImg(base) { return base ? `<img src="${base}.webp${EX_FOTO_V}" alt="" decoding="async" onload="this.parentNode.classList.add('has')" onerror="this.remove()">` : ""; }
