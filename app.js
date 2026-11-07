@@ -561,6 +561,8 @@ function buildScreen(entry) {
     el.appendChild(buildBodegaManual());
   } else if (entry.screen === "bodegaNoVend") {
     el.appendChild(buildBodegaNoVend());
+  } else if (entry.screen === "bodegaProx") {
+    el.appendChild(buildBodegaProx());
   } else if (entry.screen === "bodegaDemo") {
     el.appendChild(buildBodegaDemo());
   } else if (entry.screen === "bodegaHist") {

@@ -30,6 +30,12 @@ function exImg(nombre) { return `<img src="imágenes/existencias/${exSlug(nombre
 /* PRÓXIMAMENTE: modelos nuevos. Llevan la marca amarilla y el UPC oculto, tanto en Disponibles como en Agotados.
    Cuando un modelo ya sea oficial, borra su línea de esta lista. */
 const EX_PROX = ["iPad mini A20 Pro", "MacBook Pro 14\" M6", "MacBook Pro 14\" PROLED", "MacBook Pro 16\" PROLED", "iMac De 24 M6"];
+/* Nombre de la tarjeta de un modelo (el mismo que usa Existencias y la pantalla Bodega → Próximamente) */
+function exTituloModelo(e) {
+  const p = exParse(e.modelo, e.seccion); let t = p.titulo;
+  if (exProx(e.modelo) && /\bM6\b/.test(e.modelo) && !/M6/.test(t)) t += " M6";   // tarjeta aparte del iMac / MacBook Pro anteriores
+  return t;
+}
 const exProx = m => { m = String(m || "").toLowerCase(); return EX_PROX.some(p => m.startsWith(p.toLowerCase())); };
 function exFotoBase(i) {
   if (!i) return "";
@@ -401,11 +407,14 @@ function exEstilos() {
   .ex-chev{ width:11px; height:11px; border-right:2.5px solid #8e8e93; border-bottom:2.5px solid #8e8e93; transform:rotate(-45deg); margin:0 8px 0 0; }
   .ex-model.open .ex-chev{ transform:rotate(45deg); margin:0 8px 4px 0; }
   .ex-model.open .ex-mh{ border-bottom:1px solid rgba(255,255,255,.1); }
-  /* Próximamente: marca de agua amarilla sobre la tarjeta */
-  .ex-model.prox::after{ content:"PRÓXIMAMENTE"; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; text-align:center; pointer-events:none; z-index:4;
-    font:900 clamp(26px,9vw,44px)/1 -apple-system,system-ui,sans-serif; letter-spacing:.04em; color:#ffd60a; transform:rotate(-12deg); opacity:.93;
-    text-shadow:0 2px 3px rgba(0,0,0,.6), 0 0 16px rgba(0,0,0,.45); -webkit-text-stroke:1px rgba(0,0,0,.35); }
-  .ex-model.prox .ex-upc{ filter:blur(5px); user-select:none; -webkit-user-select:none; }
+  /* Próximamente: tarjeta atenuada con leyenda discreta (sin piezas, sin códigos, sin abrir) */
+  .ex-model.prox .ex-mh{ pointer-events:none; }
+  .ex-model.prox .ex-pic, .ex-model.prox .ex-mt{ opacity:.5; filter:saturate(.55); }
+  .ex-model.prox .ex-rows, .ex-model.prox .ex-chev{ display:none; }
+  .ex-model.prox .ex-badge{ display:none; }
+  .ex-model.prox .ex-mh::after{ content:"Próximamente"; flex:0 0 auto; margin-left:auto; padding:5px 9px; border-radius:999px; border:1px solid rgba(176,138,62,.55); background:rgba(176,138,62,.10); color:#9a7633;
+    font:600 10px/1 -apple-system,system-ui,sans-serif; letter-spacing:.07em; text-transform:uppercase; white-space:nowrap; }
+  html[data-mode="dark"] .ex-model.prox .ex-mh::after{ color:#d9b86c; border-color:rgba(217,184,108,.45); background:rgba(217,184,108,.10); }
   `;
   document.head.appendChild(st);
 }
@@ -442,15 +451,17 @@ function buildExistencias() {
   let disp = [], agot = [];
   function calc() {
     disp = []; agot = [];
+    const proxSet = new Set((typeof bodegaProx === "function") ? bodegaProx() : []);   // modelos en "Próximamente" (Bodega → Próximamente)
     demo = (typeof bodegaDemo === "function") ? bodegaDemo() : {};
     apart = (typeof bodegaApartados === "function") ? bodegaApartados() : {};
     Object.keys(todos).forEach(k => {
       const p = exParse(todos[k].modelo, todos[k].seccion);
       const it = { upc: k, ...todos[k], titulo: p.titulo, spec: p.spec, orden: p.orden, qty: libre(k), demo: Math.min(demo[k] || 0, stock[k] || 0) };
       if (p.orden) Object.assign(it, exCorrea(it.color));   // Watch nuevo: correa + talla
-      it.prox = false;   // ya no hay tarjetas "Próximamente": todas desbloqueadas (EX_PROX se conserva solo para nombrar las tarjetas M6)
       if (exProx(it.modelo) && /\bM6\b/.test(it.modelo) && !/M6/.test(it.titulo)) it.titulo += " M6";   // tarjeta aparte del iMac / MacBook Pro anteriores
-      (it.qty > 0 ? disp : agot).push(it);   // disponibles y agotados como siempre; los nuevos llevan además la marca "Próximamente"
+      it.prox = proxSet.has(it.titulo);
+      if (it.prox) it.qty = 0;   // en Próximamente no se muestran piezas
+      (it.prox || it.qty > 0 ? disp : agot).push(it);
     });
   }
   calc();

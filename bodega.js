@@ -657,6 +657,86 @@ function bodegaDemoSave(m) {
 }
 function bodegaDemoTotal() { return Object.values(bodegaDemo()).reduce((s, n) => s + n, 0); }
 
+/* Próximamente: modelos (por nombre de tarjeta de Existencias) que se muestran bloqueados con la leyenda "Próximamente".
+   Lista de textos. Se sincroniza con Firebase (sync.js) y se queda hasta que la quites en Bodega → Próximamente. */
+const BODEGA_PROX_KEY = "ishop_bodega_prox_v1";
+function bodegaProx() {
+  try { const a = JSON.parse(localStorage.getItem(BODEGA_PROX_KEY)); return Array.isArray(a) ? a.filter(x => typeof x === "string" && x) : []; } catch (e) { return []; }
+}
+function bodegaProxSave(a) {
+  const r = [...new Set((a || []).filter(Boolean))].sort((x, y) => x.localeCompare(y, undefined, { numeric: true }));
+  try { localStorage.setItem(BODEGA_PROX_KEY, JSON.stringify(r)); } catch (e) {}
+  try { if (typeof window.ishopSyncProx === "function") window.ishopSyncProx(r); } catch (e) {}
+  return r;
+}
+
+/* Pantalla Bodega → Próximamente: todos los modelos por categoría; un interruptor por modelo */
+function buildBodegaProx() {
+  bodegaEstilos();
+  if (!document.getElementById("bodProxCss")) {
+    const st = document.createElement("style"); st.id = "bodProxCss";
+    st.textContent = `
+    .bpx-sec{ display:flex; gap:6px; background:var(--bx-fill); border-radius:14px; padding:4px; margin:6px 0 12px; }
+    .bpx-sec button{ flex:1; border:0; border-radius:11px; padding:10px 4px; font:inherit; font-size:14.5px; font-weight:600; color:var(--text-secondary); background:transparent; }
+    .bpx-sec button.on{ background:var(--bx-card); color:var(--text); box-shadow:0 1px 4px rgba(0,0,0,.18); }
+    .bpx-sec em{ font-style:normal; font-size:11px; font-weight:700; margin-left:4px; color:#b08a3e; }
+    .bpx-r{ display:flex; align-items:center; gap:12px; padding:13px 14px; border-top:1px solid var(--bx-line); }
+    .bpx-r:first-child{ border-top:0; }
+    .bpx-r b{ flex:1; min-width:0; font-size:16px; font-weight:600; }
+    .bpx-r b small{ display:block; font-size:12.5px; font-weight:500; color:var(--text-secondary); margin-top:1px; }
+    .bpx-sw{ flex:0 0 auto; width:51px; height:31px; border-radius:16px; border:0; background:#8e8e9355; position:relative; transition:background .2s; padding:0; }
+    .bpx-sw::after{ content:""; position:absolute; top:2px; left:2px; width:27px; height:27px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.35); transition:transform .2s; }
+    .bpx-sw.on{ background:#b08a3e; }
+    .bpx-sw.on::after{ transform:translateX(20px); }
+    .bpx-act{ display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+    .bpx-chip{ display:inline-flex; align-items:center; gap:8px; border:1px solid #b08a3e66; background:#b08a3e1a; color:var(--text); border-radius:20px; padding:7px 8px 7px 13px; font:inherit; font-size:14px; font-weight:600; }
+    .bpx-chip i{ font-style:normal; width:20px; height:20px; border-radius:50%; background:#8e8e9344; display:flex; align-items:center; justify-content:center; font-size:13px; line-height:1; }
+    `;
+    document.head.appendChild(st);
+  }
+  const wrap = document.createElement("div"); wrap.className = "bod-wrap bx";
+  const stock = bodegaLoad().stock || {}, cat = bodegaCatalogoTodo(stock);
+  /* modelos por categoría, con el mismo nombre que usa la tarjeta de Existencias */
+  const por = {};
+  Object.keys(cat).forEach(k => {
+    const e = cat[k]; if (!e || !e.modelo || e.modelo === "Código nuevo") return;
+    const t = typeof exTituloModelo === "function" ? exTituloModelo(e) : e.modelo;
+    const sec = e.seccion || "Otros";
+    (por[sec] = por[sec] || new Set()).add(t);
+  });
+  const ords = ["iPhone", "iPad", "Mac", "Watch"];
+  const secs = Object.keys(por).sort((a, b) => (ords.indexOf(a) < 0 ? 99 : ords.indexOf(a)) - (ords.indexOf(b) < 0 ? 99 : ords.indexOf(b)) || a.localeCompare(b));
+  let sel = secs[0];
+  const ordIdx = m => bodegaOrdenModelo(m);
+
+  const intro = document.createElement("div"); intro.className = "bx-card"; intro.style.marginTop = "4px";
+  const act = document.createElement("div");
+  const lista = document.createElement("div");
+  const tabs = document.createElement("div"); tabs.className = "bpx-sec";
+  wrap.append(intro, tabs, lista);
+
+  function pinta() {
+    const pr = new Set(bodegaProx());
+    const activos = [...pr].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+    intro.innerHTML = `<h3>Próximamente</h3><p class="bx-sub" style="margin:0">Los modelos que actives aquí se ven en Existencias con la leyenda <b>Próximamente</b>, sin piezas ni códigos. Al quitarlos vuelven a mostrarse normal.</p>
+      ${activos.length ? `<div class="bpx-act">${activos.map(t => `<button class="bpx-chip" data-q="${bodegaEsc(t)}">${bodegaEsc(t)}<i aria-label="Quitar">×</i></button>`).join("")}</div>` : `<p class="bx-sub" style="margin:10px 0 0">Ningún modelo en Próximamente.</p>`}`;
+    tabs.innerHTML = secs.map(s => { const n = [...por[s]].filter(t => pr.has(t)).length; return `<button data-s="${bodegaEsc(s)}" class="${s === sel ? "on" : ""}">${bodegaEsc(s)}${n ? `<em>${n}</em>` : ""}</button>`; }).join("");
+    const ms = [...(por[sel] || [])].sort((a, b) => ordIdx(a) - ordIdx(b) || a.localeCompare(b, undefined, { numeric: true }));
+    lista.innerHTML = `<div class="bx-m"><div class="bx-mh">${bodegaEsc(sel || "")}</div>${ms.map(t => `<div class="bpx-r"><b>${bodegaEsc(t)}${pr.has(t) ? "<small>Próximamente</small>" : ""}</b><button class="bpx-sw${pr.has(t) ? " on" : ""}" data-t="${bodegaEsc(t)}" role="switch" aria-checked="${pr.has(t)}" aria-label="Próximamente: ${bodegaEsc(t)}"></button></div>`).join("") || `<div class="bx-vacio" style="padding:18px 14px">Sin modelos en esta categoría.</div>`}</div>`;
+  }
+  wrap.addEventListener("click", e => {
+    const q = e.target.closest("[data-q]"), t = e.target.closest("[data-t]"), s = e.target.closest("[data-s]");
+    if (s) { sel = s.dataset.s; pinta(); return; }
+    const nombre = q ? q.dataset.q : t ? t.dataset.t : null; if (!nombre) return;
+    const pr = new Set(bodegaProx());
+    if (pr.has(nombre)) pr.delete(nombre); else pr.add(nombre);
+    bodegaProxSave([...pr]); pinta();
+  });
+  window.addEventListener("ishop-remote", function al() { if (!wrap.isConnected) { window.removeEventListener("ishop-remote", al); return; } pinta(); });
+  pinta();
+  return wrap;
+}
+
 /* Catálogo de TODOS los productos (iPhone, iPad, Mac…) + códigos nuevos que ya tengan existencia */
 function bodegaCatalogoTodo(stock) {
   const out = {};
@@ -1379,6 +1459,16 @@ function buildBodega() {
         </button>
       </div>
 
+      <div class="bx-card">
+        <h3>Próximamente</h3>
+        <button class="bx-inner" id="bodProx">
+          <div class="bx-inner-h">${BX_ICON.clock}<span>Modelos próximamente</span>
+            ${bodegaProx().length ? `<em class="bx-badge" style="font-style:normal">${bodegaProx().length} modelo${bodegaProx().length === 1 ? "" : "s"}</em>` : ""}
+            <span class="bx-ch" style="flex:0 0 20px;color:var(--text-secondary)">${BX_ICON.chev}</span></div>
+          <p>Elige qué modelos se muestran en Existencias como "Próximamente". Al quitarlos vuelven a aparecer normal.</p>
+        </button>
+      </div>
+
       <button class="bx-card bx-hist bx-s-morado" id="bodHist">${BX_ICON.clock}<span>Historial de reportes</span><i class="bx-ch">${BX_ICON.chev}</i></button>
 
       <div class="bod-small"><button class="rojo" id="bodBorrar">Borrar todo</button></div>`;
@@ -1397,6 +1487,7 @@ function buildBodega() {
     });
     wrap.querySelector("#bodManual").addEventListener("click", () => navigate({ screen: "bodegaManual", title: "Capturar cantidades" }));
     wrap.querySelector("#bodNV").addEventListener("click", () => navigate({ screen: "bodegaNoVend", title: "Equipos no vendibles" }));
+    wrap.querySelector("#bodProx").addEventListener("click", () => navigate({ screen: "bodegaProx", title: "Próximamente" }));
     wrap.querySelector("#bodDemo").addEventListener("click", () => navigate({ screen: "bodegaDemo", title: "Demostración" }));
     { /* toque normal = Historial de reportes · mantener presionado = Escaneos guardados (oculto) */
       const hb = wrap.querySelector("#bodHist"); let t = null, largo = false;

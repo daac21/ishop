@@ -18,6 +18,7 @@ const CFG = {
 const KEY = "ishop_bodega_v1";          // misma llave que usa bodega.js
 const MAX_HIST = 40;
 const DEMO_KEY = "ishop_bodega_demo_v1";   // misma llave que usa bodega.js (Demostración)
+const PROX_KEY = "ishop_bodega_prox_v1";   // misma llave que usa bodega.js (Próximamente)
 const NV_KEY = "ishop_bodega_nv_v1";       // misma llave que usa bodega.js (Apartados / DOA / no vendibles)
 
 (async function () {
@@ -29,6 +30,8 @@ const NV_KEY = "ishop_bodega_nv_v1";       // misma llave que usa bodega.js (Apa
   const demoTxt = () => JSON.stringify(leerDemo());
   const leerNV = () => { try { const a = JSON.parse(localStorage.getItem(NV_KEY)); return Array.isArray(a) ? a : []; } catch (_) { return []; } };
   const nvTxt = () => JSON.stringify(leerNV());
+  const leerProx = () => { try { const a = JSON.parse(localStorage.getItem(PROX_KEY)); return Array.isArray(a) ? a : []; } catch (_) { return []; } };
+  const proxTxt = () => JSON.stringify(leerProx());
   const aviso = () => { try { window.dispatchEvent(new Event("ishop-remote")); } catch (_) {} };
   const estado = (t) => { window.ishopSyncEstado = t; try { window.dispatchEvent(new Event("ishop-sync-estado")); } catch (_) {} };
 
@@ -53,12 +56,13 @@ const NV_KEY = "ishop_bodega_nv_v1";       // misma llave que usa bodega.js (Apa
     if (snap.metadata.hasPendingWrites) return;               // eco de mi propio cambio
     if (!snap.exists()) {                                      // primera vez: sube lo que hay en este dispositivo
       const l = leer();
-      if (Object.keys(l.stock).length) F.setDoc(invRef, { stock: l.stock, fecha: l.fecha || "", demo: demoTxt(), nv: nvTxt(), ts: Date.now() }).catch(() => {});
+      if (Object.keys(l.stock).length) F.setDoc(invRef, { stock: l.stock, fecha: l.fecha || "", demo: demoTxt(), nv: nvTxt(), prox: proxTxt(), ts: Date.now() }).catch(() => {});
       listo = true; estado("en línea"); return;
     }
     const d = snap.data();
     // Demostración: si otro dispositivo la cambió, se copia aquí (si el documento aún no la trae, se deja la local)
     if (typeof d.demo === "string" && d.demo !== demoTxt()) { try { localStorage.setItem(DEMO_KEY, d.demo); } catch (_) {} aviso(); }
+    if (typeof d.prox === "string" && d.prox !== proxTxt()) { try { localStorage.setItem(PROX_KEY, d.prox); } catch (_) {} aviso(); }   // Próximamente
     if (typeof d.nv === "string" && d.nv !== nvTxt()) { try { localStorage.setItem(NV_KEY, d.nv); } catch (_) {} aviso(); }
     remoto = { ...(d.stock || {}) };
     const l = leer();
@@ -84,7 +88,7 @@ const NV_KEY = "ishop_bodega_nv_v1";       // misma llave que usa bodega.js (Apa
     if (apagar) { try { localStorage.setItem(PAUSA, String(Date.now())); } catch (_) {} estado("pausado (solo local)"); return; }
     const desde = pausaDesde(), l = leer();
     // Publica TODO lo local: reemplaza el inventario completo (lo agregado y lo borrado) y las entradas nuevas del historial.
-    await F.setDoc(invRef, { stock: l.stock, fecha: l.fecha || "", demo: demoTxt(), nv: nvTxt(), ts: Date.now() });
+    await F.setDoc(invRef, { stock: l.stock, fecha: l.fecha || "", demo: demoTxt(), nv: nvTxt(), prox: proxTxt(), ts: Date.now() });
     remoto = { ...l.stock };
     for (const h of (l.historial || [])) if (h.ts >= desde) await F.setDoc(F.doc(histCol, String(h.ts)), h);
     try { localStorage.removeItem(PAUSA); } catch (_) {}
@@ -95,6 +99,12 @@ const NV_KEY = "ishop_bodega_nv_v1";       // misma llave que usa bodega.js (Apa
   window.ishopSyncDemo = function (m) {
     if (!F || !listo || pausaDesde()) return;
     F.setDoc(invRef, { demo: JSON.stringify(m || {}), ts: Date.now() }, { merge: true }).catch(e => console.warn(e));
+  };
+
+  /* ---- Próximamente: bodegaProxSave() sube la lista completa de modelos bloqueados (texto JSON) ---- */
+  window.ishopSyncProx = function (a) {
+    if (!F || !listo || pausaDesde()) return;
+    F.setDoc(invRef, { prox: JSON.stringify(a || []), ts: Date.now() }, { merge: true }).catch(e => console.warn(e));
   };
 
   /* ---- Apartados / no vendibles: bodegaNVSave() sube la lista completa (texto JSON) ---- */
