@@ -551,6 +551,20 @@ function buildScreen(entry) {
     el.appendChild(buildRepair(entry.category, entry.model, entry.variant));
   } else if (entry.screen === "settings") {
     el.appendChild(buildSettings(entry));
+  } else if (entry.screen === "recordEquipo") {
+    // Hoja de Google "Record" del equipo: se abre dentro de la app y siempre muestra lo último (solo se carga al entrar aquí)
+    const RECORD_URL = "https://docs.google.com/spreadsheets/d/1IZ-agdDv36efr-7rDDvY7bbEHT_srJfb7Tx_NlffbPo/htmlview";
+    el.style.padding = "0";
+    el.style.background = "#000";
+    const bar = document.createElement("div");
+    bar.style.cssText = "position:absolute;left:0;right:0;top:0;height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;background:#111;color:#aaa;font:13px -apple-system,system-ui,sans-serif;border-bottom:1px solid #222";
+    bar.innerHTML = `<span id="rcLoad">Cargando récord…</span><a href="${RECORD_URL}" target="_blank" rel="noopener" style="color:#d9b86c;font-weight:600;text-decoration:none">Abrir en Google Sheets ↗</a>`;
+    const fr = document.createElement("iframe");
+    fr.src = RECORD_URL;
+    fr.title = "Récord del equipo";
+    fr.style.cssText = "position:absolute;left:0;right:0;top:44px;bottom:0;width:100%;height:calc(100% - 44px);border:0;background:#000";
+    fr.addEventListener("load", () => { const l = bar.querySelector("#rcLoad"); if (l) l.textContent = "Récord del equipo"; });
+    el.append(bar, fr);
   } else if (entry.screen === "record") {
     el.appendChild(buildRecord());
   } else if (entry.screen === "registros") {

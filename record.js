@@ -97,6 +97,9 @@
     let day = new Date().getDay();
 
     wrap.innerHTML = `
+      <button class="rc-team" type="button" style="display:flex;align-items:center;justify-content:space-between;width:100%;margin:0 0 12px;padding:14px 16px;border:1px solid rgba(217,184,108,.45);background:rgba(217,184,108,.10);color:inherit;border-radius:16px;font:inherit;font-size:16px;font-weight:650;text-align:left">
+        <span>Récord del equipo<small style="display:block;font-size:12.5px;font-weight:500;opacity:.65;margin-top:2px">Tabla de todos · se actualiza sola</small></span><span style="font-size:22px;opacity:.6">›</span>
+      </button>
       <div class="rc-week">
         <button class="rc-arrow" data-w="-1" aria-label="Semana anterior">‹</button>
         <div class="rc-weeklabel"><strong class="rc-lbl"></strong><span class="rc-sub"></span></div>
@@ -113,6 +116,7 @@
       <div class="rc-undobar"><button class="rc-undo off">Nada que deshacer</button></div>`;
 
     const $ = s => wrap.querySelector(s);
+    $(".rc-team").addEventListener("click", () => navigate({ screen: "recordEquipo", title: "Récord del equipo" }));
     const lbl = $(".rc-lbl"), sub = $(".rc-sub"), tot = $(".rc-tot"), dayTot = $(".rc-day-tot"),
           dayLbl = $(".rc-daylbl"), daysEl = $(".rc-days"), nextBtn = $(".rc-next"), undo = $(".rc-undo");
     const tiles = Array.from(wrap.querySelectorAll(".rc-tile"));
