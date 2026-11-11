@@ -4157,6 +4157,9 @@ const FINANCE_CONFIG = {
 };
 
 const FIN_CATS = ["iPhone", "iPad", "Mac", "Watch"];
+// Categorías que se muestran como comparativa lado a lado (con AppleCare+ vs. solo equipo), como en iPhone.
+// Aquí no existe AppleCare+ Robo y Pérdida. Para activarlo en iPad o Watch basta agregarlos a esta lista.
+const FIN_COMPARA_CATS = ["Mac"];
 const FIN_CAT_KEY = "ishop_fin_cat";
 
 function finCatGuardada() {
@@ -4296,6 +4299,10 @@ function buildFinanceResultOtros(model, capacity, planType, cat) {
     const info = APPLECARE_INFO?.[cat === "Watch" ? "Watch" : cat]?.[model]?.["AppleCare+"];
     ac = { APPLECARE: info ? info.precio : null, ROBO_PERDIDA: ac ? ac.ROBO_PERDIDA : null };
   }
+  if (FIN_COMPARA_CATS.includes(cat)) {
+    wrap.appendChild(buildFinanceCompareGrid(finData, ac.APPLECARE, cfg));
+    return wrap;
+  }
   const opts = [
     { key: "solo", label: "Sin AC+",    title: "Solo equipo (sin AppleCare+)", extra: 0 },
     { key: "ac",   label: "AppleCare+", title: "Con AppleCare+",               extra: ac.APPLECARE },
@@ -4359,6 +4366,54 @@ function buildFinanceResultOtros(model, capacity, planType, cat) {
   });
   paint("ac");
   return wrap;
+}
+
+// Comparativa lado a lado para Mac (y las categorías de FIN_COMPARA_CATS):
+// izquierda = programa + AppleCare+ (el AC se reparte en los primeros phase1 meses: 10 For Life / 13 GET),
+// derecha   = programa solo (mensualidad pura del mes 1 al phase2End) y abajo el saldo retenido.
+function buildFinanceCompareGrid(finData, acPrice, cfg) {
+  const grid = document.createElement("div");
+  grid.className = "finance-columns";
+
+  const conAC = document.createElement("div");
+  conAC.className = "finance-col";
+  const hasAC = acPrice !== null && acPrice !== undefined;
+  if (!hasAC) {
+    conAC.innerHTML = `<h4></h4><p class="pending">AppleCare+ pendiente</p>`;
+    conAC.querySelector("h4").textContent = `${cfg.label} + AppleCare+`;
+  } else {
+    const p1 = finData.monthly + acPrice / cfg.phase1;
+    const total = p1 * cfg.phase1 + finData.monthly * cfg.phase2Months + finData.residual;
+    conAC.innerHTML = `
+      <h4></h4>
+      <div class="finance-row"><span>Mes 1–${cfg.phase1}</span><strong>${money(p1)}</strong></div>
+      <div class="finance-row"><span>Mes ${cfg.phase1 + 1}–${cfg.phase2End}</span><strong>${money(finData.monthly)}</strong></div>
+      <div class="finance-row"><span>Mes ${cfg.residualMonth} (saldo)</span><strong>${money(finData.residual)}</strong></div>
+      <div class="finance-row total"><span>Total</span><strong>${money(total)}</strong></div>`;
+    conAC.querySelector("h4").textContent = `${cfg.label} + AppleCare+`;
+  }
+  grid.appendChild(conAC);
+
+  const solo = document.createElement("div");
+  solo.className = "finance-col";
+  const totalSolo = finData.monthly * (cfg.phase1 + cfg.phase2Months) + finData.residual;
+  solo.innerHTML = `
+    <h4></h4>
+    <div class="finance-row span2"><span>Mes 1–${cfg.phase2End}</span><strong>${money(finData.monthly)}</strong></div>
+    <div class="finance-row"><span>Mes ${cfg.residualMonth} (saldo)</span><strong>${money(finData.residual)}</strong></div>
+    <div class="finance-row total"><span>Total</span><strong>${money(totalSolo)}</strong></div>`;
+  solo.querySelector("h4").textContent = `${cfg.label} (solo)`;
+  grid.appendChild(solo);
+
+  if (!hasAC) return grid;
+  const box = document.createElement("div");
+  box.appendChild(grid);
+  const note = document.createElement("p");
+  note.className = "plan-note";
+  note.style.margin = "10px 2px 0";
+  note.textContent = `AppleCare+ ${money(acPrice)} ÷ ${cfg.phase1} meses = ${money(acPrice / cfg.phase1)} al mes (meses 1–${cfg.phase1}).`;
+  box.appendChild(note);
+  return box;
 }
 
 function buildFinanceColumnsGrid(finData, ac, cfg, o = {}) {

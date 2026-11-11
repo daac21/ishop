@@ -1743,3 +1743,6 @@ html .trade-banner.q-tint, html:not([data-mode="dark"]) .trade-banner.q-tint{
 html[data-mode="dark"] .fin-mini > div{ background:#1c1c1e; border-color:#2c2c2e; }
 .fin-tabs + div .finance-col{ min-height:0; padding:20px 18px; }
 .fin-tabs + div .finance-col h4{ text-align:left; font-size:15px; }
+
+/* ---- Comparativa Mac: la mensualidad "solo" ocupa el alto de las dos filas de la tarjeta con AppleCare+ ---- */
+.finance-row.span2{ flex:2; padding:28px 0; }
