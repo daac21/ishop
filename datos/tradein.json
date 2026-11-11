@@ -1209,18 +1209,6 @@
       }
     },
     "iPad Pro 12.9\" 4ª gen": {
-      "64 GB": {
-        "ÓPTIMO": "$7,000",
-        "BATERÍA": "No Aplica",
-        "PANTALLA": "No Aplica",
-        "B Y P": "No Aplica"
-      },
-      "64 GB +Cell": {
-        "ÓPTIMO": "$8,000",
-        "BATERÍA": "No Aplica",
-        "PANTALLA": "No Aplica",
-        "B Y P": "No Aplica"
-      },
       "256 GB": {
         "ÓPTIMO": "$7,000",
         "BATERÍA": "No Aplica",
@@ -1642,6 +1630,30 @@
         "BATERÍA": "No Aplica",
         "PANTALLA": "No Aplica",
         "B Y P": "No Aplica"
+      },
+      "1 TB NT": {
+        "ÓPTIMO": "$18,000",
+        "BATERÍA": "No Aplica",
+        "PANTALLA": "No Aplica",
+        "B Y P": "No Aplica"
+      },
+      "2 TB NT": {
+        "ÓPTIMO": "$20,000",
+        "BATERÍA": "No Aplica",
+        "PANTALLA": "No Aplica",
+        "B Y P": "No Aplica"
+      },
+      "1 TB NT +Cell": {
+        "ÓPTIMO": "$20,000",
+        "BATERÍA": "No Aplica",
+        "PANTALLA": "No Aplica",
+        "B Y P": "No Aplica"
+      },
+      "2 TB NT +Cell": {
+        "ÓPTIMO": "$20,000",
+        "BATERÍA": "No Aplica",
+        "PANTALLA": "No Aplica",
+        "B Y P": "No Aplica"
       }
     },
     "iPad Pro 11\" M5": {
@@ -1688,6 +1700,30 @@
         "B Y P": "No Aplica"
       },
       "2 TB +Cell": {
+        "ÓPTIMO": "$26,000",
+        "BATERÍA": "No Aplica",
+        "PANTALLA": "No Aplica",
+        "B Y P": "No Aplica"
+      },
+      "1 TB NT": {
+        "ÓPTIMO": "$23,000",
+        "BATERÍA": "No Aplica",
+        "PANTALLA": "No Aplica",
+        "B Y P": "No Aplica"
+      },
+      "2 TB NT": {
+        "ÓPTIMO": "$25,000",
+        "BATERÍA": "No Aplica",
+        "PANTALLA": "No Aplica",
+        "B Y P": "No Aplica"
+      },
+      "1 TB NT +Cell": {
+        "ÓPTIMO": "$24,000",
+        "BATERÍA": "No Aplica",
+        "PANTALLA": "No Aplica",
+        "B Y P": "No Aplica"
+      },
+      "2 TB NT +Cell": {
         "ÓPTIMO": "$26,000",
         "BATERÍA": "No Aplica",
         "PANTALLA": "No Aplica",
@@ -1742,6 +1778,30 @@
         "BATERÍA": "No Aplica",
         "PANTALLA": "No Aplica",
         "B Y P": "No Aplica"
+      },
+      "1 TB NT": {
+        "ÓPTIMO": "$20,000",
+        "BATERÍA": "No Aplica",
+        "PANTALLA": "No Aplica",
+        "B Y P": "No Aplica"
+      },
+      "2 TB NT": {
+        "ÓPTIMO": "$22,000",
+        "BATERÍA": "No Aplica",
+        "PANTALLA": "No Aplica",
+        "B Y P": "No Aplica"
+      },
+      "1 TB NT +Cell": {
+        "ÓPTIMO": "$23,000",
+        "BATERÍA": "No Aplica",
+        "PANTALLA": "No Aplica",
+        "B Y P": "No Aplica"
+      },
+      "2 TB NT +Cell": {
+        "ÓPTIMO": "$27,000",
+        "BATERÍA": "No Aplica",
+        "PANTALLA": "No Aplica",
+        "B Y P": "No Aplica"
       }
     },
     "iPad Pro 13\" M5": {
@@ -1788,6 +1848,30 @@
         "B Y P": "No Aplica"
       },
       "2 TB +Cell": {
+        "ÓPTIMO": "$35,000",
+        "BATERÍA": "No Aplica",
+        "PANTALLA": "No Aplica",
+        "B Y P": "No Aplica"
+      },
+      "1 TB NT": {
+        "ÓPTIMO": "$28,000",
+        "BATERÍA": "No Aplica",
+        "PANTALLA": "No Aplica",
+        "B Y P": "No Aplica"
+      },
+      "2 TB NT": {
+        "ÓPTIMO": "$33,000",
+        "BATERÍA": "No Aplica",
+        "PANTALLA": "No Aplica",
+        "B Y P": "No Aplica"
+      },
+      "1 TB NT +Cell": {
+        "ÓPTIMO": "$30,000",
+        "BATERÍA": "No Aplica",
+        "PANTALLA": "No Aplica",
+        "B Y P": "No Aplica"
+      },
+      "2 TB NT +Cell": {
         "ÓPTIMO": "$35,000",
         "BATERÍA": "No Aplica",
         "PANTALLA": "No Aplica",
@@ -2047,7 +2131,7 @@
     "Ultra 2": {
       "49 MM": {
         "Titanio": {
-          "ÓPTIMO": "$6,000",
+          "ÓPTIMO": "$5,000",
           "BATERÍA": "No Aplica",
           "PANTALLA": "No Aplica",
           "B Y P": "No Aplica"
