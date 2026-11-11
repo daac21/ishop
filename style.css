@@ -1731,3 +1731,15 @@ html .trade-banner.q-tint, html:not([data-mode="dark"]) .trade-banner.q-tint{
 /* Colores propios de Registros y Asesores */
 .home-reg.reg-registros{ background:linear-gradient(120deg,#0e4f63,#17768a 55%,#0c3f50); box-shadow:0 12px 26px rgba(14,79,99,.32), inset 0 1px 0 rgba(255,255,255,.18); }
 .home-reg.reg-asesores{ background:linear-gradient(120deg,#5a2a86,#7d3fae 55%,#4a2270); box-shadow:0 12px 26px rgba(90,42,134,.34), inset 0 1px 0 rgba(255,255,255,.18); }
+
+
+/* ---- For Life / GET: selector de equipo e interruptor de AppleCare+ (iPad, Mac, Watch) ---- */
+.fin-tabs{ margin:0 0 14px; }
+.fin-tabs .plan-tab{ white-space:nowrap; }
+.fin-mini{ display:flex; gap:10px; margin-top:12px; }
+.fin-mini > div{ flex:1; background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:10px 12px; display:flex; flex-direction:column; gap:3px; }
+.fin-mini span{ font-size:12px; color:var(--text-secondary); font-weight:600; }
+.fin-mini b{ font-size:16px; font-weight:750; color:var(--text); }
+html[data-mode="dark"] .fin-mini > div{ background:#1c1c1e; border-color:#2c2c2e; }
+.fin-tabs + div .finance-col{ min-height:0; padding:20px 18px; }
+.fin-tabs + div .finance-col h4{ text-align:left; font-size:15px; }

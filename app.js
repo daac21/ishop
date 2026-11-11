@@ -280,6 +280,7 @@ function dsWatermark() {
 }
 
 let TRADEIN_DATA = null;
+let FINANCIAMIENTO_OTROS = {};   // For Life / GET de iPad, Mac y Watch (datos/financiamiento_otros.json)
 let TRADEIN_VISUAL = null;
 let PRECIOS_IPHONE = null;
 let APPLECARE_DATA = null;
@@ -339,12 +340,13 @@ async function loadAllData() {
     APPLECARE_DATA = buildApplecareByModel(a);
     SWITCHUP_MODELOS = s;
     FINANCIAMIENTO_DATA = f;
+    FINANCIAMIENTO_OTROS = await fetch("datos/financiamiento_otros.json", { cache: "no-store" }).then(r => r.ok ? r.json() : {}).catch(() => ({}));
     COBERTURA_DATA = c;
     APPLECARE_INFO = aci;
     ESCANER_DATA = esc;
     completarRoboAppleCare();
     CODIGOS_CAJAS = caj;
-    localStorage.setItem("ishop_data_cache", JSON.stringify({ tradein: t, tradein_categorias: tv, precios_iphone: p, applecare: a, switchup_modelos: s, financiamiento: f, cobertura: c, applecare_info: aci, escaner: esc, codigos_cajas: caj }));
+    localStorage.setItem("ishop_data_cache", JSON.stringify({ tradein: t, tradein_categorias: tv, precios_iphone: p, applecare: a, switchup_modelos: s, financiamiento: f, financiamiento_otros: FINANCIAMIENTO_OTROS, cobertura: c, applecare_info: aci, escaner: esc, codigos_cajas: caj }));
   } catch (e) {
     const cached = localStorage.getItem("ishop_data_cache");
     if (cached) {
@@ -355,6 +357,7 @@ async function loadAllData() {
       APPLECARE_DATA = buildApplecareByModel(data.applecare || {});
       SWITCHUP_MODELOS = data.switchup_modelos || [];
       FINANCIAMIENTO_DATA = data.financiamiento || {};
+      FINANCIAMIENTO_OTROS = data.financiamiento_otros || {};
       COBERTURA_DATA = data.cobertura || {};
       APPLECARE_INFO = data.applecare_info || {};
       ESCANER_DATA = data.escaner || {};
@@ -367,6 +370,7 @@ async function loadAllData() {
       APPLECARE_DATA = {};
       SWITCHUP_MODELOS = [];
       FINANCIAMIENTO_DATA = {};
+      FINANCIAMIENTO_OTROS = {};
       COBERTURA_DATA = {};
       APPLECARE_INFO = {};
       ESCANER_DATA = {};
@@ -535,9 +539,9 @@ function buildScreen(entry) {
   } else if (entry.screen === "switchResult") {
     el.appendChild(buildSwitchResult(entry.newModel, entry.newCapacity));
   } else if (entry.screen === "financeSelect") {
-    el.appendChild(buildFinanceSelect(entry.path, entry.planType));
+    el.appendChild(buildFinanceSelect(entry.path, entry.planType, entry.cat));
   } else if (entry.screen === "financeResult") {
-    el.appendChild(buildFinanceResult(entry.model, entry.capacity, entry.planType));
+    el.appendChild(buildFinanceResult(entry.model, entry.capacity, entry.planType, entry.cat));
   } else if (entry.screen === "acCategories") {
     el.appendChild(buildAcCategories());
   } else if (entry.screen === "acModels") {
@@ -4152,47 +4156,100 @@ const FINANCE_CONFIG = {
   GET: { label: "GET",             phase1: 13, phase2Start: 14, phase2End: 20, phase2Months: 7,  residualMonth: 21 },
 };
 
-function buildFinanceSelect(path, planType) {
-  const wrap = document.createElement("div");
-  const heading = document.createElement("div");
-  heading.className = "section-heading";
+const FIN_CATS = ["iPhone", "iPad", "Mac", "Watch"];
+const FIN_CAT_KEY = "ishop_fin_cat";
 
-  if (path.length === 0) {
-    heading.innerHTML = `<h2>Elige el iPhone</h2>`;
+function finCatGuardada() {
+  try { const c = localStorage.getItem(FIN_CAT_KEY); return FIN_CATS.includes(c) ? c : "iPhone"; } catch (e) { return "iPhone"; }
+}
+
+// Modelos / capacidades de iPad, Mac y Watch (las claves que empiezan con "_" son notas o configuración).
+function finOtros(cat) {
+  const src = (FINANCIAMIENTO_OTROS && FINANCIAMIENTO_OTROS[cat]) || {};
+  const out = {};
+  Object.keys(src).forEach(k => { if (!k.startsWith("_")) out[k] = src[k]; });
+  return out;
+}
+
+function buildFinanceSelect(path, planType, cat) {
+  const wrap = document.createElement("div");
+
+  // Segundo nivel: capacidades del modelo elegido.
+  if (path.length > 0) {
+    const model = path[0];
+    cat = FIN_CATS.includes(cat) ? cat : "iPhone";
+    const caps = cat === "iPhone" ? (FINANCIAMIENTO_DATA?.[model] || {}) : (finOtros(cat)[model] || {});
+    const heading = document.createElement("div");
+    heading.className = "section-heading";
+    heading.innerHTML = `<h2></h2>`;
+    heading.querySelector("h2").textContent = model;
     wrap.appendChild(heading);
-    const list = document.createElement("div");
-    list.className = "sub-list";
-    const models = FINANCIAMIENTO_DATA ? Object.keys(FINANCIAMIENTO_DATA) : [];
-    if (models.length === 0) {
-      wrap.appendChild(buildPlaceholder("Sin datos", "💳", "Aún no hay planes cargados en datos/financiamiento.json."));
+    const capKeys = Object.keys(caps).filter(k => !k.startsWith("_"));
+    if (cat !== "iPhone" && capKeys.length === 0) {
+      wrap.appendChild(buildPlaceholder("Próximamente", "💳", "Aún no hay precios de " + FINANCE_CONFIG[planType].label + " cargados para este equipo."));
       return wrap;
     }
-    buildModelPicker("iPhone", models, wrap, (model) => {
-      navigate({ screen: "financeSelect", path: [model], planType, title: modeloNombre(model) });
-    }, { desc: true });
+    const list = document.createElement("div");
+    list.className = "sub-list";
+    capKeys.forEach(capKey => {
+      const btn = document.createElement("button");
+      btn.className = "sub-btn";
+      btn.innerHTML = `<span></span><span class="chev"></span>`;
+      btn.firstChild.textContent = capKey;
+      btn.addEventListener("click", () => {
+        navigate({ screen: "financeResult", model, capacity: capKey, planType, cat, title: capKey });
+      });
+      list.appendChild(btn);
+    });
+    wrap.appendChild(list);
     return wrap;
   }
 
-  const model = path[0];
-  const caps = FINANCIAMIENTO_DATA?.[model] || {};
-  heading.innerHTML = `<h2>${model}</h2>`;
-  wrap.appendChild(heading);
-  const list = document.createElement("div");
-  list.className = "sub-list";
-  Object.keys(caps).forEach(cap => {
-    const btn = document.createElement("button");
-    btn.className = "sub-btn";
-    btn.innerHTML = `<span>${cap}</span><span class="chev"></span>`;
-    btn.addEventListener("click", () => {
-      navigate({ screen: "financeResult", model, capacity: cap, planType, title: cap });
-    });
-    list.appendChild(btn);
+  // Primer nivel: selector de equipo (iPhone | iPad | Mac | Watch) + lista de modelos.
+  const tabs = document.createElement("div");
+  tabs.className = "plan-tabs fin-tabs";
+  const body = document.createElement("div");
+  wrap.appendChild(tabs);
+  wrap.appendChild(body);
+
+  function paint(c) {
+    try { localStorage.setItem(FIN_CAT_KEY, c); } catch (e) {}
+    tabs.querySelectorAll(".plan-tab").forEach(t => t.classList.toggle("active", t.dataset.cat === c));
+    body.innerHTML = "";
+    const heading = document.createElement("div");
+    heading.className = "section-heading";
+    heading.innerHTML = `<h2>Elige el ${c}</h2>`;
+    body.appendChild(heading);
+
+    const models = c === "iPhone" ? (FINANCIAMIENTO_DATA ? Object.keys(FINANCIAMIENTO_DATA) : []) : Object.keys(finOtros(c));
+    if (models.length === 0) {
+      const archivo = c === "iPhone" ? "datos/financiamiento.json" : "datos/financiamiento_otros.json";
+      body.appendChild(buildPlaceholder("Sin datos", "💳", "Aún no hay planes cargados en " + archivo + "."));
+      return;
+    }
+    const pickCat = c === "Watch" ? "Apple Watch" : c;
+    const opts = c === "iPhone" ? { desc: true } : {
+      sub: key => Object.keys(finOtros(c)[key] || {}).filter(k => !k.startsWith("_")).length ? "" : "Próximamente",
+    };
+    buildModelPicker(pickCat, models, body, (model) => {
+      navigate({ screen: "financeSelect", path: [model], planType, cat: c, title: modeloNombre(model) });
+    }, opts);
+  }
+
+  FIN_CATS.forEach(c => {
+    const b = document.createElement("button");
+    b.className = "plan-tab";
+    b.dataset.cat = c;
+    b.textContent = c;
+    b.addEventListener("click", () => paint(c));
+    tabs.appendChild(b);
   });
-  wrap.appendChild(list);
+  paint(FIN_CATS.includes(cat) ? cat : finCatGuardada());
   return wrap;
 }
 
-function buildFinanceResult(model, capacity, planType) {
+function buildFinanceResult(model, capacity, planType, cat) {
+  if (cat && cat !== "iPhone") return buildFinanceResultOtros(model, capacity, planType, cat);
   const wrap = document.createElement("div");
   const cfg = FINANCE_CONFIG[planType];
   const finData = FINANCIAMIENTO_DATA?.[model]?.[capacity]?.[planType];
@@ -4209,6 +4266,98 @@ function buildFinanceResult(model, capacity, planType) {
   }
 
   wrap.appendChild(buildFinanceColumnsGrid(finData, ac, cfg));
+  return wrap;
+}
+
+// iPad / Mac / Watch: un solo recuadro grande con interruptor Sin AC+ | AppleCare+ | AC+ R y P.
+// Los plazos salen de FINANCE_CONFIG y se pueden cambiar en datos/financiamiento_otros.json -> "_config".
+function buildFinanceResultOtros(model, capacity, planType, cat) {
+  const wrap = document.createElement("div");
+  const cfgFile = (FINANCIAMIENTO_OTROS && FINANCIAMIENTO_OTROS._config) || {};
+  const cfg = Object.assign({}, FINANCE_CONFIG[planType],
+    { label: planType === "IFL" ? "For Life" : "GET" },
+    cfgFile[planType] || {}, (cfgFile[cat] && cfgFile[cat][planType]) || {});
+  const finData = finOtros(cat)?.[model]?.[capacity]?.[planType];
+
+  const banner = document.createElement("div");
+  banner.className = "trade-banner";
+  banner.innerHTML = `<span></span><strong></strong>`;
+  banner.querySelector("span").textContent = cfg.label;
+  banner.querySelector("strong").textContent = `${model} ${capacity}`;
+  wrap.appendChild(banner);
+
+  if (!finData || typeof finData.monthly !== "number" || typeof finData.residual !== "number") {
+    wrap.appendChild(buildPlaceholder("Sin datos", "💳", "Aún no hay plan " + cfg.label + " cargado para este equipo."));
+    return wrap;
+  }
+
+  let ac = findApplecareForModel(model);
+  if (!ac || ac.APPLECARE === undefined) {
+    const info = APPLECARE_INFO?.[cat === "Watch" ? "Watch" : cat]?.[model]?.["AppleCare+"];
+    ac = { APPLECARE: info ? info.precio : null, ROBO_PERDIDA: ac ? ac.ROBO_PERDIDA : null };
+  }
+  const opts = [
+    { key: "solo", label: "Sin AC+",    title: "Solo equipo (sin AppleCare+)", extra: 0 },
+    { key: "ac",   label: "AppleCare+", title: "Con AppleCare+",               extra: ac.APPLECARE },
+    { key: "ryp",  label: "AC+ R y P",  title: "AppleCare+ Robo y Pérdida",    extra: ac.ROBO_PERDIDA },
+  ];
+  const calc = extra => {
+    const p1 = finData.monthly + extra / cfg.phase1;
+    return { p1, p2: finData.monthly, total: p1 * cfg.phase1 + finData.monthly * cfg.phase2Months + finData.residual };
+  };
+  const ok = o => o.extra !== null && o.extra !== undefined;
+
+  const tabs = document.createElement("div");
+  tabs.className = "plan-tabs fin-tabs";
+  const box = document.createElement("div");
+  wrap.appendChild(tabs);
+  wrap.appendChild(box);
+
+  function paint(key) {
+    tabs.querySelectorAll(".plan-tab").forEach(t => t.classList.toggle("active", t.dataset.key === key));
+    box.innerHTML = "";
+    const o = opts.find(x => x.key === key);
+    const grid = document.createElement("div");
+    grid.className = "finance-columns solo";
+    const card = document.createElement("div");
+    card.className = "finance-col";
+    if (!ok(o)) {
+      card.innerHTML = `<h4></h4><p class="pending">AppleCare+ pendiente</p>`;
+      card.querySelector("h4").textContent = o.title;
+    } else {
+      const r = calc(o.extra);
+      card.innerHTML = `
+        <h4></h4>
+        <div class="finance-row"><span>Mes 1–${cfg.phase1}</span><strong>${money(r.p1)}</strong></div>
+        <div class="finance-row"><span>Mes ${cfg.phase1 + 1}–${cfg.phase2End}</span><strong>${money(r.p2)}</strong></div>
+        <div class="finance-row"><span>Mes ${cfg.residualMonth} (saldo)</span><strong>${money(finData.residual)}</strong></div>
+        <div class="finance-row total"><span>Total</span><strong>${money(r.total)}</strong></div>`;
+      card.querySelector("h4").textContent = o.title;
+    }
+    grid.appendChild(card);
+    box.appendChild(grid);
+
+    const mini = document.createElement("div");
+    mini.className = "fin-mini";
+    opts.filter(x => x.key !== key).forEach(x => {
+      const d = document.createElement("div");
+      d.innerHTML = `<span></span><b></b>`;
+      d.querySelector("span").textContent = x.label;
+      d.querySelector("b").textContent = ok(x) ? money(calc(x.extra).total) : "—";
+      mini.appendChild(d);
+    });
+    box.appendChild(mini);
+  }
+
+  opts.forEach(o => {
+    const b = document.createElement("button");
+    b.className = "plan-tab";
+    b.dataset.key = o.key;
+    b.textContent = o.label;
+    b.addEventListener("click", () => paint(o.key));
+    tabs.appendChild(b);
+  });
+  paint("ac");
   return wrap;
 }
 
