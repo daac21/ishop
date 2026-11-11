@@ -340,7 +340,7 @@ async function loadAllData() {
     APPLECARE_DATA = buildApplecareByModel(a);
     SWITCHUP_MODELOS = s;
     FINANCIAMIENTO_DATA = f;
-    FINANCIAMIENTO_OTROS = await fetch("datos/financiamiento_otros.json", { cache: "no-store" }).then(r => r.ok ? r.json() : {}).catch(() => ({}));
+    FINANCIAMIENTO_OTROS = await fetch("datos/financiamiento_otros.json?v=" + Date.now(), { cache: "no-store" }).then(r => r.ok ? r.json() : {}).catch(() => ({}));
     COBERTURA_DATA = c;
     APPLECARE_INFO = aci;
     ESCANER_DATA = esc;
