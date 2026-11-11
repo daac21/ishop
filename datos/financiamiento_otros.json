@@ -29,8 +29,40 @@
     "iMac": {},
     "iMac M6": {},
     "MacBook Neo": {},
-    "MacBook Air 13": {},
-    "MacBook Air 15": {},
+    "MacBook Air 13": {
+      "512 GB": {
+        "IFL": {
+          "monthly": 819.0,
+          "residual": 10343.0
+        },
+        "GET": {
+          "monthly": 909.0,
+          "residual": 11819.0
+        }
+      }
+    },
+    "MacBook Air 15": {
+      "512 GB": {
+        "IFL": {
+          "monthly": 949.0,
+          "residual": 12223.0
+        },
+        "GET": {
+          "monthly": 1059.0,
+          "residual": 13819.0
+        }
+      },
+      "1 TB": {
+        "IFL": {
+          "monthly": 1249.0,
+          "residual": 12523.0
+        },
+        "GET": {
+          "monthly": 1409.0,
+          "residual": 14319.0
+        }
+      }
+    },
     "MacBook Pro 14": {},
     "MacBook Pro 14 M6": {},
     "MacBook Pro 14 PROLED": {},
